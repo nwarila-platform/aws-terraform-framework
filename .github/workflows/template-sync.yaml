@@ -1,4 +1,5 @@
 name: Template Sync
+# Caller for nwarila/terraform-template reusable workflow.
 
 on:
   schedule:
