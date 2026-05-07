@@ -18,4 +18,4 @@ jobs:
   sync:
     uses: NWarila/terraform-template/.github/workflows/reusable-template-sync.yaml@ecb7a746e4af5ec8edad395d6a7acb7962332286
     with:
-      ecb7a746e4af5ec8edad395d6a7acb7962332286
+      template_ref: ecb7a746e4af5ec8edad395d6a7acb7962332286
