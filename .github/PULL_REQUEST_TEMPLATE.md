@@ -9,6 +9,6 @@
 ## Test plan
 
 - [ ] `make ci` passes locally
-- [ ] PR Validation green in CI
+- [ ] CI green
 - [ ] Security Scan green in CI
 - [ ] Documentation reflects the change (when applicable)

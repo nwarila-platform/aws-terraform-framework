@@ -25,9 +25,6 @@ docs:
 docs-diff:
 	terraform-docs --config .terraform-docs.yml --output-check terraform
 
-graph:
-	bash tools/render_graphs.sh
-
 docs-check:
 	$(PYTHON) tools/check_docs_layout.py
 
@@ -35,7 +32,11 @@ tflint:
 	tflint --chdir=terraform
 
 opa-test:
-	opa test policies/opa
+	@if find policies/opa -name '*.rego' -print -quit | grep -q .; then \
+		opa test policies/opa; \
+	else \
+		echo "no OPA policies to test"; \
+	fi
 
 ci:
 	$(MAKE) fmt-check
