@@ -23,11 +23,10 @@
 !/.github/PULL_REQUEST_TEMPLATE.md
 !/.github/renovate.json5
 !/.github/workflows/
-!/.github/workflows/pr-validation.yaml
+!/.github/workflows/ci.yaml
+!/.github/workflows/repo-hygiene.yaml
 !/.github/workflows/security.yaml
 !/.github/workflows/template-sync.yaml
-!/.github/workflows/scorecard.yaml
-!/.github/workflows/codeql.yaml
 
 # Terraform module sources and tests
 !/terraform/
@@ -48,7 +47,9 @@
 !/docs/explanation/threat-model.md
 !/docs/reference/
 !/docs/reference/invariants.md
+!/docs/reference/mirroring.md
 !/docs/reference/release-gates.md
+!/docs/reference/runner-protocol.md
 !/docs/reference/terraform.md
 !/docs/how-to/
 !/docs/how-to/develop-this-module.md
@@ -58,6 +59,7 @@
 # Tools
 !/tools/
 !/tools/check_docs_layout.py
+!/tools/install_ci_tools.sh
 
 # Policies
 !/policies/
