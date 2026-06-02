@@ -129,6 +129,14 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
+      contains(var.aws_config.regions, replace(load_balancer.region, "-", "_"))
+    ])
+    error_message = "Each all_load_balancers entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
       contains(["application", "gateway", "network"], load_balancer.load_balancer_type)
     ])
     error_message = "load_balancer_type must be application, gateway, or network."

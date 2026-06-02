@@ -35,6 +35,8 @@
 !/terraform/*.tfvars.example
 !/terraform/tests/
 !/terraform/tests/.gitkeep
+!/terraform/tests/*.tftest.hcl
+!/terraform/tests/*.tftest.json
 
 # Documentation (Diátaxis)
 !/docs/
