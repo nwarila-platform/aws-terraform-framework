@@ -30,11 +30,9 @@
 
 # Terraform module sources and tests
 !/terraform/
-!/terraform/locals.tf
-!/terraform/outputs.tf
-!/terraform/resources.tf
-!/terraform/variables.tf
-!/terraform/versions.tf
+!/terraform/*.tf
+!/terraform/backend.hcl
+!/terraform/*.tfvars.example
 !/terraform/tests/
 !/terraform/tests/.gitkeep
 

@@ -1,0 +1,1 @@
+key = "red-hat-enterprise-linux-8-ami/terraform.tfstate"
