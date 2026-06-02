@@ -32,6 +32,7 @@ locals {
         #region           = < This is set statically >
         ami               = system.ami
         availability_zone = system.availability_zone
+        get_password_data = system.get_password_data
         key_name          = system.key_name
         hostname          = system.hostname
         instance_type     = system.instance_type
@@ -42,8 +43,10 @@ locals {
           volume_size           = system.root_block_device.volume_size
           volume_type           = system.root_block_device.volume_type
           encrypted             = true
+          iops                  = system.root_block_device.iops
           kms_key_id            = system.aws_kms_alias
           delete_on_termination = system.root_block_device.delete_on_termination
+          throughput            = system.root_block_device.throughput
 
           tags = merge(
             system.root_block_device.tags,
@@ -230,10 +233,11 @@ locals {
         max_allocated_storage     = database.max_allocated_storage
         password                  = database.password
         #region                     = < This is set statically >
-        skip_final_snapshot = database.skip_final_snapshot
-        storage_encrypted   = true
-        storage_type        = try(database.storage_type, "gp3")
-        username            = database.username
+        skip_final_snapshot    = database.skip_final_snapshot
+        storage_encrypted      = true
+        storage_type           = try(database.storage_type, "gp3")
+        username               = database.username
+        vpc_security_group_ids = database.vpc_security_group_ids
 
         tags = merge(
           # Overwriteable Default Tags

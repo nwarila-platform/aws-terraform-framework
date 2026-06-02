@@ -410,6 +410,7 @@ resource "aws_instance" "us_iso_west_1" {
   ami               = local.amazon_machine_images[each.value.ami]["us_iso_west_1"].id
   instance_type     = each.value.instance_type
   availability_zone = each.value.availability_zone
+  get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_iso_west_1[each.value.key_name].key_name
 
@@ -418,7 +419,9 @@ resource "aws_instance" "us_iso_west_1" {
     volume_size           = each.value.root_block_device.volume_size
     encrypted             = each.value.root_block_device.encrypted
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
+    throughput            = each.value.root_block_device.throughput
     kms_key_id = (
       data.aws_kms_alias.us_iso_west_1[each.value.root_block_device.kms_key_id].target_key_arn
     )
@@ -470,6 +473,7 @@ resource "aws_instance" "us_iso_west_1_refresh" {
   ami               = local.amazon_machine_images[each.value.ami]["us_iso_west_1"].id
   instance_type     = each.value.instance_type
   availability_zone = each.value.availability_zone
+  get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_iso_west_1[each.value.key_name].key_name
 
@@ -478,7 +482,9 @@ resource "aws_instance" "us_iso_west_1_refresh" {
     volume_size           = each.value.root_block_device.volume_size
     encrypted             = each.value.root_block_device.encrypted
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
+    throughput            = each.value.root_block_device.throughput
     kms_key_id = (
       data.aws_kms_alias.us_iso_west_1[each.value.root_block_device.kms_key_id].target_key_arn
     )
@@ -528,6 +534,7 @@ resource "aws_instance" "us_iso_east_1" {
   ami               = local.amazon_machine_images[each.value.ami]["us_iso_east_1"].id
   instance_type     = each.value.instance_type
   availability_zone = each.value.availability_zone
+  get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_iso_east_1[each.value.key_name].key_name
 
@@ -536,7 +543,9 @@ resource "aws_instance" "us_iso_east_1" {
     volume_size           = each.value.root_block_device.volume_size
     encrypted             = each.value.root_block_device.encrypted
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
+    throughput            = each.value.root_block_device.throughput
     kms_key_id = (
       data.aws_kms_alias.us_iso_east_1[each.value.root_block_device.kms_key_id].target_key_arn
     )
@@ -588,6 +597,7 @@ resource "aws_instance" "us_iso_east_1_refresh" {
   ami               = local.amazon_machine_images[each.value.ami]["us_iso_east_1"].id
   instance_type     = each.value.instance_type
   availability_zone = each.value.availability_zone
+  get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_iso_east_1[each.value.key_name].key_name
 
@@ -596,7 +606,9 @@ resource "aws_instance" "us_iso_east_1_refresh" {
     volume_size           = each.value.root_block_device.volume_size
     encrypted             = each.value.root_block_device.encrypted
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
+    throughput            = each.value.root_block_device.throughput
     kms_key_id = (
       data.aws_kms_alias.us_iso_east_1[each.value.root_block_device.kms_key_id].target_key_arn
     )
@@ -726,11 +738,10 @@ resource "aws_db_instance" "us_iso_west_1" {
   # Itterate through all network interfaces in the target region.
   for_each = local.relational_database_service.us_iso_west_1
 
-  allocated_storage       = each.value.allocated_storage
-  availability_zone       = each.value.availability_zone
-  backup_retention_period = each.value.backup_retention_period
-  backup_window           = each.value.backup_window
-  #blue_green_update           = each.value.blue_green_update
+  allocated_storage         = each.value.allocated_storage
+  availability_zone         = each.value.availability_zone
+  backup_retention_period   = each.value.backup_retention_period
+  backup_window             = each.value.backup_window
   ca_cert_identifier        = each.value.ca_cert_identifier
   db_name                   = each.value.db_name
   db_subnet_group_name      = each.value.db_subnet_group_name
@@ -747,9 +758,19 @@ resource "aws_db_instance" "us_iso_west_1" {
   skip_final_snapshot       = each.value.skip_final_snapshot
   storage_encrypted         = each.value.storage_encrypted
   storage_type              = each.value.storage_type
+  tags                      = each.value.tags
   username                  = each.value.username
+  vpc_security_group_ids    = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_iso_west_1[each.value.kms_key_id].target_key_arn
+
+  dynamic "blue_green_update" {
+    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+
+    content {
+      enabled = blue_green_update.value
+    }
+  }
 
 }
 
@@ -762,11 +783,10 @@ resource "aws_db_instance" "us_iso_east_1" {
   # Itterate through all network interfaces in the target region.
   for_each = local.relational_database_service.us_iso_east_1
 
-  allocated_storage       = each.value.allocated_storage
-  availability_zone       = each.value.availability_zone
-  backup_retention_period = each.value.backup_retention_period
-  backup_window           = each.value.backup_window
-  #blue_green_update           = each.value.blue_green_update
+  allocated_storage         = each.value.allocated_storage
+  availability_zone         = each.value.availability_zone
+  backup_retention_period   = each.value.backup_retention_period
+  backup_window             = each.value.backup_window
   ca_cert_identifier        = each.value.ca_cert_identifier
   db_name                   = each.value.db_name
   db_subnet_group_name      = each.value.db_subnet_group_name
@@ -783,9 +803,19 @@ resource "aws_db_instance" "us_iso_east_1" {
   skip_final_snapshot       = each.value.skip_final_snapshot
   storage_encrypted         = each.value.storage_encrypted
   storage_type              = each.value.storage_type
+  tags                      = each.value.tags
   username                  = each.value.username
+  vpc_security_group_ids    = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_iso_east_1[each.value.kms_key_id].target_key_arn
+
+  dynamic "blue_green_update" {
+    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+
+    content {
+      enabled = blue_green_update.value
+    }
+  }
 
 }
 
