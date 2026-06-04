@@ -30,6 +30,7 @@
 
 # Terraform module sources and tests
 !/terraform/
+!/terraform/.terraform.lock.hcl
 !/terraform/*.tf
 !/terraform/backend.hcl
 !/terraform/*.tfvars.example
@@ -59,12 +60,15 @@
 # Tools
 !/tools/
 !/tools/check_docs_layout.py
+!/tools/build_plan_input.py
 !/tools/install_ci_tools.sh
 
 # Policies
 !/policies/
 !/policies/opa/
 !/policies/opa/.gitkeep
+!/policies/opa/terraform_plan.rego
+!/policies/opa/terraform_plan_test.rego
 
 # Contract files (seeded by seed_consumer.py)
 !/CHANGELOG.md

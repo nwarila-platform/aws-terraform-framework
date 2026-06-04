@@ -1,3 +1,3 @@
 config {
-  module = false
+  call_module_type = "none"
 }

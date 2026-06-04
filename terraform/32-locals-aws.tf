@@ -11,12 +11,12 @@
 locals {
   amazon_machine_images = {
     "red_hat_enterprise_linux_8" = {
-      us_iso_west_1 = try(data.aws_ami.us_iso_west_1_red_hat_enterprise_linux_8[0], null)
-      us_iso_east_1 = try(data.aws_ami.us_iso_east_1_red_hat_enterprise_linux_8[0], null)
+      us_west_2 = try(data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0], null)
+      us_east_1 = try(data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0], null)
     }
     "windows_server_2022_base" = {
-      us_iso_west_1 = try(data.aws_ami.us_iso_west_1_windows_server_2022_base[0], null)
-      us_iso_east_1 = try(data.aws_ami.us_iso_east_1_windows_server_2022_base[0], null)
+      us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
+      us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
     }
   }
 }
@@ -231,7 +231,7 @@ locals {
         instance_class            = database.instance_class
         kms_key_id                = database.aws_kms_alias
         max_allocated_storage     = database.max_allocated_storage
-        password                  = database.password
+        password                  = sensitive(database.password)
         #region                     = < This is set statically >
         skip_final_snapshot    = database.skip_final_snapshot
         storage_encrypted      = true
