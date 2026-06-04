@@ -4,8 +4,8 @@ all_systems = [
   {
     /* Required Parameters */
     hostname               = "tcnhq-jnk01"
-    region                 = "us-iso-west-1"
-    availability_zone      = "us-iso-west-1c"
+    region                 = "us-west-2"
+    availability_zone      = "us-west-2c"
     # TODO: This should be automated based on availablility zone.
     subnet_id              = "subnet-000a0000000000aaa"
     key_name               = "example-admin-int"
@@ -64,7 +64,7 @@ all_systems = [
 
 all_load_balancers = [
   {
-    region       = "us-iso-west-1"
+    region       = "us-west-2"
     resource_key = "example_application_lb"
     name         = "example-app-lb"
     subnets      = ["subnet-000a0000000000aaa", "subnet-000a0000000000bbb"]

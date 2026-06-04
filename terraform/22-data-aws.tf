@@ -16,16 +16,16 @@
 
 #region ------ [ Amazon Machine Image(s): Red Hat Enterprise Linux 8 ] ---------------------- #
 
-data "aws_ami" "us_iso_west_1_red_hat_enterprise_linux_8" {
+data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
 
   count = length([
     for s in var.all_systems : s
     if s.ami == "red_hat_enterprise_linux_8" &&
-    contains(["us_iso_west_1", "us-iso-west-1"], s.region)
+    contains(["us_west_2", "us-west-2"], s.region)
   ]) > 0 ? 1 : 0
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_west_1
+  provider = aws.us_west_2
 
   // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
@@ -86,16 +86,16 @@ data "aws_ami" "us_iso_west_1_red_hat_enterprise_linux_8" {
   }
 }
 
-data "aws_ami" "us_iso_east_1_red_hat_enterprise_linux_8" {
+data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
 
   count = length([
     for s in var.all_systems : s
     if s.ami == "red_hat_enterprise_linux_8" &&
-    contains(["us_iso_east_1", "us-iso-east-1"], s.region)
+    contains(["us_east_1", "us-east-1"], s.region)
   ]) > 0 ? 1 : 0
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_east_1
+  provider = aws.us_east_1
 
   // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
@@ -160,16 +160,16 @@ data "aws_ami" "us_iso_east_1_red_hat_enterprise_linux_8" {
 
 #region ------ [ Amazon Machine Image(s): Windows Server 2022 Base ] ------------------------ #
 
-data "aws_ami" "us_iso_west_1_windows_server_2022_base" {
+data "aws_ami" "us_west_2_windows_server_2022_base" {
 
   count = length([
     for s in var.all_systems : s
     if s.ami == "windows_server_2022_base" &&
-    contains(["us_iso_west_1", "us-iso-west-1"], s.region)
+    contains(["us_west_2", "us-west-2"], s.region)
   ]) > 0 ? 1 : 0
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_west_1
+  provider = aws.us_west_2
 
   // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
@@ -230,16 +230,16 @@ data "aws_ami" "us_iso_west_1_windows_server_2022_base" {
   # }
 }
 
-data "aws_ami" "us_iso_east_1_windows_server_2022_base" {
+data "aws_ami" "us_east_1_windows_server_2022_base" {
 
   count = length([
     for s in var.all_systems : s
     if s.ami == "windows_server_2022_base" &&
-    contains(["us_iso_east_1", "us-iso-east-1"], s.region)
+    contains(["us_east_1", "us-east-1"], s.region)
   ]) > 0 ? 1 : 0
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_east_1
+  provider = aws.us_east_1
 
   // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
@@ -307,10 +307,10 @@ data "aws_ami" "us_iso_east_1_windows_server_2022_base" {
 
 #region ------ [ Load all of the AWS KMS Keys Using Their Alias Name ] ------------------------ #
 
-data "aws_kms_alias" "us_iso_west_1" {
+data "aws_kms_alias" "us_west_2" {
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_west_1
+  provider = aws.us_west_2
 
   # Itterate through all network interfaces in the target region.
   # ?Note: This for_each loop itterates through all system definitions, creates a list of
@@ -319,10 +319,10 @@ data "aws_kms_alias" "us_iso_west_1" {
   for_each = toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
-      if contains(["us_iso_west_1", "us-iso-west-1"], system.region)
+      if contains(["us_west_2", "us-west-2"], system.region)
       ], [
       for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_iso_west_1", "us-iso-west-1"], database.region)
+      if contains(["us_west_2", "us-west-2"], database.region)
     ]))
   )
 
@@ -331,19 +331,19 @@ data "aws_kms_alias" "us_iso_west_1" {
 }
 
 
-data "aws_kms_alias" "us_iso_east_1" {
+data "aws_kms_alias" "us_east_1" {
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_east_1
+  provider = aws.us_east_1
 
   # Itterate through all network interfaces in the target region.
   for_each = toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
-      if contains(["us_iso_east_1", "us-iso-east-1"], system.region)
+      if contains(["us_east_1", "us-east-1"], system.region)
       ], [
       for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_iso_east_1", "us-iso-east-1"], database.region)
+      if contains(["us_east_1", "us-east-1"], database.region)
     ]))
   )
 
@@ -356,10 +356,10 @@ data "aws_kms_alias" "us_iso_east_1" {
 
 #region ------ [ Load All AWS EC2 Key Pairs ] ------------------------------------------------- #
 
-data "aws_key_pair" "us_iso_west_1" {
+data "aws_key_pair" "us_west_2" {
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_west_1
+  provider = aws.us_west_2
 
   # Itterate through all network interfaces in the target region.
   # ?Note: This for_each loop itterates through all system definitions, creates a list of
@@ -368,7 +368,7 @@ data "aws_key_pair" "us_iso_west_1" {
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
-      if contains(["us_iso_west_1", "us-iso-west-1"], system.region)
+      if contains(["us_west_2", "us-west-2"], system.region)
     ])
   )
 
@@ -377,10 +377,10 @@ data "aws_key_pair" "us_iso_west_1" {
 }
 
 
-data "aws_key_pair" "us_iso_east_1" {
+data "aws_key_pair" "us_east_1" {
 
   # Set the provider in which to deploy the instance.
-  provider = aws.us_iso_east_1
+  provider = aws.us_east_1
 
   # Itterate through all network interfaces in the target region.
   # ?Note: This for_each loop itterates through all system definitions, creates a list of
@@ -389,7 +389,7 @@ data "aws_key_pair" "us_iso_east_1" {
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
-      if contains(["us_iso_east_1", "us-iso-east-1"], system.region)
+      if contains(["us_east_1", "us-east-1"], system.region)
     ])
   )
 

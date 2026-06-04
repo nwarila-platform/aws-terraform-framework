@@ -6,18 +6,18 @@
 provider "aws" {
 
   // Define the provider, using an alias, targetting a specific region.
-  alias = "us_iso_west_1"
+  alias = "us_west_2"
 
   // Specify the region to connect to.
-  region = "us-iso-west-1"
+  region = "us-west-2"
 
 }
 
 provider "aws" {
 
   // Define the provider, using an alias, targetting a specific region
-  alias = "us_iso_east_1"
+  alias = "us_east_1"
 
   // Specify the region to connect to.
-  region = "us-iso-east-1"
+  region = "us-east-1"
 }

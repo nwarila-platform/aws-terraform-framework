@@ -11,7 +11,7 @@ variable "aws_config" {
   })
 
   default = {
-    regions = ["us_iso_east_1", "us_iso_west_1"]
+    regions = ["us_east_1", "us_west_2"]
   }
   nullable = false
 }
@@ -54,7 +54,7 @@ variable "all_load_balancers" {
       prefix  = optional(string)
     }))
     idle_timeout    = optional(number)
-    internal        = optional(bool, false)
+    internal        = optional(bool, true)
     ip_address_type = optional(string, "ipv4")
     ipam_pools = optional(object({
       ipv4_ipam_pool_id = string
