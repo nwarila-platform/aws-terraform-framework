@@ -25,6 +25,7 @@
 !/.github/workflows/
 !/.github/workflows/ci.yaml
 !/.github/workflows/repo-hygiene.yaml
+!/.github/workflows/release-please.yaml
 !/.github/workflows/security.yaml
 !/.github/workflows/template-sync.yaml
 
@@ -35,7 +36,6 @@
 !/terraform/backend.hcl
 !/terraform/*.tfvars.example
 !/terraform/tests/
-!/terraform/tests/.gitkeep
 !/terraform/tests/*.tftest.hcl
 !/terraform/tests/*.tftest.json
 
@@ -66,11 +66,5 @@
 # Policies
 !/policies/
 !/policies/opa/
-!/policies/opa/.gitkeep
 !/policies/opa/terraform_plan.rego
 !/policies/opa/terraform_plan_test.rego
-
-# Contract files (seeded by seed_consumer.py)
-!/CHANGELOG.md
-!/release-please-config.json
-!/.release-please-manifest.json

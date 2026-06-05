@@ -20,6 +20,6 @@ jobs:
   hygiene:
     permissions:
       contents: read
-    uses: NWarila/.github/.github/workflows/reusable-repo-hygiene.yaml@f45f8e6695d61af2f36ac37b72ef2dcfa05bc089
+    uses: NWarila/.github/.github/workflows/reusable-repo-hygiene.yaml@f45f8e6695d61af2f36ac37b72ef2dcfa05bc089 # NWarila/.github main @ 2026-06-04
     with:
       source_ref: f45f8e6695d61af2f36ac37b72ef2dcfa05bc089

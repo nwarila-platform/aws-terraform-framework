@@ -14,8 +14,9 @@ What this module guarantees:
   state resources, RDS database instances, load balancers, and refresh trigger
   resources are derived from typed variables under `terraform/10-variables.tf`
   and `terraform/12-variables-aws.tf`.
-- Region input accepts the configured ISO region keys in either hyphenated or
-  underscored form and normalizes them before resources are bucketed.
+- Region input accepts the configured commercial region keys (`us-east-1` and
+  `us-west-2`) in either hyphenated or underscored form and normalizes them
+  before resources are bucketed.
 - EBS volumes and RDS storage are always encrypted; callers provide the KMS alias
   used to resolve the final key ARN.
 - RDS passwords are normalized through `sensitive()` before they flow into
@@ -65,7 +66,7 @@ What this module does **not** guarantee:
 - It does not harden operating systems, databases, application workloads, or
   network policy beyond the Terraform resources it declares.
 - It does not rotate database passwords or own secret distribution.
-- It does not decide whether publishing ISO-region-specific IaC is acceptable;
+- It does not decide whether publishing environment-specific IaC is acceptable;
   that portfolio decision is tracked separately.
 
 Cross-reference: `SECURITY.md` in the org control plane defines the reporting

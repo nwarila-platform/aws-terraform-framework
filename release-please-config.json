@@ -1,12 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "terraform-module",
-  "bootstrap-sha": "0000000000000000000000000000000000000000",
+  "bootstrap-sha": "e9cb4825b8ea36efcb466ae8c1b162585ad12ca9",
   "include-component-in-tag": false,
   "include-v-in-tag": true,
   "packages": {
     ".": {
-      "package-name": "",
+      "package-name": "aws-terraform-framework",
       "changelog-path": "CHANGELOG.md"
     }
   }
