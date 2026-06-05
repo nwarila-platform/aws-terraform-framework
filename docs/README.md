@@ -8,4 +8,4 @@ per [org ADR-0002](https://github.com/nwarila-platform/.github/blob/main/docs/de
 | Explanation  | `explanation/`        | Architecture, threat model, testing  |
 | Reference    | `reference/`          | Generated terraform docs, invariants |
 | How-to       | `how-to/`             | Task-oriented guides                 |
-| Decisions    | `decision-records/`   | ADRs (org-mirrored + repo-specific)  |
+| Decisions    | `decision-records/`   | ADR index and future repo ADRs       |

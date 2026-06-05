@@ -86,6 +86,8 @@ locals {
 
           # AWS Network Interface Properties
           description     = system.network_interfaces[index].description
+          hostname        = system.hostname
+          index           = index
           interface_type  = system.network_interfaces[index].interface_type
           private_ips     = [system.network_interfaces[index].private_ip]
           security_groups = system.network_interfaces[index].security_groups
@@ -226,8 +228,8 @@ locals {
         deletion_protection       = database.deletion_protection
         engine                    = database.engine
         engine_version            = database.engine_version
-        final_snapshot_identifier = try(database.identifier, "${database.db_name}-FINAL")
-        identifier                = try(database.identifier, lower(database.db_name))
+        final_snapshot_identifier = "${database.db_name}-FINAL"
+        identifier                = lower(database.db_name)
         instance_class            = database.instance_class
         kms_key_id                = database.aws_kms_alias
         max_allocated_storage     = database.max_allocated_storage

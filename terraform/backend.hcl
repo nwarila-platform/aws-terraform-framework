@@ -1,1 +1,1 @@
-key = "red-hat-enterprise-linux-8-ami/terraform.tfstate"
+key = "aws-terraform-framework/terraform.tfstate"

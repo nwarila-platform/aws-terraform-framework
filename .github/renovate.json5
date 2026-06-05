@@ -9,7 +9,7 @@
   // Rules in this file:
   //   - Pin third-party GitHub Actions to commit SHAs (matches the OPA
   //     golden_terraform package's enforcement).
-  //   - Pin Terraform and provider versions exactly (org ADR 0005).
+  //   - Pin Terraform and provider versions exactly per the framework-template contract.
   //   - Track explicit `# renovate:` annotations in workflow comments for
   //     tool versions (Terraform CLI, TFLint, terraform-docs, OPA, zizmor).
 
@@ -70,8 +70,12 @@
       "semanticCommitScope": "deps"
     },
     {
-      "matchDepNames": ["NWarila/terraform-framework-template"],
-      "groupName": "terraform-framework-template",
+      "matchDepNames": [
+        "NWarila/.github",
+        "NWarila/drift-gate",
+        "NWarila/terraform-framework-template"
+      ],
+      "groupName": "first-party workflow pins",
       "semanticCommitType": "chore",
       "semanticCommitScope": "deps",
       "automerge": false

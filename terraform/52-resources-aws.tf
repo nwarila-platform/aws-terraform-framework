@@ -432,14 +432,17 @@ resource "aws_instance" "us_west_2" {
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
-      for network_interface in aws_network_interface.us_west_2 :
-      network_interface.id => network_interface
-      if network_interface.tags.Name == each.value.hostname
+      for eni_key, network_interface in aws_network_interface.us_west_2 :
+      eni_key => {
+        id    = network_interface.id
+        index = local.elastic_network_interfaces.us_west_2[eni_key].index
+      }
+      if local.elastic_network_interfaces.us_west_2[eni_key].hostname == each.value.hostname
     }
     content {
       delete_on_termination = false
-      device_index          = network_interface.value.tags.Index
-      network_card_index    = network_interface.value.tags.Index
+      device_index          = network_interface.value.index
+      network_card_index    = network_interface.value.index
       network_interface_id  = network_interface.value.id
     }
   }
@@ -495,14 +498,17 @@ resource "aws_instance" "us_west_2_refresh" {
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
-      for network_interface in aws_network_interface.us_west_2 :
-      network_interface.id => network_interface
-      if network_interface.tags.Name == each.value.hostname
+      for eni_key, network_interface in aws_network_interface.us_west_2 :
+      eni_key => {
+        id    = network_interface.id
+        index = local.elastic_network_interfaces.us_west_2[eni_key].index
+      }
+      if local.elastic_network_interfaces.us_west_2[eni_key].hostname == each.value.hostname
     }
     content {
       delete_on_termination = false
-      device_index          = network_interface.value.tags.Index
-      network_card_index    = network_interface.value.tags.Index
+      device_index          = network_interface.value.index
+      network_card_index    = network_interface.value.index
       network_interface_id  = network_interface.value.id
     }
   }
@@ -556,14 +562,17 @@ resource "aws_instance" "us_east_1" {
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
-      for network_interface in aws_network_interface.us_east_1 :
-      network_interface.id => network_interface
-      if network_interface.tags.Name == each.value.hostname
+      for eni_key, network_interface in aws_network_interface.us_east_1 :
+      eni_key => {
+        id    = network_interface.id
+        index = local.elastic_network_interfaces.us_east_1[eni_key].index
+      }
+      if local.elastic_network_interfaces.us_east_1[eni_key].hostname == each.value.hostname
     }
     content {
       delete_on_termination = false
-      device_index          = network_interface.value.tags.Index
-      network_card_index    = network_interface.value.tags.Index
+      device_index          = network_interface.value.index
+      network_card_index    = network_interface.value.index
       network_interface_id  = network_interface.value.id
     }
   }
@@ -619,14 +628,17 @@ resource "aws_instance" "us_east_1_refresh" {
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
-      for network_interface in aws_network_interface.us_east_1 :
-      network_interface.id => network_interface
-      if network_interface.tags.Name == each.value.hostname
+      for eni_key, network_interface in aws_network_interface.us_east_1 :
+      eni_key => {
+        id    = network_interface.id
+        index = local.elastic_network_interfaces.us_east_1[eni_key].index
+      }
+      if local.elastic_network_interfaces.us_east_1[eni_key].hostname == each.value.hostname
     }
     content {
       delete_on_termination = false
-      device_index          = network_interface.value.tags.Index
-      network_card_index    = network_interface.value.tags.Index
+      device_index          = network_interface.value.index
+      network_card_index    = network_interface.value.index
       network_interface_id  = network_interface.value.id
     }
   }
