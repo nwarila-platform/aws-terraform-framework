@@ -7,8 +7,8 @@ PRs to `main` must pass:
 - `Security` (the local `security.yaml` caller, which delegates to
   `NWarila/.github` CodeQL, IaC/security, and Scorecard reusables)
 - `Template Sync` (`NWarila/drift-gate` against
-  `NWarila/terraform-framework-template@3b0a832f38e8057d8531e890a666242dc32cab21`)
-- `Repo Hygiene` (`NWarila/.github` repo-hygiene policy)
+  `NWarila/terraform-framework-template@2114aec93668cde41003beb6445b85a68cf12ec5`)
+- `Repo Hygiene` (`nwarila-platform/.github` repo-hygiene policy)
 
 Workflow and action references are 40-character SHA-pinned per the repo-hygiene
 contract.
