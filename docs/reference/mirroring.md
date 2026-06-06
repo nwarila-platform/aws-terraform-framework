@@ -62,18 +62,20 @@ through cross-repo `uses:` (reusable workflows) or cross-repo
 `actions/checkout` (helper scripts called from reusables).
 
 - `.github/workflows/reusable-*.yaml` — consumers `uses:` them cross-repo.
-- Template-only validation helpers stay in `NWarila/terraform-framework-template`.
-  This AWS consumer keeps only the helper scripts its own `make ci` invokes:
-  `tools/build_plan_input.py`, `tools/check_docs_layout.py`, and
-  `tools/install_ci_tools.sh`.
+- `tools/build_opa_input.py`, `build_plan_input.py`, `check_adr_schema.py`,
+  `check_baseline_manifest.py`, `check_privileged_workflows.py`,
+  `run_privileged_workflow_tests.py`, `verify.py` — invoked only by this
+  template's own `make ci`.
 - `tools/ci/*` — invoked by `reusable-terraform-deploy` after that
   reusable checks this template out into a `framework/` path.
 - `tests/ci/*.bats` — bats tests for this template's own `tools/`.
 - `tests/fixtures/privileged-workflows/*` — inputs for this template's
   own `tools/check_privileged_workflows.py`.
-- `policies/opa/repo_hygiene*.rego` are universal template policies. This AWS
-  consumer carries its own `policies/opa/terraform_plan*.rego` because `make ci`
-  evaluates the AWS plan policy locally.
+- `policies/opa/repo_hygiene*.rego`, `terraform_plan*.rego` — universal
+  policies evaluated only by this template's own `tools/verify.py`. When a
+  consumer wants to enforce them, the right answer is a composite action
+  or reusable workflow that cross-checks-out this template — not a
+  byte-identical mirror.
 - `fixtures/integration/basic/README.md` — input for this template's
   integration runner.
 - `docs/decision-records/template/*` — this template's own ADRs.
@@ -100,4 +102,4 @@ would be a duplicate source of truth in this manifest.
 1. Rewrite `README.md` for the real framework.
 2. Replace the synthetic Terraform under `terraform/`.
 3. Update examples and generated Terraform docs.
-4. Run `make ci` in the consumer repository.
+4. Run `python tools/verify.py verify` (template-side validation).
