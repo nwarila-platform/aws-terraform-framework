@@ -1,105 +1,60 @@
-# Mirroring And Consumer Baseline
+# Mirroring Reference
 
-This template's role is to give downstream frameworks a standardized
-scaffold to drop their code into and get a highly effective deployment
-cycle for free. `baseline-manifest.json` enumerates only what a consumer
-**actually uses in its own production lifecycle**. Files that exist solely
-to serve this template's own self-tests stay in the template; consumers
-reach them through `uses:` or cross-repo checkout, not by mirroring.
+This reference describes how inherited files move from control-plane and template repositories into adopting repositories. It is governed by [ADR-0001](../decision-records/org/0001-use-architecture-decision-records.md), [ADR-0006](../decision-records/org/0006-keep-github-control-planes-namespace-local.md), and [ADR-0009](../decision-records/org/0009-classify-baseline-manifest-byte-identity.md).
 
-## Design Principle
+## Core Rule
 
-> Consumers mirror what they run. The template keeps what only it runs.
+Consumers mirror what they inherit as governance or directly run in their own lifecycle. Templates keep files that only templates run. Repo-specific material stays local to the repository that owns it.
 
-Concretely:
+## Source Classes
 
-- A consumer's local `make ci`, pre-commit hooks, editor, formatter, and
-  PR-time security caller need certain files locally. Those go in
-  `byte_identical`.
-- Consumer caller workflows reach this template's reusables via cross-repo
-  `uses:`. The reusables themselves are template-only.
-- Helper tools, fixture inputs, and unit tests that only the template's
-  own `make ci` invokes are template-only.
-- Files that every consumer wants but customizes per-repo (ownership,
-  Renovate dep groups, `.gitignore` allowlist, repo-specific `Makefile`
-  targets) belong in `scaffold_starter`, not `byte_identical`.
+| Source class | Master location | Consumer location | Byte identity |
+| ------------ | --------------- | ----------------- | ------------- |
+| Org ADRs | Owning namespace `.github/docs/decision-records/` | `docs/decision-records/org/` | Yes |
+| Org community files | Owning namespace `.github` | Repository root or `.github/` | Yes when uniform |
+| Type-template ADRs | Type template `docs/decision-records/template/` | `docs/decision-records/template/` | Yes |
+| Type-specific reusable workflows | Type template `.github/workflows/` | Called by `uses:` or mirrored only when directly run | Depends on contract |
+| Universal org reusable workflows | Owning namespace `.github/.github/workflows/` | Called by SHA-pinned thin callers | No local body copy |
+| Repo-specific ADRs | Owning repository `docs/decision-records/repo/` | Not mirrored | No |
+| Repo-specific docs and diagrams | Owning repository `docs/` | Not mirrored | No |
 
-## byte_identical
+## Namespace Rule
 
-Drift-gate enforces byte-equality on these entries in every consumer.
+Org governance is namespace-local. A `NWarila/*` repository mirrors org ADRs and community files from `NWarila/.github`. A repository under another namespace mirrors the same categories from that namespace's `.github` control plane. Cross-namespace references remain valid for explicit type-template or tool dependencies, but not for org-control-plane governance.
 
-| Path | Why it's mirrored |
-| --- | --- |
-| `.editorconfig`, `.gitattributes`, `.markdownlint-cli2.jsonc`, `.pre-commit-config.yaml`, `.terraform-docs.yml`, `.tflint.hcl` | Local editor / formatter / linter configs |
-| `.github/workflows/security.yaml` | Canonical security caller — every consumer runs it identically |
-| `docs/reference/mirroring.md` (this file) | Canonical statement of the manifest contract |
-| `docs/reference/runner-protocol.md` | Canonical contract for how runners call the framework deploy reusable |
-| `tools/check_docs_layout.py` | Invoked by the consumer's local `make ci` for Diataxis layout enforcement |
-| `tools/install_ci_tools.sh` | Invoked by the consumer's PR-validation workflow to install pinned CI tooling |
+## Org ADR Auto-Sync
 
-## scaffold_starter
+Repositories that already mirror org ADRs should carry a scheduled caller for the namespace-local `reusable-org-adr-auto-sync.yaml`. The caller runs from the adopting repository, so its sync token can only update that repository. It fetches the owning namespace `.github` `org-adr-manifest.json`, copies only `docs/decision-records/org/` targets, removes stale mirrored ADR Markdown files, updates the adopting repository's ADR-only detector source pin when present, and opens or refreshes a PR.
 
-Drift-gate documents these entries but does not byte-compare them.
-Consumers receive them at bootstrap and customize freely.
+The reusable keeps `GITHUB_TOKEN` read-only. Real sync writes require the caller to pass an explicit `sync_token` secret with permission to push the sync branch and open the PR.
 
-| Path | Why it's a starter |
-| --- | --- |
-| `Makefile` | Consumers add their own targets (graph rendering, release-evidence helpers, etc.) |
-| `.gitignore` | Consumers extend the allowlist with their own examples/, tests/, terraform/ files |
-| `.github/CODEOWNERS` | Consumers set their own ownership |
-| `.github/renovate.json5` | Consumers add their own dep groups (terraform-framework-template SHA pin, terraform CLI, providers, etc.) |
-| `.github/PULL_REQUEST_TEMPLATE.md` | Consumers tailor PR fields to their domain |
-| `baseline-manifest.json` | Template repos that derive from this one publish their own manifest |
-| `docs/reference/invariants.md` | Consumers add framework-specific invariants and may drop those tied to this template's synthetic providers |
-| `docs/reference/quality-gates.md` | Consumers map the gate-role taxonomy onto their actual workflow names |
-| `docs/reference/release-gates.md` | Consumers document the gates that actually run in their own release pipeline |
+This auto-sync supplements the drift-gate detector; it does not replace review. The detector stays responsible for byte-identity verification, while the auto-sync keeps the repair path small and namespace-scoped.
 
-## Template-Only (NOT in the manifest)
+## Byte-Identity Rule
 
-These files live in this template and serve this template's own
-validation. Consumers do not mirror them; consumer workflows reach them
-through cross-repo `uses:` (reusable workflows) or cross-repo
-`actions/checkout` (helper scripts called from reusables).
+Use byte identity when local edits would be drift. Do not use byte identity when local edits would be maturity.
 
-- `.github/workflows/reusable-*.yaml` — consumers `uses:` them cross-repo.
-- `tools/build_opa_input.py`, `build_plan_input.py`, `check_adr_schema.py`,
-  `check_baseline_manifest.py`, `check_privileged_workflows.py`,
-  `run_privileged_workflow_tests.py`, `verify.py` — invoked only by this
-  template's own `make ci`.
-- `tools/ci/*` — invoked by `reusable-terraform-deploy` after that
-  reusable checks this template out into a `framework/` path.
-- `tests/ci/*.bats` — bats tests for this template's own `tools/`.
-- `tests/fixtures/privileged-workflows/*` — inputs for this template's
-  own `tools/check_privileged_workflows.py`.
-- `policies/opa/repo_hygiene*.rego`, `terraform_plan*.rego` — universal
-  policies evaluated only by this template's own `tools/verify.py`. When a
-  consumer wants to enforce them, the right answer is a composite action
-  or reusable workflow that cross-checks-out this template — not a
-  byte-identical mirror.
-- `fixtures/integration/basic/README.md` — input for this template's
-  integration runner.
-- `docs/decision-records/template/*` — this template's own ADRs.
-  Consumers read them on github.com.
+Byte-identical entries are appropriate for:
 
-**Heuristic for adding a new file**: ask "does a *consumer* invoke this
-file in its own production lifecycle?" If yes, it belongs in
-`byte_identical` (or `scaffold_starter` if it's per-repo customizable).
-If no — if it serves only the template's own self-tests, fixtures, or
-internal helpers — it stays template-only and consumers reach it via
-`uses:`/checkout when they need to.
+- Org ADR mirrors.
+- Shared community-health files.
+- Stable org reference documents that are intentionally inherited.
+- Skeleton sentinels that preserve expected directories.
 
-## Org Baseline
+Starter, scaffold, existence, or local entries are appropriate for:
 
-The `NWarila/.github` organization manifest enumerates files every repo
-under the org mirrors regardless of framework type (`LICENSE`,
-`SECURITY.md`, `CODE_OF_CONDUCT.md`, the org-tier ADRs, Diataxis
-`.gitkeep` markers, and the universal reusable workflows). Those entries
-intentionally do **not** appear here — they are sourced from the org and
-would be a duplicate source of truth in this manifest.
+- Repo-customizable lint, hook, editor, or documentation configuration.
+- Workflow callers that embed namespace-specific `.github` paths across a multi-namespace target set.
+- Runner protocol references that describe repo-specific overlay paths, runtime fixtures, or evidence artifacts.
+- Template-internal tools, tests, fixtures, and policies that consumers do not run.
+- Repo-specific diagrams, inventories, runtime evidence, and runbooks.
 
-## New Framework Checklist
+## Review Checklist
 
-1. Rewrite `README.md` for the real framework.
-2. Replace the synthetic Terraform under `terraform/`.
-3. Update examples and generated Terraform docs.
-4. Run `python tools/verify.py verify` (template-side validation).
+- Does the target repository inherit or run this file?
+- Would a local improvement be drift or maturity?
+- Does the file embed a namespace, repository name, branch, environment, or runtime-specific value?
+- Is the source an org control plane, a type template, or the repository itself?
+- Is the file body needed locally, or should the repository call it by `uses:`?
+
+When the answer is unclear, prefer a smaller byte-identical manifest and a separate starter or reference entry.

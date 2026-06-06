@@ -1,0 +1,80 @@
+environment = "DEV"
+
+all_systems = [
+  {
+    /* Required Parameters */
+    hostname               = "tcnhq-jnk01"
+    region                 = "us-west-2"
+    availability_zone      = "us-west-2c"
+    # Match this subnet to the selected availability zone when adapting the example.
+    subnet_id              = "subnet-000a0000000000aaa"
+    key_name               = "example-admin-int"
+    aws_kms_alias          = "aws/ebs"
+    refresh                = false
+
+    /* Optional Parameters */
+    ami                    = "red_hat_enterprise_linux_8"
+    instance_type          = "m6i.xlarge"
+    set_state              = "running"
+
+
+    # AWS AMI Module doesn't seem to like this being a variable, more testing needed.
+    # !Error: Invalid Expression - A static list expression is required.
+    # lifecycle = {
+    #   ignore_changes = []
+    # }
+
+    # Operating System Volume
+    root_block_device = {
+      volume_type           = "gp3"
+      volume_size           = "100"
+      delete_on_termination = true
+      tags = {}
+    }
+
+    network_interfaces = [
+      {
+        description     = "Primary Network Interface"
+        private_ip      = "1.2.3.4"
+        security_groups = [
+            "sg-000a000aa000aaaaa",
+            "sg-0aaa00a0a000a0000"
+        ]
+      }
+    ]
+
+    ebs_block_devices = [
+      {
+        volume_type           = "gp3"
+        volume_size           = "25"
+        delete_on_termination = false
+      }
+    ]
+
+    tags = {
+      #Name        = <Set Automatically From 'hostname'>
+      #OS          = <Set Automatically From 'ami'>
+      Backup       = true
+      Function     = "Jenkins Server"
+      #Terraform   = <Statically Set To 'True'>
+      #Environment = <Set Automatically From 'var.environment'>
+    }
+  }
+]
+
+all_load_balancers = [
+  {
+    region       = "us-west-2"
+    resource_key = "example_application_lb"
+    name         = "example-app-lb"
+    subnets      = ["subnet-000a0000000000aaa", "subnet-000a0000000000bbb"]
+
+    security_groups = [
+      "sg-000a000aa000aaaaa"
+    ]
+
+    tags = {
+      Function = "Example Application Load Balancer"
+    }
+  }
+]

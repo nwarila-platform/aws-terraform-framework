@@ -25,18 +25,19 @@
 !/.github/workflows/
 !/.github/workflows/ci.yaml
 !/.github/workflows/repo-hygiene.yaml
+!/.github/workflows/release-please.yaml
 !/.github/workflows/security.yaml
 !/.github/workflows/template-sync.yaml
 
 # Terraform module sources and tests
 !/terraform/
-!/terraform/locals.tf
-!/terraform/outputs.tf
-!/terraform/resources.tf
-!/terraform/variables.tf
-!/terraform/versions.tf
+!/terraform/.terraform.lock.hcl
+!/terraform/*.tf
+!/terraform/backend.hcl
+!/terraform/*.tfvars.example
 !/terraform/tests/
-!/terraform/tests/.gitkeep
+!/terraform/tests/*.tftest.hcl
+!/terraform/tests/*.tftest.json
 
 # Documentation (Diátaxis)
 !/docs/
@@ -59,14 +60,11 @@
 # Tools
 !/tools/
 !/tools/check_docs_layout.py
+!/tools/build_plan_input.py
 !/tools/install_ci_tools.sh
 
 # Policies
 !/policies/
 !/policies/opa/
-!/policies/opa/.gitkeep
-
-# Contract files (seeded by seed_consumer.py)
-!/CHANGELOG.md
-!/release-please-config.json
-!/.release-please-manifest.json
+!/policies/opa/terraform_plan.rego
+!/policies/opa/terraform_plan_test.rego
