@@ -87,3 +87,352 @@ run "load_balancers_bucket_by_region" {
     error_message = "east_nlb should preserve dns_record_client_routing_policy."
   }
 }
+
+run "load_balancer_rejects_missing_default_target_group_key_reference" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "missing"
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_duplicate_target_group_resource_keys" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+          },
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8081
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_duplicate_rule_priorities" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+            rules = [
+              {
+                resource_key = "web_path"
+                priority     = 10
+                action = {
+                  type             = "forward"
+                  target_group_key = "web"
+                }
+                conditions = [
+                  {
+                    path_pattern = ["/web/*"]
+                  }
+                ]
+              },
+              {
+                resource_key = "admin_path"
+                priority     = 10
+                action = {
+                  type             = "forward"
+                  target_group_key = "web"
+                }
+                conditions = [
+                  {
+                    path_pattern = ["/admin/*"]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_forward_action_with_redirect_payload" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+              redirect = {
+                status_code = "HTTP_301"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_condition_with_two_types" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+            rules = [
+              {
+                resource_key = "web_host_path"
+                priority     = 10
+                action = {
+                  type             = "forward"
+                  target_group_key = "web"
+                }
+                conditions = [
+                  {
+                    host_header  = ["app.example.com"]
+                    path_pattern = ["/web/*"]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_non_instance_target_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+            target_type  = "ip"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key = "https"
+            port         = 443
+            protocol     = "HTTPS"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_accepts_fully_wired_nested_routing_schema" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "schema_alb"
+        name            = "schema-alb"
+        security_groups = ["sg-schema"]
+        subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "Jenkins Server"
+            vpc_id       = "vpc-schema"
+            port         = 8080
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key    = "https"
+            port            = 443
+            protocol        = "HTTPS"
+            certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/schema"
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+          },
+          {
+            resource_key = "http"
+            port         = 80
+            protocol     = "HTTP"
+            default_action = {
+              type = "redirect"
+              redirect = {
+                port        = "443"
+                protocol    = "HTTPS"
+                status_code = "HTTP_301"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
