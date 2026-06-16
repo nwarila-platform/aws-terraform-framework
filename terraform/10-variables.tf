@@ -154,7 +154,7 @@ variable "all_databases" {
     engine_version = string
 
     username = string
-    password = string
+    password = optional(string)
 
     aws_kms_alias = string
 
@@ -166,18 +166,19 @@ variable "all_databases" {
     })
 
     /* Optional Parameters */
-    allocated_storage        = optional(string, "100")
-    backup_retention_period  = optional(string, null)
-    backup_window            = optional(string, null)
-    blue_green_update        = optional(bool, false)
-    ca_cert_identifier       = optional(string, null)
-    dedicated_log_volume     = optional(bool, true)
-    delete_automated_backups = optional(bool, true)
-    deletion_protection      = optional(bool, true)
-    max_allocated_storage    = optional(string, "1000")
-    skip_final_snapshot      = optional(bool, false)
-    storage_type             = optional(string)
-    vpc_security_group_ids   = optional(list(string), null)
+    allocated_storage           = optional(string, "100")
+    backup_retention_period     = optional(string, null)
+    backup_window               = optional(string, null)
+    blue_green_update           = optional(bool, false)
+    ca_cert_identifier          = optional(string, null)
+    dedicated_log_volume        = optional(bool, true)
+    delete_automated_backups    = optional(bool, true)
+    deletion_protection         = optional(bool, true)
+    manage_master_user_password = optional(bool, false)
+    max_allocated_storage       = optional(string, "1000")
+    skip_final_snapshot         = optional(bool, false)
+    storage_type                = optional(string)
+    vpc_security_group_ids      = optional(list(string), null)
 
   }))
 
@@ -204,5 +205,13 @@ variable "all_databases" {
       !startswith(database.aws_kms_alias, "alias/")
     ]))
     error_message = "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
+  }
+
+  validation {
+    condition = nonsensitive(alltrue([
+      for database in var.all_databases :
+      database.manage_master_user_password || (database.password != null && database.password != "")
+    ]))
+    error_message = "Each all_databases entry must set a non-empty password unless manage_master_user_password is true."
   }
 }

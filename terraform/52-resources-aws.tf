@@ -1254,29 +1254,30 @@ resource "aws_db_instance" "us_west_2" {
   # Itterate through all network interfaces in the target region.
   for_each = local.relational_database_service.us_west_2
 
-  allocated_storage         = each.value.allocated_storage
-  availability_zone         = each.value.availability_zone
-  backup_retention_period   = each.value.backup_retention_period
-  backup_window             = each.value.backup_window
-  ca_cert_identifier        = each.value.ca_cert_identifier
-  db_name                   = each.value.db_name
-  db_subnet_group_name      = each.value.db_subnet_group_name
-  dedicated_log_volume      = each.value.dedicated_log_volume
-  delete_automated_backups  = each.value.delete_automated_backups
-  deletion_protection       = each.value.deletion_protection
-  engine                    = each.value.engine
-  engine_version            = each.value.engine_version
-  final_snapshot_identifier = each.value.final_snapshot_identifier
-  identifier                = each.value.identifier
-  instance_class            = each.value.instance_class
-  max_allocated_storage     = each.value.max_allocated_storage
-  password                  = local.relational_database_service_credentials.us_west_2[each.key].password
-  skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = true
-  storage_type              = each.value.storage_type
-  tags                      = each.value.tags
-  username                  = local.relational_database_service_credentials.us_west_2[each.key].username
-  vpc_security_group_ids    = each.value.vpc_security_group_ids
+  allocated_storage           = each.value.allocated_storage
+  availability_zone           = each.value.availability_zone
+  backup_retention_period     = each.value.backup_retention_period
+  backup_window               = each.value.backup_window
+  ca_cert_identifier          = each.value.ca_cert_identifier
+  db_name                     = each.value.db_name
+  db_subnet_group_name        = each.value.db_subnet_group_name
+  dedicated_log_volume        = each.value.dedicated_log_volume
+  delete_automated_backups    = each.value.delete_automated_backups
+  deletion_protection         = each.value.deletion_protection
+  engine                      = each.value.engine
+  engine_version              = each.value.engine_version
+  final_snapshot_identifier   = each.value.final_snapshot_identifier
+  identifier                  = each.value.identifier
+  instance_class              = each.value.instance_class
+  manage_master_user_password = each.value.manage_master_user_password ? true : null
+  max_allocated_storage       = each.value.max_allocated_storage
+  password                    = each.value.manage_master_user_password ? null : local.relational_database_service_credentials.us_west_2[each.key].password
+  skip_final_snapshot         = each.value.skip_final_snapshot
+  storage_encrypted           = true
+  storage_type                = each.value.storage_type
+  tags                        = each.value.tags
+  username                    = local.relational_database_service_credentials.us_west_2[each.key].username
+  vpc_security_group_ids      = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_west_2[each.value.kms_key_id].target_key_arn
 
@@ -1299,29 +1300,30 @@ resource "aws_db_instance" "us_east_1" {
   # Itterate through all network interfaces in the target region.
   for_each = local.relational_database_service.us_east_1
 
-  allocated_storage         = each.value.allocated_storage
-  availability_zone         = each.value.availability_zone
-  backup_retention_period   = each.value.backup_retention_period
-  backup_window             = each.value.backup_window
-  ca_cert_identifier        = each.value.ca_cert_identifier
-  db_name                   = each.value.db_name
-  db_subnet_group_name      = each.value.db_subnet_group_name
-  dedicated_log_volume      = each.value.dedicated_log_volume
-  delete_automated_backups  = each.value.delete_automated_backups
-  deletion_protection       = each.value.deletion_protection
-  engine                    = each.value.engine
-  engine_version            = each.value.engine_version
-  final_snapshot_identifier = each.value.final_snapshot_identifier
-  identifier                = each.value.identifier
-  instance_class            = each.value.instance_class
-  max_allocated_storage     = each.value.max_allocated_storage
-  password                  = local.relational_database_service_credentials.us_east_1[each.key].password
-  skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = true
-  storage_type              = each.value.storage_type
-  tags                      = each.value.tags
-  username                  = local.relational_database_service_credentials.us_east_1[each.key].username
-  vpc_security_group_ids    = each.value.vpc_security_group_ids
+  allocated_storage           = each.value.allocated_storage
+  availability_zone           = each.value.availability_zone
+  backup_retention_period     = each.value.backup_retention_period
+  backup_window               = each.value.backup_window
+  ca_cert_identifier          = each.value.ca_cert_identifier
+  db_name                     = each.value.db_name
+  db_subnet_group_name        = each.value.db_subnet_group_name
+  dedicated_log_volume        = each.value.dedicated_log_volume
+  delete_automated_backups    = each.value.delete_automated_backups
+  deletion_protection         = each.value.deletion_protection
+  engine                      = each.value.engine
+  engine_version              = each.value.engine_version
+  final_snapshot_identifier   = each.value.final_snapshot_identifier
+  identifier                  = each.value.identifier
+  instance_class              = each.value.instance_class
+  manage_master_user_password = each.value.manage_master_user_password ? true : null
+  max_allocated_storage       = each.value.max_allocated_storage
+  password                    = each.value.manage_master_user_password ? null : local.relational_database_service_credentials.us_east_1[each.key].password
+  skip_final_snapshot         = each.value.skip_final_snapshot
+  storage_encrypted           = true
+  storage_type                = each.value.storage_type
+  tags                        = each.value.tags
+  username                    = local.relational_database_service_credentials.us_east_1[each.key].username
+  vpc_security_group_ids      = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
 

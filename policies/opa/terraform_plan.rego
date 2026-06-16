@@ -24,3 +24,11 @@ deny contains msg if {
 	object.get(resource.values, "storage_encrypted", false) != true
 	msg := sprintf("%s must enable storage_encrypted", [resource.address])
 }
+
+deny contains msg if {
+	resource := input.resources[_]
+	resource.type == "aws_instance"
+	metadata_options := object.get(resource.values, "metadata_options", {})
+	object.get(metadata_options, "http_tokens", "optional") != "required"
+	msg := sprintf("%s must enforce IMDSv2 (metadata_options.http_tokens = required)", [resource.address])
+}

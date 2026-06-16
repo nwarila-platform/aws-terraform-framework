@@ -368,6 +368,35 @@ run "databases_reject_kms_alias_prefix" {
   ]
 }
 
+run "databases_reject_empty_password_when_not_managed" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "empty_password_db"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = ""
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Empty password database"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
 run "databases_keep_credentials_sensitive" {
   command = plan
 
@@ -432,6 +461,58 @@ run "databases_keep_credentials_sensitive" {
   assert {
     condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].password)
     error_message = "Database password must stay sensitive on the planned RDS resource."
+  }
+}
+
+run "databases_allow_managed_master_user_password_without_plaintext_password" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-west-2"
+        availability_zone           = "us-west-2a"
+        db_name                     = "manageddb"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        manage_master_user_password = true
+        aws_kms_alias               = "west"
+
+        tags = {
+          Function = "Managed password database"
+        }
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_west_2["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  assert {
+    condition     = local.relational_database_service.us_west_2["manageddb"].manage_master_user_password == true
+    error_message = "Managed-password database local should carry manage_master_user_password = true."
+  }
+
+  assert {
+    condition     = aws_db_instance.us_west_2["manageddb"].manage_master_user_password == true
+    error_message = "Managed-password database resource should set manage_master_user_password = true."
+  }
+
+  assert {
+    condition     = aws_db_instance.us_west_2["manageddb"].password == null
+    error_message = "Managed-password database resource must not set a plaintext password."
+  }
+
+  assert {
+    condition     = issensitive(aws_db_instance.us_west_2["manageddb"].username)
+    error_message = "Managed-password database username must stay sensitive on the planned RDS resource."
   }
 }
 
