@@ -32,6 +32,7 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
+  # Red Hat's public AMI publisher account.
   owners = ["279693163583"]
 
   # [Optional(String)] Name Regex:
@@ -102,6 +103,7 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
+  # Red Hat's public AMI publisher account.
   owners = ["279693163583"]
 
   # [Optional(String)] Name Regex:
@@ -176,7 +178,7 @@ data "aws_ami" "us_west_2_windows_server_2022_base" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  owners = ["434177640246", "amazon"]
+  owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
   name_regex = "^TPM-Windows_Server-2022-English-Full-Base-[\\d.]+$"
@@ -246,7 +248,7 @@ data "aws_ami" "us_east_1_windows_server_2022_base" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  owners = ["434177640246", "amazon"]
+  owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
   name_regex = "^TPM-Windows_Server-2022-English-Full-Base-[\\d.]+$"

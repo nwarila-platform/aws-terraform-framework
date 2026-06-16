@@ -3,12 +3,12 @@ environment = "DEV"
 all_systems = [
   {
     /* Required Parameters */
-    hostname               = "tcnhq-jnk01"
+    hostname               = "example-app-01"
     region                 = "us-west-2"
     availability_zone      = "us-west-2c"
     # Match this subnet to the selected availability zone when adapting the example.
     subnet_id              = "subnet-000a0000000000aaa"
-    key_name               = "example-admin-int"
+    key_name               = "example-admin-key"
     aws_kms_alias          = "aws/ebs"
     refresh                = false
 
@@ -35,7 +35,7 @@ all_systems = [
     network_interfaces = [
       {
         description     = "Primary Network Interface"
-        private_ip      = "1.2.3.4"
+        private_ip      = "10.0.0.10"
         security_groups = [
             "sg-000a000aa000aaaaa",
             "sg-0aaa00a0a000a0000"
