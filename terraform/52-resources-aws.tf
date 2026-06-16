@@ -142,7 +142,7 @@ resource "aws_lb" "us_west_2" {
   }
 
   dynamic "subnet_mapping" {
-    for_each = each.value.subnet_mapping
+    for_each = each.value.subnet_mapping == null ? [] : each.value.subnet_mapping
 
     content {
       allocation_id        = subnet_mapping.value.allocation_id
@@ -250,7 +250,7 @@ resource "aws_lb" "us_east_1" {
   }
 
   dynamic "subnet_mapping" {
-    for_each = each.value.subnet_mapping
+    for_each = each.value.subnet_mapping == null ? [] : each.value.subnet_mapping
 
     content {
       allocation_id        = subnet_mapping.value.allocation_id
@@ -774,7 +774,7 @@ resource "aws_ebs_volume" "us_west_2" {
 
   # Define the Elastic Block Store Properties
   availability_zone = each.value.availability_zone
-  encrypted         = each.value.encrypted
+  encrypted         = true
   iops              = each.value.iops
   kms_key_id        = data.aws_kms_alias.us_west_2[each.value.kms_key_id].target_key_arn
   snapshot_id       = each.value.snapshot_id
@@ -798,7 +798,7 @@ resource "aws_ebs_volume" "us_west_2_refresh" {
 
   # Define the Elastic Block Store Properties
   availability_zone = each.value.availability_zone
-  encrypted         = each.value.encrypted
+  encrypted         = true
   iops              = each.value.iops
   kms_key_id        = data.aws_kms_alias.us_west_2[each.value.kms_key_id].target_key_arn
   snapshot_id       = each.value.snapshot_id
@@ -826,7 +826,7 @@ resource "aws_ebs_volume" "us_east_1" {
 
   # Define the Elastic Block Store Properties
   availability_zone = each.value.availability_zone
-  encrypted         = each.value.encrypted
+  encrypted         = true
   iops              = each.value.iops
 
   snapshot_id = each.value.snapshot_id
@@ -854,7 +854,7 @@ resource "aws_ebs_volume" "us_east_1_refresh" {
 
   # Define the Elastic Block Store Properties
   availability_zone = each.value.availability_zone
-  encrypted         = each.value.encrypted
+  encrypted         = true
   iops              = each.value.iops
 
   snapshot_id = each.value.snapshot_id
@@ -903,7 +903,7 @@ resource "aws_instance" "us_west_2" {
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
-    encrypted             = each.value.root_block_device.encrypted
+    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
     iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
@@ -975,7 +975,7 @@ resource "aws_instance" "us_west_2_refresh" {
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
-    encrypted             = each.value.root_block_device.encrypted
+    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
     iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
@@ -1045,7 +1045,7 @@ resource "aws_instance" "us_east_1" {
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
-    encrypted             = each.value.root_block_device.encrypted
+    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
     iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
@@ -1117,7 +1117,7 @@ resource "aws_instance" "us_east_1_refresh" {
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
-    encrypted             = each.value.root_block_device.encrypted
+    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
     iops                  = each.value.root_block_device.iops
     tags                  = each.value.root_block_device.tags
@@ -1272,7 +1272,7 @@ resource "aws_db_instance" "us_west_2" {
   max_allocated_storage     = each.value.max_allocated_storage
   password                  = local.relational_database_service_credentials.us_west_2[each.key].password
   skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = each.value.storage_encrypted
+  storage_encrypted         = true
   storage_type              = each.value.storage_type
   tags                      = each.value.tags
   username                  = local.relational_database_service_credentials.us_west_2[each.key].username
@@ -1317,7 +1317,7 @@ resource "aws_db_instance" "us_east_1" {
   max_allocated_storage     = each.value.max_allocated_storage
   password                  = local.relational_database_service_credentials.us_east_1[each.key].password
   skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = each.value.storage_encrypted
+  storage_encrypted         = true
   storage_type              = each.value.storage_type
   tags                      = each.value.tags
   username                  = local.relational_database_service_credentials.us_east_1[each.key].username

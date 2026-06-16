@@ -314,10 +314,10 @@ data "aws_kms_alias" "us_west_2" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
 
-  # Itterate through all network interfaces in the target region.
-  # ?Note: This for_each loop itterates through all system definitions, creates a list of
-  # ?  of aws_kms_aliases, removes any duplicates, and converts the list of alises to a set
-  # ?  so it can be itterated over and queried automatically for use in the AWS resources.
+  # Iterate through all KMS aliases in the target region.
+  # ?Note: This for_each loop iterates through all system and database definitions,
+  # ?  removes duplicate aws_kms_alias values, and converts the list of aliases to a set
+  # ?  so it can be iterated over and queried automatically for use in the AWS resources.
   for_each = toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
@@ -338,7 +338,7 @@ data "aws_kms_alias" "us_east_1" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all KMS aliases in the target region.
   for_each = toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
@@ -363,10 +363,10 @@ data "aws_key_pair" "us_west_2" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
 
-  # Itterate through all network interfaces in the target region.
-  # ?Note: This for_each loop itterates through all system definitions, creates a list of
-  # ?  of aws_kms_aliases, removes any duplicates, and converts the list of alises to a set
-  # ?  so it can be itterated over and queried automatically for use in the AWS resources.
+  # Iterate through all key pairs in the target region.
+  # ?Note: This for_each loop iterates through all system definitions, removes duplicate
+  # ?  key_name values, and converts the list to a set so it can be iterated over and
+  # ?  queried automatically for use in the AWS resources.
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
@@ -384,10 +384,10 @@ data "aws_key_pair" "us_east_1" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  # Itterate through all network interfaces in the target region.
-  # ?Note: This for_each loop itterates through all system definitions, creates a list of
-  # ?  of aws_kms_aliases, removes any duplicates, and converts the list of alises to a set
-  # ?  so it can be itterated over and queried automatically for use in the AWS resources.
+  # Iterate through all key pairs in the target region.
+  # ?Note: This for_each loop iterates through all system definitions, removes duplicate
+  # ?  key_name values, and converts the list to a set so it can be iterated over and
+  # ?  queried automatically for use in the AWS resources.
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
