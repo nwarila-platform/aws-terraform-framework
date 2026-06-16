@@ -304,6 +304,150 @@ data "aws_ami" "us_east_1_windows_server_2022_base" {
 
 #endregion --- [ Amazon Machine Image(s): Windows Server 2022 Base ] ------------------------ #
 
+#region ------ [ Amazon Machine Image(s): Windows Server 2025 Base ] ------------------------ #
+
+data "aws_ami" "us_west_2_windows_server_2025_base" {
+
+  count = length([
+    for s in var.all_systems : s
+    if s.ami == "windows_server_2025_base" &&
+    contains(["us_west_2", "us-west-2"], s.region)
+  ]) > 0 ? 1 : 0
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_west_2
+
+  // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
+  most_recent = true
+
+  # [Optional(String[])] List of AMI owners to limit search.
+  # Valid values: <AWS account ID>, 'self', <AWS owner alias>
+  owners = var.windows_ami_owners
+
+  # [Optional(String)] Name Regex:
+  name_regex = "^TPM-Windows_Server-2025-English-Full-Base-[\\d.]+$"
+
+  // ===================================================================================== //
+  // === Filter(s): One or more name/value pairs to filter off of.                     === //
+  // ------------------------------------------------------------------------------------- //
+  // All filters are optional, most filters are lists, and all of them are combined to     //
+  // allow robust targeting.                                                               //
+  // ===================================================================================== //
+
+  # [String[]] image-type: Type of image.
+  # Valid values: "machine", "kernel", "ramdisk"
+  filter {
+    name   = "image-type"
+    values = ["machine"]
+  }
+
+  # [String[]] Root Device Type: Type of root device.
+  # Valid values: "ebs", "instance-store"
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+
+  # [String[]] Architecture: OS architecture of the AMI.
+  # Valid values: "x86_64", "arm64", "arm64_mac", "x86_64_mac", "i386"
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  # [String[]] Root Device Name: Device name of the root device.
+  filter {
+    name   = "root-device-name"
+    values = ["/dev/sda1"]
+  }
+
+  # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
+  #     successfully registered and can be used to launch an instance.
+  # Valid values: "available", "pending", "failed"
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  # [String[]] Description: Description of the AMI that was provided during image creation.
+  # filter {
+  #   name   = "description"
+  #   values = ["Provided by Red Hat, Inc."]
+  # }
+}
+
+data "aws_ami" "us_east_1_windows_server_2025_base" {
+
+  count = length([
+    for s in var.all_systems : s
+    if s.ami == "windows_server_2025_base" &&
+    contains(["us_east_1", "us-east-1"], s.region)
+  ]) > 0 ? 1 : 0
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_east_1
+
+  // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
+  most_recent = true
+
+  # [Optional(String[])] List of AMI owners to limit search.
+  # Valid values: <AWS account ID>, 'self', <AWS owner alias>
+  owners = var.windows_ami_owners
+
+  # [Optional(String)] Name Regex:
+  name_regex = "^TPM-Windows_Server-2025-English-Full-Base-[\\d.]+$"
+
+  // ===================================================================================== //
+  // === Filter(s): One or more name/value pairs to filter off of.                     === //
+  // ------------------------------------------------------------------------------------- //
+  // All filters are optional, most filters are lists, and all of them are combined to     //
+  // allow robust targeting.                                                               //
+  // ===================================================================================== //
+
+  # [String[]] image-type: Type of image.
+  # Valid values: "machine", "kernel", "ramdisk"
+  filter {
+    name   = "image-type"
+    values = ["machine"]
+  }
+
+  # [String[]] Root Device Type: Type of root device.
+  # Valid values: "ebs", "instance-store"
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+
+  # [String[]] Architecture: OS architecture of the AMI.
+  # Valid values: "x86_64", "arm64", "arm64_mac", "x86_64_mac", "i386"
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  # [String[]] Root Device Name: Device name of the root device.
+  filter {
+    name   = "root-device-name"
+    values = ["/dev/sda1"]
+  }
+
+  # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
+  #     successfully registered and can be used to launch an instance.
+  # Valid values: "available", "pending", "failed"
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  # [String[]] Description: Description of the AMI that was provided during image creation.
+  # filter {
+  #   name   = "description"
+  #   values = ["Provided by Red Hat, Inc."]
+  # }
+}
+
+#endregion --- [ Amazon Machine Image(s): Windows Server 2025 Base ] ------------------------ #
+
 #endregion --- [ Amazon Machine Image(s) ] ---------------------------------------------------- #
 
 

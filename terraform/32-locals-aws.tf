@@ -18,6 +18,10 @@ locals {
       us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
       us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
     }
+    "windows_server_2025_base" = {
+      us_west_2 = try(data.aws_ami.us_west_2_windows_server_2025_base[0], null)
+      us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
+    }
   }
 }
 
