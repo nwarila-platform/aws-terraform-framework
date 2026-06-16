@@ -30,14 +30,15 @@ locals {
       for system in var.all_systems : system.hostname => {
 
         #region           = < This is set statically >
-        ami               = system.ami
-        availability_zone = system.availability_zone
-        get_password_data = system.get_password_data
-        key_name          = system.key_name
-        hostname          = system.hostname
-        instance_type     = system.instance_type
-        refresh           = system.refresh
-        set_state         = system.set_state
+        ami                  = system.ami
+        availability_zone    = system.availability_zone
+        get_password_data    = system.get_password_data
+        key_name             = system.key_name
+        iam_instance_profile = system.iam_instance_profile
+        hostname             = system.hostname
+        instance_type        = system.instance_type
+        refresh              = system.refresh
+        set_state            = system.set_state
 
         root_block_device = {
           volume_size           = system.root_block_device.volume_size

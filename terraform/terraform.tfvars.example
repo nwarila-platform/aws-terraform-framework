@@ -9,6 +9,7 @@ all_systems = [
     # Match this subnet to the selected availability zone when adapting the example.
     subnet_id              = "subnet-000a0000000000aaa"
     key_name               = "example-admin-key"
+    iam_instance_profile   = "example-ssm-profile"
     aws_kms_alias          = "aws/ebs"
     refresh                = false
 
