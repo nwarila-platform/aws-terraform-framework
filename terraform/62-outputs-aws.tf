@@ -66,7 +66,7 @@
 #      security_groups = [
 #        "sg-000a000aa000aaaaa",
 #      ]
-#      subnet_id       = "subnet-069e5602626840cae"
+#      subnet_id       = "subnet-000a0000000000ccc"
 #      tags                  = {
 #        Environment = "INT"
 #        Name        = "FirstSystem"

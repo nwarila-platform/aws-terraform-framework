@@ -16,6 +16,13 @@ variable "aws_config" {
   nullable = false
 }
 
+variable "windows_ami_owners" {
+  description = "AWS account IDs that own the custom Windows base AMI (TPM-Windows_Server-2022). Defaults to the calling account; override if the AMI lives elsewhere."
+  type        = list(string)
+  default     = ["self"]
+  nullable    = false
+}
+
 variable "all_load_balancers" {
   description = "Define all Elastic Load Balancers managed by this framework."
 
