@@ -22,6 +22,12 @@ This file is overwritten by `terraform-docs` on every PR via the
 | [aws_instance.us_west_2_refresh](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/instance) | resource |
 | [aws_lb.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb) | resource |
 | [aws_lb.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb) | resource |
+| [aws_lb_listener.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener) | resource |
+| [aws_lb_listener.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener) | resource |
+| [aws_lb_listener_certificate.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener_certificate) | resource |
+| [aws_lb_listener_certificate.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener_certificate) | resource |
+| [aws_lb_listener_rule.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener_rule) | resource |
+| [aws_lb_listener_rule.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_listener_rule) | resource |
 | [aws_lb_target_group.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_target_group) | resource |
 | [aws_lb_target_group.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_target_group) | resource |
 | [aws_lb_target_group_attachment.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/lb_target_group_attachment) | resource |

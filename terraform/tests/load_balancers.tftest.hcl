@@ -96,6 +96,21 @@ run "load_balancers_bucket_by_region" {
     condition     = length(local.lb_target_group_attachments.us_west_2) == 0 && length(local.lb_target_group_attachments.us_east_1) == 0
     error_message = "Load balancers without target_groups should not emit target group attachments."
   }
+
+  assert {
+    condition     = length(local.lb_listeners.us_west_2) == 0 && length(local.lb_listeners.us_east_1) == 0
+    error_message = "Load balancers without listeners should not emit listeners."
+  }
+
+  assert {
+    condition     = length(local.lb_listener_rules.us_west_2) == 0 && length(local.lb_listener_rules.us_east_1) == 0
+    error_message = "Load balancers without listener rules should not emit listener rules."
+  }
+
+  assert {
+    condition     = length(local.lb_listener_certificates.us_west_2) == 0 && length(local.lb_listener_certificates.us_east_1) == 0
+    error_message = "Load balancers without additional listener certificates should not emit listener certificates."
+  }
 }
 
 run "load_balancer_target_groups_attach_matching_function_systems" {
@@ -229,6 +244,144 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
   assert {
     condition     = length([for k, _ in aws_lb_target_group_attachment.us_west_2 : k if startswith(k, "function_alb/cache/")]) == 0
     error_message = "A target group with no matching Function should produce zero attachments."
+  }
+}
+
+run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "web-listener"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-web-a"
+        key_name          = "test-key"
+        aws_kms_alias     = "ebs"
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.20"
+            security_groups = ["sg-web"]
+          }
+        ]
+
+        tags = {
+          Function = "web"
+        }
+      }
+    ]
+
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "routing_alb"
+        name            = "routing-alb"
+        security_groups = ["sg-lb"]
+        subnets         = ["subnet-web-a", "subnet-web-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "web"
+            vpc_id       = "vpc-test"
+            port         = 8080
+            protocol     = "HTTP"
+          }
+        ]
+
+        listeners = [
+          {
+            resource_key    = "https"
+            port            = 443
+            protocol        = "HTTPS"
+            ssl_policy      = "ELBSecurityPolicy-2016-08"
+            certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/routing-default"
+            additional_certificate_arns = [
+              "arn:aws:acm:us-west-2:123456789012:certificate/routing-extra",
+            ]
+            default_action = {
+              type             = "forward"
+              target_group_key = "web"
+            }
+            rules = [
+              {
+                resource_key = "web_path"
+                priority     = 10
+                action = {
+                  type             = "forward"
+                  target_group_key = "web"
+                }
+                conditions = [
+                  {
+                    path_pattern = ["/web/*"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            resource_key = "http"
+            port         = 80
+            protocol     = "HTTP"
+            default_action = {
+              type = "redirect"
+              redirect = {
+                port        = "443"
+                protocol    = "HTTPS"
+                status_code = "HTTP_301"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = local.lb_listeners.us_west_2["routing_alb/https"].default_action.target_group_key == "routing_alb/web"
+    error_message = "The HTTPS listener default forward action should resolve to the composite routing_alb/web target group key."
+  }
+
+  assert {
+    condition     = local.lb_listeners.us_west_2["routing_alb/http"].default_action.target_group_key == null
+    error_message = "The HTTP redirect listener should not resolve a target group key."
+  }
+
+  assert {
+    condition     = local.lb_listener_rules.us_west_2["routing_alb/https/web_path"].listener_key == "routing_alb/https"
+    error_message = "The listener rule should resolve to the composite routing_alb/https listener key."
+  }
+
+  assert {
+    condition     = local.lb_listener_rules.us_west_2["routing_alb/https/web_path"].action.target_group_key == "routing_alb/web"
+    error_message = "The listener rule forward action should resolve to the composite routing_alb/web target group key."
+  }
+
+  assert {
+    condition     = local.lb_listener_certificates.us_west_2["routing_alb/https/arn:aws:acm:us-west-2:123456789012:certificate/routing-extra"].listener_key == "routing_alb/https"
+    error_message = "The additional certificate should carry the explicit composite listener key instead of parsing it from the map key."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_listener.us_west_2), "routing_alb/https")
+    error_message = "The HTTPS listener should be planned with the composite routing_alb/https key."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_listener.us_west_2), "routing_alb/http")
+    error_message = "The HTTP redirect listener should be planned with the composite routing_alb/http key."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_listener_rule.us_west_2), "routing_alb/https/web_path")
+    error_message = "The HTTPS path listener rule should be planned with the composite routing_alb/https/web_path key."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_listener_certificate.us_west_2), "routing_alb/https/arn:aws:acm:us-west-2:123456789012:certificate/routing-extra")
+    error_message = "The HTTPS additional listener certificate should be planned with the composite routing_alb/https/<arn> key."
   }
 }
 
