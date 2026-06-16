@@ -341,51 +341,60 @@ locals {
 
 
   relational_database_service = {
-    for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+    for region in var.aws_config.regions : region => nonsensitive({
+      for database in var.all_databases : nonsensitive(database.db_name) => {
 
-        allocated_storage         = database.allocated_storage
-        availability_zone         = database.availability_zone
-        backup_retention_period   = database.backup_retention_period
-        backup_window             = database.backup_window
-        blue_green_update         = database.blue_green_update
-        ca_cert_identifier        = database.ca_cert_identifier
-        db_name                   = database.db_name
-        db_subnet_group_name      = database.db_subnet_group_name
-        dedicated_log_volume      = database.dedicated_log_volume
-        delete_automated_backups  = database.delete_automated_backups
-        deletion_protection       = database.deletion_protection
-        engine                    = database.engine
-        engine_version            = database.engine_version
-        final_snapshot_identifier = "${database.db_name}-FINAL"
-        identifier                = lower(database.db_name)
-        instance_class            = database.instance_class
-        kms_key_id                = database.aws_kms_alias
-        max_allocated_storage     = database.max_allocated_storage
-        password                  = sensitive(database.password)
+        allocated_storage         = nonsensitive(database.allocated_storage)
+        availability_zone         = nonsensitive(database.availability_zone)
+        backup_retention_period   = nonsensitive(database.backup_retention_period)
+        backup_window             = nonsensitive(database.backup_window)
+        blue_green_update         = nonsensitive(database.blue_green_update)
+        ca_cert_identifier        = nonsensitive(database.ca_cert_identifier)
+        db_name                   = nonsensitive(database.db_name)
+        db_subnet_group_name      = nonsensitive(database.db_subnet_group_name)
+        dedicated_log_volume      = nonsensitive(database.dedicated_log_volume)
+        delete_automated_backups  = nonsensitive(database.delete_automated_backups)
+        deletion_protection       = nonsensitive(database.deletion_protection)
+        engine                    = nonsensitive(database.engine)
+        engine_version            = nonsensitive(database.engine_version)
+        final_snapshot_identifier = "${nonsensitive(database.db_name)}-FINAL"
+        identifier                = lower(nonsensitive(database.db_name))
+        instance_class            = nonsensitive(database.instance_class)
+        kms_key_id                = nonsensitive(database.aws_kms_alias)
+        max_allocated_storage     = nonsensitive(database.max_allocated_storage)
         #region                     = < This is set statically >
-        skip_final_snapshot    = database.skip_final_snapshot
+        skip_final_snapshot    = nonsensitive(database.skip_final_snapshot)
         storage_encrypted      = true
-        storage_type           = try(database.storage_type, "gp3")
-        username               = database.username
-        vpc_security_group_ids = database.vpc_security_group_ids
+        storage_type           = nonsensitive(try(database.storage_type, "gp3"))
+        vpc_security_group_ids = nonsensitive(database.vpc_security_group_ids)
 
         tags = merge(
           # Overwriteable Default Tags
           {
-            Backup = try(database.tags["Backup"], "True")
+            Backup = try(nonsensitive(database.tags["Backup"]), "True")
           },
-          database.tags,
+          nonsensitive(database.tags),
           # Non-Overwritable Default Tags
           {
-            Name        = database.db_name
+            Name        = nonsensitive(database.db_name)
             Environment = var.environment
             Terraform   = "True"
           }
         )
       }
       # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
+      if replace(nonsensitive(database.region), "-", "_") == region
+    })
+  }
+
+  relational_database_service_credentials = {
+    for region in var.aws_config.regions : region => {
+      for database in var.all_databases : nonsensitive(database.db_name) => {
+        password = sensitive(database.password)
+        username = sensitive(database.username)
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(nonsensitive(database.region), "-", "_") == region
     }
   }
 

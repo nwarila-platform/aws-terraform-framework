@@ -1270,12 +1270,12 @@ resource "aws_db_instance" "us_west_2" {
   identifier                = each.value.identifier
   instance_class            = each.value.instance_class
   max_allocated_storage     = each.value.max_allocated_storage
-  password                  = each.value.password
+  password                  = local.relational_database_service_credentials.us_west_2[each.key].password
   skip_final_snapshot       = each.value.skip_final_snapshot
   storage_encrypted         = each.value.storage_encrypted
   storage_type              = each.value.storage_type
   tags                      = each.value.tags
-  username                  = each.value.username
+  username                  = local.relational_database_service_credentials.us_west_2[each.key].username
   vpc_security_group_ids    = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_west_2[each.value.kms_key_id].target_key_arn
@@ -1315,12 +1315,12 @@ resource "aws_db_instance" "us_east_1" {
   identifier                = each.value.identifier
   instance_class            = each.value.instance_class
   max_allocated_storage     = each.value.max_allocated_storage
-  password                  = each.value.password
+  password                  = local.relational_database_service_credentials.us_east_1[each.key].password
   skip_final_snapshot       = each.value.skip_final_snapshot
   storage_encrypted         = each.value.storage_encrypted
   storage_type              = each.value.storage_type
   tags                      = each.value.tags
-  username                  = each.value.username
+  username                  = local.relational_database_service_credentials.us_east_1[each.key].username
   vpc_security_group_ids    = each.value.vpc_security_group_ids
 
   kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
