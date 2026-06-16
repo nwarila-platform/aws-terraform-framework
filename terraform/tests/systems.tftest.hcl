@@ -451,6 +451,73 @@ run "systems_reject_unknown_ami_keys" {
   ]
 }
 
+run "systems_reject_windows_hostnames_over_15_characters" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "win-server-01234"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Windows hostname too long"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.7.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_accept_valid_windows_hostnames" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "win-app-01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Valid Windows hostname"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.7.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = contains(keys(aws_instance.us_west_2), "win-app-01")
+    error_message = "Valid Windows hostname should plan a west-region instance."
+  }
+}
+
 run "systems_reject_kms_alias_prefix" {
   command = plan
 

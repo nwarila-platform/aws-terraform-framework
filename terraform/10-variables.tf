@@ -126,6 +126,18 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
+      !can(regex("windows", lower(system.ami))) || (
+        length(system.hostname) <= 15 &&
+        can(regex("^[0-9A-Za-z][0-9A-Za-z-]*$", system.hostname)) &&
+        !can(regex("^[0-9]+$", system.hostname))
+      )
+    ])
+    error_message = "Windows system hostnames must be 15 characters or less, contain only letters, numbers, and hyphens, and not be all numeric."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
       !startswith(system.aws_kms_alias, "alias/")
     ])
     error_message = "all_systems aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
