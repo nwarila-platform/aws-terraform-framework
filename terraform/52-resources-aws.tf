@@ -894,6 +894,12 @@ resource "aws_instance" "us_west_2" {
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_west_2[each.value.key_name].key_name
 
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
@@ -960,6 +966,12 @@ resource "aws_instance" "us_west_2_refresh" {
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_west_2[each.value.key_name].key_name
 
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
     volume_size           = each.value.root_block_device.volume_size
@@ -1023,6 +1035,12 @@ resource "aws_instance" "us_east_1" {
   get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
 
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type
@@ -1089,6 +1107,12 @@ resource "aws_instance" "us_east_1_refresh" {
   get_password_data = each.value.get_password_data
   tags              = each.value.tags
   key_name          = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
 
   root_block_device {
     volume_type           = each.value.root_block_device.volume_type

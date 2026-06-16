@@ -39,7 +39,7 @@ variable "all_systems" {
     /* Optional Parameters */
     ami               = optional(string, "red_hat_enterprise_linux_8")
     instance_type     = optional(string, "m6i.large")
-    get_password_data = optional(bool, true)
+    get_password_data = optional(bool, false)
     set_state         = optional(string)
 
     root_block_device = optional(
