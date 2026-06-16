@@ -277,6 +277,157 @@ resource "aws_lb" "us_east_1" {
 #endregion --- [ Create All Elastic Load Balancers (ELBs) ] ---------------------------------- #
 
 
+#region ------ [ Create All Elastic Load Balancer Target Groups ] ----------------------------- #
+
+#region ------ [ Create All Elastic Load Balancer Target Groups - us-west-2 ] ---------- #
+
+resource "aws_lb_target_group" "us_west_2" {
+
+  # Itterate through all Elastic Load Balancer target groups in the target region.
+  for_each = local.lb_target_groups.us_west_2
+
+  # Set the provider in which to deploy the target group.
+  provider = aws.us_west_2
+
+  # Define the Elastic Load Balancer Target Group Properties
+  connection_termination            = each.value.connection_termination
+  deregistration_delay              = each.value.deregistration_delay
+  ip_address_type                   = each.value.ip_address_type
+  load_balancing_algorithm_type     = each.value.load_balancing_algorithm_type
+  load_balancing_anomaly_mitigation = each.value.load_balancing_anomaly_mitigation
+  load_balancing_cross_zone_enabled = each.value.load_balancing_cross_zone_enabled
+  port                              = each.value.port
+  preserve_client_ip                = each.value.preserve_client_ip
+  protocol                          = each.value.protocol
+  protocol_version                  = each.value.protocol_version
+  proxy_protocol_v2                 = each.value.proxy_protocol_v2
+  slow_start                        = each.value.slow_start
+  tags                              = each.value.tags
+  target_type                       = each.value.target_type
+  vpc_id                            = each.value.vpc_id
+
+  dynamic "health_check" {
+    for_each = each.value.health_check == null ? [] : [each.value.health_check]
+
+    content {
+      enabled             = health_check.value.enabled
+      healthy_threshold   = health_check.value.healthy_threshold
+      interval            = health_check.value.interval
+      matcher             = health_check.value.matcher
+      path                = health_check.value.path
+      port                = health_check.value.port
+      protocol            = health_check.value.protocol
+      timeout             = health_check.value.timeout
+      unhealthy_threshold = health_check.value.unhealthy_threshold
+    }
+  }
+
+  dynamic "stickiness" {
+    for_each = each.value.stickiness == null ? [] : [each.value.stickiness]
+
+    content {
+      cookie_duration = stickiness.value.cookie_duration
+      cookie_name     = stickiness.value.cookie_name
+      enabled         = stickiness.value.enabled
+      type            = stickiness.value.type
+    }
+  }
+
+}
+
+resource "aws_lb_target_group_attachment" "us_west_2" {
+
+  # Itterate through all Elastic Load Balancer target group attachments in the target region.
+  for_each = local.lb_target_group_attachments.us_west_2
+
+  # Set the provider in which to deploy the target group attachment.
+  provider = aws.us_west_2
+
+  # Define the Elastic Load Balancer Target Group Attachment Properties
+  target_group_arn = aws_lb_target_group.us_west_2[each.value.tg_key].arn
+  target_id        = merge(aws_instance.us_west_2, aws_instance.us_west_2_refresh)[each.value.hostname].id
+  port             = each.value.port
+
+}
+
+#endregion --- [ Create All Elastic Load Balancer Target Groups - us-west-2 ] ---------- #
+
+#region ------ [ Create All Elastic Load Balancer Target Groups - us-east-1 ] ---------- #
+
+resource "aws_lb_target_group" "us_east_1" {
+
+  # Itterate through all Elastic Load Balancer target groups in the target region.
+  for_each = local.lb_target_groups.us_east_1
+
+  # Set the provider in which to deploy the target group.
+  provider = aws.us_east_1
+
+  # Define the Elastic Load Balancer Target Group Properties
+  connection_termination            = each.value.connection_termination
+  deregistration_delay              = each.value.deregistration_delay
+  ip_address_type                   = each.value.ip_address_type
+  load_balancing_algorithm_type     = each.value.load_balancing_algorithm_type
+  load_balancing_anomaly_mitigation = each.value.load_balancing_anomaly_mitigation
+  load_balancing_cross_zone_enabled = each.value.load_balancing_cross_zone_enabled
+  port                              = each.value.port
+  preserve_client_ip                = each.value.preserve_client_ip
+  protocol                          = each.value.protocol
+  protocol_version                  = each.value.protocol_version
+  proxy_protocol_v2                 = each.value.proxy_protocol_v2
+  slow_start                        = each.value.slow_start
+  tags                              = each.value.tags
+  target_type                       = each.value.target_type
+  vpc_id                            = each.value.vpc_id
+
+  dynamic "health_check" {
+    for_each = each.value.health_check == null ? [] : [each.value.health_check]
+
+    content {
+      enabled             = health_check.value.enabled
+      healthy_threshold   = health_check.value.healthy_threshold
+      interval            = health_check.value.interval
+      matcher             = health_check.value.matcher
+      path                = health_check.value.path
+      port                = health_check.value.port
+      protocol            = health_check.value.protocol
+      timeout             = health_check.value.timeout
+      unhealthy_threshold = health_check.value.unhealthy_threshold
+    }
+  }
+
+  dynamic "stickiness" {
+    for_each = each.value.stickiness == null ? [] : [each.value.stickiness]
+
+    content {
+      cookie_duration = stickiness.value.cookie_duration
+      cookie_name     = stickiness.value.cookie_name
+      enabled         = stickiness.value.enabled
+      type            = stickiness.value.type
+    }
+  }
+
+}
+
+resource "aws_lb_target_group_attachment" "us_east_1" {
+
+  # Itterate through all Elastic Load Balancer target group attachments in the target region.
+  for_each = local.lb_target_group_attachments.us_east_1
+
+  # Set the provider in which to deploy the target group attachment.
+  provider = aws.us_east_1
+
+  # Define the Elastic Load Balancer Target Group Attachment Properties
+  target_group_arn = aws_lb_target_group.us_east_1[each.value.tg_key].arn
+  target_id        = merge(aws_instance.us_east_1, aws_instance.us_east_1_refresh)[each.value.hostname].id
+  port             = each.value.port
+
+}
+
+#endregion --- [ Create All Elastic Load Balancer Target Groups - us-east-1 ] ---------- #
+
+#endregion --- [ Create All Elastic Load Balancer Target Groups ] ----------------------------- #
+
+
 #region ------ [ Create All Elastic Block Store (EBS) Objects ] ------------------------------- #
 
 #region ------ [ Create All Elastic Block Store (EBS) Objects - us-west-2 ] ------------- #
