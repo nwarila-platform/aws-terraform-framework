@@ -383,6 +383,26 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
     condition     = contains(keys(aws_lb_listener_certificate.us_west_2), "routing_alb/https/arn:aws:acm:us-west-2:123456789012:certificate/routing-extra")
     error_message = "The HTTPS additional listener certificate should be planned with the composite routing_alb/https/<arn> key."
   }
+
+  assert {
+    condition     = length(output.aws_target_groups) == 1 && contains(keys(output.aws_target_groups), "routing_alb/web")
+    error_message = "The aws_target_groups output should expose the planned target group under the composite routing_alb/web key."
+  }
+
+  assert {
+    condition     = length(output.aws_target_group_arns) == 1 && contains(keys(output.aws_target_group_arns), "routing_alb/web")
+    error_message = "The aws_target_group_arns output should expose the planned target group ARN under the composite routing_alb/web key."
+  }
+
+  assert {
+    condition     = length(output.aws_listeners) == 2 && contains(keys(output.aws_listeners), "routing_alb/http") && contains(keys(output.aws_listeners), "routing_alb/https")
+    error_message = "The aws_listeners output should expose the planned listeners under their composite keys."
+  }
+
+  assert {
+    condition     = length(output.aws_listener_arns) == 2 && contains(keys(output.aws_listener_arns), "routing_alb/http") && contains(keys(output.aws_listener_arns), "routing_alb/https")
+    error_message = "The aws_listener_arns output should expose the planned listener ARNs under their composite keys."
+  }
 }
 
 run "load_balancer_rejects_missing_default_target_group_key_reference" {

@@ -54,9 +54,13 @@ This file is overwritten by `terraform-docs` on every PR via the
 
 | Name | Description |
 | ---- | ----------- |
+| aws\_listener\_arns | Elastic Load Balancer Listener ARNs keyed by all\_load\_balancers and listeners resource\_key. |
+| aws\_listeners | Stable Elastic Load Balancer Listener attributes keyed by all\_load\_balancers and listeners resource\_key. |
 | aws\_load\_balancer\_arn\_suffixes | Elastic Load Balancer ARN suffixes keyed by all\_load\_balancers resource\_key. |
 | aws\_load\_balancer\_arns | Elastic Load Balancer ARNs keyed by all\_load\_balancers resource\_key. |
 | aws\_load\_balancer\_dns\_names | Elastic Load Balancer DNS names keyed by all\_load\_balancers resource\_key. |
 | aws\_load\_balancer\_zone\_ids | Elastic Load Balancer Route 53 zone IDs keyed by all\_load\_balancers resource\_key. |
 | aws\_load\_balancers | Stable Elastic Load Balancer attributes keyed by all\_load\_balancers resource\_key. |
+| aws\_target\_group\_arns | Elastic Load Balancer Target Group ARNs keyed by all\_load\_balancers and target\_groups resource\_key. |
+| aws\_target\_groups | Stable Elastic Load Balancer Target Group attributes keyed by all\_load\_balancers and target\_groups resource\_key. |
 <!-- END_TF_DOCS -->

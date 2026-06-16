@@ -490,3 +490,65 @@ output "aws_load_balancer_zone_ids" {
 }
 
 #endregion --- [ Resource(s): aws_lb ] -------------------------------------------------------- #
+
+
+#region ------ [ Resource(s): aws_lb_target_group ] ------------------------------------------ #
+
+output "aws_target_groups" {
+  description = "Stable Elastic Load Balancer Target Group attributes keyed by all_load_balancers and target_groups resource_key."
+  value = merge(
+    {
+      for key, target_group in aws_lb_target_group.us_west_2 : key => {
+        arn        = target_group.arn
+        arn_suffix = target_group.arn_suffix
+        name       = target_group.name
+      }
+    },
+    {
+      for key, target_group in aws_lb_target_group.us_east_1 : key => {
+        arn        = target_group.arn
+        arn_suffix = target_group.arn_suffix
+        name       = target_group.name
+      }
+    }
+  )
+}
+
+output "aws_target_group_arns" {
+  description = "Elastic Load Balancer Target Group ARNs keyed by all_load_balancers and target_groups resource_key."
+  value = merge(
+    { for key, target_group in aws_lb_target_group.us_west_2 : key => target_group.arn },
+    { for key, target_group in aws_lb_target_group.us_east_1 : key => target_group.arn }
+  )
+}
+
+#endregion --- [ Resource(s): aws_lb_target_group ] ------------------------------------------ #
+
+
+#region ------ [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
+
+output "aws_listeners" {
+  description = "Stable Elastic Load Balancer Listener attributes keyed by all_load_balancers and listeners resource_key."
+  value = merge(
+    {
+      for key, listener in aws_lb_listener.us_west_2 : key => {
+        arn = listener.arn
+      }
+    },
+    {
+      for key, listener in aws_lb_listener.us_east_1 : key => {
+        arn = listener.arn
+      }
+    }
+  )
+}
+
+output "aws_listener_arns" {
+  description = "Elastic Load Balancer Listener ARNs keyed by all_load_balancers and listeners resource_key."
+  value = merge(
+    { for key, listener in aws_lb_listener.us_west_2 : key => listener.arn },
+    { for key, listener in aws_lb_listener.us_east_1 : key => listener.arn }
+  )
+}
+
+#endregion --- [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
