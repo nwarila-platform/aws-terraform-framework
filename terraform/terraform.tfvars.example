@@ -73,6 +73,67 @@ all_load_balancers = [
       "sg-000a000aa000aaaaa"
     ]
 
+    target_groups = [
+      {
+        resource_key = "jenkins"
+        function     = "Jenkins Server"
+        vpc_id       = "vpc-000a0000000000aaa"
+        port         = 8080
+        protocol     = "HTTP"
+
+        health_check = {
+          path = "/login"
+        }
+      }
+    ]
+
+    listeners = [
+      {
+        resource_key    = "https"
+        port            = 443
+        protocol        = "HTTPS"
+        certificate_arn = "arn:aws:acm:us-west-2:111122223333:certificate/EXAMPLE"
+
+        default_action = {
+          type             = "forward"
+          target_group_key = "jenkins"
+        }
+
+        rules = [
+          {
+            resource_key = "jenkins_path"
+            priority     = 100
+
+            action = {
+              type             = "forward"
+              target_group_key = "jenkins"
+            }
+
+            conditions = [
+              {
+                path_pattern = ["/jenkins/*"]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        resource_key = "http"
+        port         = 80
+        protocol     = "HTTP"
+
+        default_action = {
+          type = "redirect"
+
+          redirect = {
+            port        = "443"
+            protocol    = "HTTPS"
+            status_code = "HTTP_301"
+          }
+        }
+      }
+    ]
+
     tags = {
       Function = "Example Application Load Balancer"
     }
