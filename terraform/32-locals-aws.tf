@@ -269,6 +269,76 @@ locals {
     ])...)
   }
 
+  lb_listeners = {
+    for region in var.aws_config.regions : region => merge([
+      for load_balancer in var.all_load_balancers : {
+        for listener in load_balancer.listeners :
+        "${load_balancer.resource_key}/${listener.resource_key}" => {
+
+          lb_key          = load_balancer.resource_key
+          listener_key    = listener.resource_key
+          port            = listener.port
+          protocol        = listener.protocol
+          ssl_policy      = listener.ssl_policy
+          alpn_policy     = listener.alpn_policy
+          certificate_arn = listener.certificate_arn
+
+          default_action = {
+            type             = listener.default_action.type
+            target_group_key = listener.default_action.target_group_key == null ? null : "${load_balancer.resource_key}/${listener.default_action.target_group_key}"
+            redirect         = listener.default_action.redirect
+            fixed_response   = listener.default_action.fixed_response
+          }
+        }
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ]...)
+  }
+
+  lb_listener_rules = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : {
+          for rule in listener.rules :
+          "${load_balancer.resource_key}/${listener.resource_key}/${rule.resource_key}" => {
+
+            listener_key = "${load_balancer.resource_key}/${listener.resource_key}"
+            priority     = rule.priority
+
+            action = {
+              type             = rule.action.type
+              target_group_key = rule.action.target_group_key == null ? null : "${load_balancer.resource_key}/${rule.action.target_group_key}"
+              redirect         = rule.action.redirect
+              fixed_response   = rule.action.fixed_response
+            }
+
+            conditions = rule.conditions
+          }
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
+  lb_listener_certificates = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : {
+          for certificate_arn in listener.additional_certificate_arns :
+          "${load_balancer.resource_key}/${listener.resource_key}/${certificate_arn}" => {
+
+            listener_key    = "${load_balancer.resource_key}/${listener.resource_key}"
+            certificate_arn = certificate_arn
+          }
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
 
   relational_database_service = {
     for region in var.aws_config.regions : region => {

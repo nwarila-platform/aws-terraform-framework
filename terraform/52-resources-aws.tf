@@ -428,6 +428,335 @@ resource "aws_lb_target_group_attachment" "us_east_1" {
 #endregion --- [ Create All Elastic Load Balancer Target Groups ] ----------------------------- #
 
 
+#region ------ [ Create All Elastic Load Balancer Listeners ] --------------------------------- #
+
+#region ------ [ Create All Elastic Load Balancer Listeners - us-west-2 ] -------------- #
+
+resource "aws_lb_listener" "us_west_2" {
+
+  # Itterate through all Elastic Load Balancer listeners in the target region.
+  for_each = local.lb_listeners.us_west_2
+
+  # Set the provider in which to deploy the listener.
+  provider = aws.us_west_2
+
+  # Define the Elastic Load Balancer Listener Properties
+  alpn_policy       = each.value.alpn_policy
+  certificate_arn   = each.value.certificate_arn
+  load_balancer_arn = aws_lb.us_west_2[each.value.lb_key].arn
+  port              = each.value.port
+  protocol          = each.value.protocol
+  ssl_policy        = each.value.ssl_policy
+
+  default_action {
+    target_group_arn = each.value.default_action.type == "forward" ? aws_lb_target_group.us_west_2[each.value.default_action.target_group_key].arn : null
+    type             = each.value.default_action.type
+
+    dynamic "redirect" {
+      for_each = each.value.default_action.redirect == null ? [] : [each.value.default_action.redirect]
+
+      content {
+        host        = redirect.value.host
+        path        = redirect.value.path
+        port        = redirect.value.port
+        protocol    = redirect.value.protocol
+        query       = redirect.value.query
+        status_code = redirect.value.status_code
+      }
+    }
+
+    dynamic "fixed_response" {
+      for_each = each.value.default_action.fixed_response == null ? [] : [each.value.default_action.fixed_response]
+
+      content {
+        content_type = fixed_response.value.content_type
+        message_body = fixed_response.value.message_body
+        status_code  = fixed_response.value.status_code
+      }
+    }
+  }
+
+}
+
+resource "aws_lb_listener_rule" "us_west_2" {
+
+  # Itterate through all Elastic Load Balancer listener rules in the target region.
+  for_each = local.lb_listener_rules.us_west_2
+
+  # Set the provider in which to deploy the listener rule.
+  provider = aws.us_west_2
+
+  # Define the Elastic Load Balancer Listener Rule Properties
+  listener_arn = aws_lb_listener.us_west_2[each.value.listener_key].arn
+  priority     = each.value.priority
+
+  action {
+    target_group_arn = each.value.action.type == "forward" ? aws_lb_target_group.us_west_2[each.value.action.target_group_key].arn : null
+    type             = each.value.action.type
+
+    dynamic "redirect" {
+      for_each = each.value.action.redirect == null ? [] : [each.value.action.redirect]
+
+      content {
+        host        = redirect.value.host
+        path        = redirect.value.path
+        port        = redirect.value.port
+        protocol    = redirect.value.protocol
+        query       = redirect.value.query
+        status_code = redirect.value.status_code
+      }
+    }
+
+    dynamic "fixed_response" {
+      for_each = each.value.action.fixed_response == null ? [] : [each.value.action.fixed_response]
+
+      content {
+        content_type = fixed_response.value.content_type
+        message_body = fixed_response.value.message_body
+        status_code  = fixed_response.value.status_code
+      }
+    }
+  }
+
+  dynamic "condition" {
+    for_each = each.value.conditions
+
+    content {
+      dynamic "host_header" {
+        for_each = condition.value.host_header == null ? [] : [condition.value.host_header]
+
+        content {
+          values = host_header.value
+        }
+      }
+
+      dynamic "http_header" {
+        for_each = condition.value.http_header == null ? [] : [condition.value.http_header]
+
+        content {
+          http_header_name = http_header.value.http_header_name
+          values           = http_header.value.values
+        }
+      }
+
+      dynamic "http_request_method" {
+        for_each = condition.value.http_request_method == null ? [] : [condition.value.http_request_method]
+
+        content {
+          values = http_request_method.value
+        }
+      }
+
+      dynamic "path_pattern" {
+        for_each = condition.value.path_pattern == null ? [] : [condition.value.path_pattern]
+
+        content {
+          values = path_pattern.value
+        }
+      }
+
+      dynamic "query_string" {
+        for_each = condition.value.query_string == null ? [] : condition.value.query_string
+
+        content {
+          key   = query_string.value.key
+          value = query_string.value.value
+        }
+      }
+
+      dynamic "source_ip" {
+        for_each = condition.value.source_ip == null ? [] : [condition.value.source_ip]
+
+        content {
+          values = source_ip.value
+        }
+      }
+    }
+  }
+
+}
+
+resource "aws_lb_listener_certificate" "us_west_2" {
+
+  # Itterate through all Elastic Load Balancer listener certificates in the target region.
+  for_each = local.lb_listener_certificates.us_west_2
+
+  # Set the provider in which to deploy the listener certificate.
+  provider = aws.us_west_2
+
+  # Define the Elastic Load Balancer Listener Certificate Properties
+  certificate_arn = each.value.certificate_arn
+  listener_arn    = aws_lb_listener.us_west_2[each.value.listener_key].arn
+
+}
+
+#endregion --- [ Create All Elastic Load Balancer Listeners - us-west-2 ] -------------- #
+
+#region ------ [ Create All Elastic Load Balancer Listeners - us-east-1 ] -------------- #
+
+resource "aws_lb_listener" "us_east_1" {
+
+  # Itterate through all Elastic Load Balancer listeners in the target region.
+  for_each = local.lb_listeners.us_east_1
+
+  # Set the provider in which to deploy the listener.
+  provider = aws.us_east_1
+
+  # Define the Elastic Load Balancer Listener Properties
+  alpn_policy       = each.value.alpn_policy
+  certificate_arn   = each.value.certificate_arn
+  load_balancer_arn = aws_lb.us_east_1[each.value.lb_key].arn
+  port              = each.value.port
+  protocol          = each.value.protocol
+  ssl_policy        = each.value.ssl_policy
+
+  default_action {
+    target_group_arn = each.value.default_action.type == "forward" ? aws_lb_target_group.us_east_1[each.value.default_action.target_group_key].arn : null
+    type             = each.value.default_action.type
+
+    dynamic "redirect" {
+      for_each = each.value.default_action.redirect == null ? [] : [each.value.default_action.redirect]
+
+      content {
+        host        = redirect.value.host
+        path        = redirect.value.path
+        port        = redirect.value.port
+        protocol    = redirect.value.protocol
+        query       = redirect.value.query
+        status_code = redirect.value.status_code
+      }
+    }
+
+    dynamic "fixed_response" {
+      for_each = each.value.default_action.fixed_response == null ? [] : [each.value.default_action.fixed_response]
+
+      content {
+        content_type = fixed_response.value.content_type
+        message_body = fixed_response.value.message_body
+        status_code  = fixed_response.value.status_code
+      }
+    }
+  }
+
+}
+
+resource "aws_lb_listener_rule" "us_east_1" {
+
+  # Itterate through all Elastic Load Balancer listener rules in the target region.
+  for_each = local.lb_listener_rules.us_east_1
+
+  # Set the provider in which to deploy the listener rule.
+  provider = aws.us_east_1
+
+  # Define the Elastic Load Balancer Listener Rule Properties
+  listener_arn = aws_lb_listener.us_east_1[each.value.listener_key].arn
+  priority     = each.value.priority
+
+  action {
+    target_group_arn = each.value.action.type == "forward" ? aws_lb_target_group.us_east_1[each.value.action.target_group_key].arn : null
+    type             = each.value.action.type
+
+    dynamic "redirect" {
+      for_each = each.value.action.redirect == null ? [] : [each.value.action.redirect]
+
+      content {
+        host        = redirect.value.host
+        path        = redirect.value.path
+        port        = redirect.value.port
+        protocol    = redirect.value.protocol
+        query       = redirect.value.query
+        status_code = redirect.value.status_code
+      }
+    }
+
+    dynamic "fixed_response" {
+      for_each = each.value.action.fixed_response == null ? [] : [each.value.action.fixed_response]
+
+      content {
+        content_type = fixed_response.value.content_type
+        message_body = fixed_response.value.message_body
+        status_code  = fixed_response.value.status_code
+      }
+    }
+  }
+
+  dynamic "condition" {
+    for_each = each.value.conditions
+
+    content {
+      dynamic "host_header" {
+        for_each = condition.value.host_header == null ? [] : [condition.value.host_header]
+
+        content {
+          values = host_header.value
+        }
+      }
+
+      dynamic "http_header" {
+        for_each = condition.value.http_header == null ? [] : [condition.value.http_header]
+
+        content {
+          http_header_name = http_header.value.http_header_name
+          values           = http_header.value.values
+        }
+      }
+
+      dynamic "http_request_method" {
+        for_each = condition.value.http_request_method == null ? [] : [condition.value.http_request_method]
+
+        content {
+          values = http_request_method.value
+        }
+      }
+
+      dynamic "path_pattern" {
+        for_each = condition.value.path_pattern == null ? [] : [condition.value.path_pattern]
+
+        content {
+          values = path_pattern.value
+        }
+      }
+
+      dynamic "query_string" {
+        for_each = condition.value.query_string == null ? [] : condition.value.query_string
+
+        content {
+          key   = query_string.value.key
+          value = query_string.value.value
+        }
+      }
+
+      dynamic "source_ip" {
+        for_each = condition.value.source_ip == null ? [] : [condition.value.source_ip]
+
+        content {
+          values = source_ip.value
+        }
+      }
+    }
+  }
+
+}
+
+resource "aws_lb_listener_certificate" "us_east_1" {
+
+  # Itterate through all Elastic Load Balancer listener certificates in the target region.
+  for_each = local.lb_listener_certificates.us_east_1
+
+  # Set the provider in which to deploy the listener certificate.
+  provider = aws.us_east_1
+
+  # Define the Elastic Load Balancer Listener Certificate Properties
+  certificate_arn = each.value.certificate_arn
+  listener_arn    = aws_lb_listener.us_east_1[each.value.listener_key].arn
+
+}
+
+#endregion --- [ Create All Elastic Load Balancer Listeners - us-east-1 ] -------------- #
+
+#endregion --- [ Create All Elastic Load Balancer Listeners ] --------------------------------- #
+
+
 #region ------ [ Create All Elastic Block Store (EBS) Objects ] ------------------------------- #
 
 #region ------ [ Create All Elastic Block Store (EBS) Objects - us-west-2 ] ------------- #
