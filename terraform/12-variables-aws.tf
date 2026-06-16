@@ -266,6 +266,14 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
+      load_balancer.internal == true
+    ])
+    error_message = "Each all_load_balancers entry must be internal; public load balancers are not allowed."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
       load_balancer.client_keep_alive == null || (load_balancer.client_keep_alive >= 60 && load_balancer.client_keep_alive <= 604800)
     ])
     error_message = "client_keep_alive must be between 60 and 604800 seconds."

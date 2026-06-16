@@ -101,6 +101,35 @@ variable "all_systems" {
   default  = []
   nullable = false
 
+  validation {
+    condition     = length(distinct([for system in var.all_systems : system.hostname])) == length(var.all_systems)
+    error_message = "Each all_systems entry must have a unique hostname."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      contains(var.aws_config.regions, replace(system.region, "-", "_"))
+    ])
+    error_message = "Each all_systems entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      contains(["red_hat_enterprise_linux_8", "windows_server_2022_base"], system.ami)
+    ])
+    error_message = "Each all_systems entry ami must be red_hat_enterprise_linux_8 or windows_server_2022_base."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !startswith(system.aws_kms_alias, "alias/")
+    ])
+    error_message = "all_systems aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
+  }
+
   # validation {
   #   condition     = length(distinct([for s in var.baseline_ami_systems : s.ip])) == length(var.baseline_ami_systems)
   #   error_message = "Duplicate 'private_ip' values detected. Each server will need a unique IPv4 address."
@@ -154,4 +183,25 @@ variable "all_databases" {
 
   default  = []
   nullable = false
+
+  validation {
+    condition     = length(distinct([for database in var.all_databases : database.db_name])) == length(var.all_databases)
+    error_message = "Each all_databases entry must have a unique db_name."
+  }
+
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      contains(var.aws_config.regions, replace(database.region, "-", "_"))
+    ])
+    error_message = "Each all_databases entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      !startswith(database.aws_kms_alias, "alias/")
+    ])
+    error_message = "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
+  }
 }
