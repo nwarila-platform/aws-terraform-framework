@@ -122,6 +122,207 @@ run "instance_state_created_only_when_set_state_is_not_null" {
   }
 }
 
+run "ebs_volume_attachments_use_structured_wiring" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "west-ebs"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-west-ebs"
+        key_name          = "west-key"
+        aws_kms_alias     = "west"
+
+        tags = {
+          Function = "West EBS"
+        }
+
+        ebs_block_devices = [
+          {
+            volume_size = "125"
+          },
+          {
+            delete_on_termination = false
+            volume_size           = "250"
+          }
+        ]
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.5.10"
+          }
+        ]
+      },
+      {
+        region            = "us-west-2"
+        hostname          = "west-ebs-refresh"
+        availability_zone = "us-west-2b"
+        subnet_id         = "subnet-west-ebs-refresh"
+        key_name          = "west-key"
+        aws_kms_alias     = "west"
+        refresh           = true
+
+        tags = {
+          Function = "West EBS refresh"
+        }
+
+        ebs_block_devices = [
+          {
+            volume_size = "64"
+          }
+        ]
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.5.11"
+          }
+        ]
+      },
+      {
+        region            = "us-east-1"
+        hostname          = "east-ebs"
+        availability_zone = "us-east-1a"
+        subnet_id         = "subnet-east-ebs"
+        key_name          = "east-key"
+        aws_kms_alias     = "east"
+
+        tags = {
+          Function = "East EBS"
+        }
+
+        ebs_block_devices = [
+          {
+            volume_size = "32"
+          }
+        ]
+
+        network_interfaces = [
+          {
+            private_ip = "10.1.5.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  override_resource {
+    target          = aws_instance.us_west_2["west-ebs"]
+    override_during = plan
+    values = {
+      id = "i-west-ebs"
+    }
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_west_2["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["east"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/11111111-1111-1111-1111-111111111111"
+    }
+  }
+
+  override_resource {
+    target          = aws_instance.us_west_2_refresh["west-ebs-refresh"]
+    override_during = plan
+    values = {
+      id = "i-west-ebs-refresh"
+    }
+  }
+
+  override_resource {
+    target          = aws_instance.us_east_1["east-ebs"]
+    override_during = plan
+    values = {
+      id = "i-east-ebs"
+    }
+  }
+
+  override_resource {
+    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-0"]
+    override_during = plan
+    values = {
+      id = "vol-west-ebs-0"
+    }
+  }
+
+  override_resource {
+    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-1"]
+    override_during = plan
+    values = {
+      id = "vol-west-ebs-1"
+    }
+  }
+
+  override_resource {
+    target          = aws_ebs_volume.us_west_2_refresh["west-ebs-refresh-ebs-0"]
+    override_during = plan
+    values = {
+      id = "vol-west-ebs-refresh-0"
+    }
+  }
+
+  override_resource {
+    target          = aws_ebs_volume.us_east_1["east-ebs-ebs-0"]
+    override_during = plan
+    values = {
+      id = "vol-east-ebs-0"
+    }
+  }
+
+  assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-0"].hostname == "west-ebs"
+    error_message = "The west normal EBS local should carry its owning hostname explicitly."
+  }
+
+  assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-1"].index == 1
+    error_message = "The second west normal EBS local should carry its source index explicitly."
+  }
+
+  assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde"
+    error_message = "The second west normal EBS local should carry its planned device name explicitly."
+  }
+
+  assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-refresh-ebs-0"].hostname == "west-ebs-refresh"
+    error_message = "The west refresh EBS local should carry its owning hostname explicitly."
+  }
+
+  assert {
+    condition     = local.ebs_block_devices.us_east_1["east-ebs-ebs-0"].device_name == "/dev/sdd"
+    error_message = "The east EBS local should carry its planned device name explicitly."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd"
+    error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-1"].volume_id == "vol-west-ebs-1" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].skip_destroy == false
+    error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and skip_destroy."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].device_name == "/dev/sdd"
+    error_message = "The west refresh EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_east_1["east-ebs-ebs-0"].volume_id == "vol-east-ebs-0" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].instance_id == "i-east-ebs" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].device_name == "/dev/sdd"
+    error_message = "The east EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+}
+
 run "systems_reject_duplicate_hostnames" {
   command = plan
 

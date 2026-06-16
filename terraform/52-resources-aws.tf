@@ -1173,14 +1173,15 @@ resource "aws_volume_attachment" "us_west_2" {
   provider = aws.us_west_2
 
   # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
-  for_each = aws_ebs_volume.us_west_2
+  for_each = {
+    for k, v in local.ebs_block_devices.us_west_2 : k => v
+    if v.refresh == false
+  }
 
-  skip_destroy = (
-    local.ebs_block_devices.us_west_2["${each.value.tags.Name}-ebs-${each.value.tags.Index}"].delete_on_termination
-  )
-  instance_id = aws_instance.us_west_2[each.value.tags.Name].id
-  volume_id   = each.value.id
-  device_name = each.value.tags.DeviceName
+  skip_destroy = each.value.delete_on_termination
+  instance_id  = aws_instance.us_west_2[each.value.hostname].id
+  volume_id    = aws_ebs_volume.us_west_2[each.key].id
+  device_name  = each.value.device_name
 
 }
 
@@ -1190,14 +1191,15 @@ resource "aws_volume_attachment" "us_west_2_refresh" {
   provider = aws.us_west_2
 
   # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
-  for_each = aws_ebs_volume.us_west_2_refresh
+  for_each = {
+    for k, v in local.ebs_block_devices.us_west_2 : k => v
+    if v.refresh == true
+  }
 
-  skip_destroy = (
-    local.ebs_block_devices.us_west_2["${each.value.tags.Name}-ebs-${each.value.tags.Index}"].delete_on_termination
-  )
-  instance_id = aws_instance.us_west_2_refresh[each.value.tags.Name].id
-  volume_id   = each.value.id
-  device_name = each.value.tags.DeviceName
+  skip_destroy = each.value.delete_on_termination
+  instance_id  = aws_instance.us_west_2_refresh[each.value.hostname].id
+  volume_id    = aws_ebs_volume.us_west_2_refresh[each.key].id
+  device_name  = each.value.device_name
 
 }
 
@@ -1211,14 +1213,15 @@ resource "aws_volume_attachment" "us_east_1" {
   provider = aws.us_east_1
 
   # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
-  for_each = aws_ebs_volume.us_east_1
+  for_each = {
+    for k, v in local.ebs_block_devices.us_east_1 : k => v
+    if v.refresh == false
+  }
 
-  skip_destroy = (
-    local.ebs_block_devices.us_east_1["${each.value.tags.Name}-ebs-${each.value.tags.Index}"].delete_on_termination
-  )
-  instance_id = aws_instance.us_east_1[each.value.tags.Name].id
-  volume_id   = each.value.id
-  device_name = each.value.tags.DeviceName
+  skip_destroy = each.value.delete_on_termination
+  instance_id  = aws_instance.us_east_1[each.value.hostname].id
+  volume_id    = aws_ebs_volume.us_east_1[each.key].id
+  device_name  = each.value.device_name
 
 }
 
@@ -1228,14 +1231,15 @@ resource "aws_volume_attachment" "us_east_1_refresh" {
   provider = aws.us_east_1
 
   # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
-  for_each = aws_ebs_volume.us_east_1_refresh
+  for_each = {
+    for k, v in local.ebs_block_devices.us_east_1 : k => v
+    if v.refresh == true
+  }
 
-  skip_destroy = (
-    local.ebs_block_devices.us_east_1["${each.value.tags.Name}-ebs-${each.value.tags.Index}"].delete_on_termination
-  )
-  instance_id = aws_instance.us_east_1_refresh[each.value.tags.Name].id
-  volume_id   = each.value.id
-  device_name = each.value.tags.DeviceName
+  skip_destroy = each.value.delete_on_termination
+  instance_id  = aws_instance.us_east_1_refresh[each.value.hostname].id
+  volume_id    = aws_ebs_volume.us_east_1_refresh[each.key].id
+  device_name  = each.value.device_name
 
 }
 

@@ -120,13 +120,21 @@ locals {
           # AWS Network Interface Properties
           availability_zone     = system.availability_zone
           delete_on_termination = system.ebs_block_devices[index].delete_on_termination
-          encrypted             = true
-          iops                  = system.ebs_block_devices[index].iops
-          refresh               = system.refresh
-          snapshot_id           = system.ebs_block_devices[index].snapshot_id
-          throughput            = system.ebs_block_devices[index].throughput
-          volume_size           = system.ebs_block_devices[index].volume_size
-          volume_type           = system.ebs_block_devices[index].volume_type
+          device_name = can(regex(
+            "[Ww]indows",
+            local.amazon_machine_images[system.ami][region].platform
+            )) ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
+            "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+          )
+          encrypted   = true
+          hostname    = system.hostname
+          index       = index
+          iops        = system.ebs_block_devices[index].iops
+          refresh     = system.refresh
+          snapshot_id = system.ebs_block_devices[index].snapshot_id
+          throughput  = system.ebs_block_devices[index].throughput
+          volume_size = system.ebs_block_devices[index].volume_size
+          volume_type = system.ebs_block_devices[index].volume_type
 
           # ?Note: This is property relies on a data lookup, which is region specific, so its
           # ?  final value is actually calculated in the 'aws_ebs_volume' resource.
