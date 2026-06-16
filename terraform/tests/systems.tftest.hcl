@@ -368,6 +368,73 @@ run "databases_reject_kms_alias_prefix" {
   ]
 }
 
+run "databases_keep_credentials_sensitive" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "sensitivedb"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Sensitive database"
+        }
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_west_2["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  assert {
+    condition     = !issensitive(local.relational_database_service.us_west_2["sensitivedb"].db_name)
+    error_message = "Database db_name must be non-sensitive so it can be used as a stable resource key."
+  }
+
+  assert {
+    condition     = !issensitive(local.relational_database_service.us_west_2["sensitivedb"].kms_key_id)
+    error_message = "Database KMS alias metadata must be non-sensitive so it can key the KMS data source."
+  }
+
+  assert {
+    condition     = contains(keys(data.aws_kms_alias.us_west_2), "west")
+    error_message = "Database KMS alias metadata must be usable as a KMS data source key."
+  }
+
+  assert {
+    condition     = issensitive(local.relational_database_service_credentials.us_west_2["sensitivedb"].username)
+    error_message = "Database username must stay sensitive in the RDS credentials local."
+  }
+
+  assert {
+    condition     = issensitive(local.relational_database_service_credentials.us_west_2["sensitivedb"].password)
+    error_message = "Database password must stay sensitive in the RDS credentials local."
+  }
+
+  assert {
+    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].username)
+    error_message = "Database username must stay sensitive on the planned RDS resource."
+  }
+
+  assert {
+    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].password)
+    error_message = "Database password must stay sensitive on the planned RDS resource."
+  }
+}
+
 run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 

@@ -320,10 +320,10 @@ data "aws_kms_alias" "us_west_2" {
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
       if contains(["us_west_2", "us-west-2"], system.region)
-      ], [
-      for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_west_2", "us-west-2"], database.region)
-    ]))
+      ], nonsensitive([
+        for database in var.all_databases : database.aws_kms_alias
+        if contains(["us_west_2", "us-west-2"], database.region)
+    ])))
   )
 
   name = "alias/${each.value}"
@@ -341,10 +341,10 @@ data "aws_kms_alias" "us_east_1" {
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
       if contains(["us_east_1", "us-east-1"], system.region)
-      ], [
-      for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_east_1", "us-east-1"], database.region)
-    ]))
+      ], nonsensitive([
+        for database in var.all_databases : database.aws_kms_alias
+        if contains(["us_east_1", "us-east-1"], database.region)
+    ])))
   )
 
   name = "alias/${each.value}"

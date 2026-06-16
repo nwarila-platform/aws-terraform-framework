@@ -181,27 +181,28 @@ variable "all_databases" {
 
   }))
 
-  default  = []
-  nullable = false
+  default   = []
+  nullable  = false
+  sensitive = true
 
   validation {
-    condition     = length(distinct([for database in var.all_databases : database.db_name])) == length(var.all_databases)
+    condition     = nonsensitive(length(distinct([for database in var.all_databases : database.db_name])) == length(var.all_databases))
     error_message = "Each all_databases entry must have a unique db_name."
   }
 
   validation {
-    condition = alltrue([
+    condition = nonsensitive(alltrue([
       for database in var.all_databases :
       contains(var.aws_config.regions, replace(database.region, "-", "_"))
-    ])
+    ]))
     error_message = "Each all_databases entry region must normalize to one of aws_config.regions."
   }
 
   validation {
-    condition = alltrue([
+    condition = nonsensitive(alltrue([
       for database in var.all_databases :
       !startswith(database.aws_kms_alias, "alias/")
-    ])
+    ]))
     error_message = "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
   }
 }
