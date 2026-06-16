@@ -400,3 +400,43 @@ data "aws_key_pair" "us_east_1" {
 }
 
 #endregion --- [ Load All AWS EC2 Key Pairs ] ------------------------------------------------- #
+
+
+#region ------ [ Load All AWS IAM Instance Profiles ] ----------------------------------------- #
+
+data "aws_iam_instance_profile" "us_west_2" {
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_west_2
+
+  # IAM instance profiles are global; this region split keeps wiring parallel to key_name.
+  for_each = toset(
+    distinct([
+      for s in var.all_systems : s.iam_instance_profile
+      if contains(["us_west_2", "us-west-2"], s.region)
+    ])
+  )
+
+  name = each.value
+
+}
+
+
+data "aws_iam_instance_profile" "us_east_1" {
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_east_1
+
+  # IAM instance profiles are global; this region split keeps wiring parallel to key_name.
+  for_each = toset(
+    distinct([
+      for s in var.all_systems : s.iam_instance_profile
+      if contains(["us_east_1", "us-east-1"], s.region)
+    ])
+  )
+
+  name = each.value
+
+}
+
+#endregion --- [ Load All AWS IAM Instance Profiles ] ----------------------------------------- #

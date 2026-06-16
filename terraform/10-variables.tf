@@ -19,13 +19,14 @@ variable "all_systems" {
 
   type = list(object({
     /* Required Parameters */
-    region            = string
-    hostname          = string
-    availability_zone = string
-    subnet_id         = string
-    key_name          = string
-    aws_kms_alias     = string
-    refresh           = optional(bool, false)
+    region               = string
+    hostname             = string
+    availability_zone    = string
+    subnet_id            = string
+    key_name             = string
+    iam_instance_profile = string
+    aws_kms_alias        = string
+    refresh              = optional(bool, false)
 
     tags = object({
       #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
@@ -128,6 +129,14 @@ variable "all_systems" {
       !startswith(system.aws_kms_alias, "alias/")
     ])
     error_message = "all_systems aws_kms_alias must NOT include the 'alias/' prefix (it is added automatically)."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      trimspace(system.iam_instance_profile) != ""
+    ])
+    error_message = "Each all_systems entry must set a non-empty iam_instance_profile."
   }
 
   # validation {

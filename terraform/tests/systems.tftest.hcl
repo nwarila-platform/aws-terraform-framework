@@ -11,13 +11,14 @@ variables {
 
   all_systems = [
     {
-      region            = "us-west-2"
-      hostname          = "west-state"
-      availability_zone = "us-west-2a"
-      subnet_id         = "subnet-west-a"
-      key_name          = "west-key"
-      aws_kms_alias     = "west"
-      set_state         = "stopped"
+      region               = "us-west-2"
+      hostname             = "west-state"
+      availability_zone    = "us-west-2a"
+      subnet_id            = "subnet-west-a"
+      key_name             = "west-key"
+      iam_instance_profile = "example-ssm-profile"
+      aws_kms_alias        = "west"
+      set_state            = "stopped"
 
       tags = {
         Function = "West instance with state control"
@@ -30,12 +31,13 @@ variables {
       ]
     },
     {
-      region            = "us_west_2"
-      hostname          = "west-no-state"
-      availability_zone = "us-west-2a"
-      subnet_id         = "subnet-west-b"
-      key_name          = "west-key"
-      aws_kms_alias     = "west"
+      region               = "us_west_2"
+      hostname             = "west-no-state"
+      availability_zone    = "us-west-2a"
+      subnet_id            = "subnet-west-b"
+      key_name             = "west-key"
+      iam_instance_profile = "example-ssm-profile"
+      aws_kms_alias        = "west"
 
       tags = {
         Function = "West instance without state control"
@@ -48,13 +50,14 @@ variables {
       ]
     },
     {
-      region            = "us-west-2"
-      hostname          = "west-refresh"
-      availability_zone = "us-west-2b"
-      subnet_id         = "subnet-west-c"
-      key_name          = "west-key"
-      aws_kms_alias     = "west"
-      refresh           = true
+      region               = "us-west-2"
+      hostname             = "west-refresh"
+      availability_zone    = "us-west-2b"
+      subnet_id            = "subnet-west-c"
+      key_name             = "west-key"
+      iam_instance_profile = "example-ssm-profile"
+      aws_kms_alias        = "west"
+      refresh              = true
 
       tags = {
         Function = "West refresh instance"
@@ -67,13 +70,14 @@ variables {
       ]
     },
     {
-      region            = "us-east-1"
-      hostname          = "east-state"
-      availability_zone = "us-east-1a"
-      subnet_id         = "subnet-east-a"
-      key_name          = "east-key"
-      aws_kms_alias     = "east"
-      set_state         = "running"
+      region               = "us-east-1"
+      hostname             = "east-state"
+      availability_zone    = "us-east-1a"
+      subnet_id            = "subnet-east-a"
+      key_name             = "east-key"
+      iam_instance_profile = "example-ssm-profile"
+      aws_kms_alias        = "east"
+      set_state            = "running"
 
       tags = {
         Function = "East instance with state control"
@@ -120,6 +124,11 @@ run "instance_state_created_only_when_set_state_is_not_null" {
     condition     = aws_ec2_instance_state.us_east_1["east-state"].state == "running"
     error_message = "east-state should preserve the requested running state."
   }
+
+  assert {
+    condition     = aws_instance.us_west_2["west-state"].iam_instance_profile != null
+    error_message = "west-state should attach an IAM instance profile."
+  }
 }
 
 run "ebs_volume_attachments_use_structured_wiring" {
@@ -128,12 +137,13 @@ run "ebs_volume_attachments_use_structured_wiring" {
   variables {
     all_systems = [
       {
-        region            = "us-west-2"
-        hostname          = "west-ebs"
-        availability_zone = "us-west-2a"
-        subnet_id         = "subnet-west-ebs"
-        key_name          = "west-key"
-        aws_kms_alias     = "west"
+        region               = "us-west-2"
+        hostname             = "west-ebs"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-ebs"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
 
         tags = {
           Function = "West EBS"
@@ -156,13 +166,14 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
       },
       {
-        region            = "us-west-2"
-        hostname          = "west-ebs-refresh"
-        availability_zone = "us-west-2b"
-        subnet_id         = "subnet-west-ebs-refresh"
-        key_name          = "west-key"
-        aws_kms_alias     = "west"
-        refresh           = true
+        region               = "us-west-2"
+        hostname             = "west-ebs-refresh"
+        availability_zone    = "us-west-2b"
+        subnet_id            = "subnet-west-ebs-refresh"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        refresh              = true
 
         tags = {
           Function = "West EBS refresh"
@@ -181,12 +192,13 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
       },
       {
-        region            = "us-east-1"
-        hostname          = "east-ebs"
-        availability_zone = "us-east-1a"
-        subnet_id         = "subnet-east-ebs"
-        key_name          = "east-key"
-        aws_kms_alias     = "east"
+        region               = "us-east-1"
+        hostname             = "east-ebs"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-east-ebs"
+        key_name             = "east-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "east"
 
         tags = {
           Function = "East EBS"
@@ -329,12 +341,13 @@ run "systems_reject_duplicate_hostnames" {
   variables {
     all_systems = [
       {
-        region            = "us-west-2"
-        hostname          = "duplicate-host"
-        availability_zone = "us-west-2a"
-        subnet_id         = "subnet-west-a"
-        key_name          = "west-key"
-        aws_kms_alias     = "west"
+        region               = "us-west-2"
+        hostname             = "duplicate-host"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
 
         tags = {
           Function = "Duplicate host A"
@@ -347,12 +360,13 @@ run "systems_reject_duplicate_hostnames" {
         ]
       },
       {
-        region            = "us-west-2"
-        hostname          = "duplicate-host"
-        availability_zone = "us-west-2b"
-        subnet_id         = "subnet-west-b"
-        key_name          = "west-key"
-        aws_kms_alias     = "west"
+        region               = "us-west-2"
+        hostname             = "duplicate-host"
+        availability_zone    = "us-west-2b"
+        subnet_id            = "subnet-west-b"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
 
         tags = {
           Function = "Duplicate host B"
@@ -378,12 +392,13 @@ run "systems_reject_regions_outside_aws_config" {
   variables {
     all_systems = [
       {
-        region            = "eu-west-1"
-        hostname          = "bad-region"
-        availability_zone = "eu-west-1a"
-        subnet_id         = "subnet-eu-a"
-        key_name          = "eu-key"
-        aws_kms_alias     = "eu"
+        region               = "eu-west-1"
+        hostname             = "bad-region"
+        availability_zone    = "eu-west-1a"
+        subnet_id            = "subnet-eu-a"
+        key_name             = "eu-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "eu"
 
         tags = {
           Function = "Unsupported region"
@@ -409,13 +424,14 @@ run "systems_reject_unknown_ami_keys" {
   variables {
     all_systems = [
       {
-        region            = "us-west-2"
-        hostname          = "unknown-ami"
-        availability_zone = "us-west-2a"
-        subnet_id         = "subnet-west-a"
-        key_name          = "west-key"
-        aws_kms_alias     = "west"
-        ami               = "amazon_linux_2023"
+        region               = "us-west-2"
+        hostname             = "unknown-ami"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "amazon_linux_2023"
 
         tags = {
           Function = "Unsupported AMI"
@@ -441,12 +457,13 @@ run "systems_reject_kms_alias_prefix" {
   variables {
     all_systems = [
       {
-        region            = "us-west-2"
-        hostname          = "prefixed-kms"
-        availability_zone = "us-west-2a"
-        subnet_id         = "subnet-west-a"
-        key_name          = "west-key"
-        aws_kms_alias     = "alias/west"
+        region               = "us-west-2"
+        hostname             = "prefixed-kms"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "alias/west"
 
         tags = {
           Function = "Prefixed KMS alias"
@@ -455,6 +472,38 @@ run "systems_reject_kms_alias_prefix" {
         network_interfaces = [
           {
             private_ip = "10.0.4.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_empty_iam_instance_profile" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "empty-profile"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = ""
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Empty IAM instance profile"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.6.10"
           }
         ]
       }
