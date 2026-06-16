@@ -86,6 +86,150 @@ run "load_balancers_bucket_by_region" {
     condition     = aws_lb.us_east_1["east_nlb"].dns_record_client_routing_policy == "any_availability_zone"
     error_message = "east_nlb should preserve dns_record_client_routing_policy."
   }
+
+  assert {
+    condition     = length(local.lb_target_groups.us_west_2) == 0 && length(local.lb_target_groups.us_east_1) == 0
+    error_message = "Load balancers without target_groups should not emit target groups."
+  }
+
+  assert {
+    condition     = length(local.lb_target_group_attachments.us_west_2) == 0 && length(local.lb_target_group_attachments.us_east_1) == 0
+    error_message = "Load balancers without target_groups should not emit target group attachments."
+  }
+}
+
+run "load_balancer_target_groups_attach_matching_function_systems" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "web-a"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-web-a"
+        key_name          = "test-key"
+        aws_kms_alias     = "ebs"
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.10"
+            security_groups = ["sg-web"]
+          }
+        ]
+
+        tags = {
+          Function = "web"
+        }
+      },
+      {
+        region            = "us-west-2"
+        hostname          = "web-refresh"
+        availability_zone = "us-west-2b"
+        subnet_id         = "subnet-web-b"
+        key_name          = "test-key"
+        aws_kms_alias     = "ebs"
+        refresh           = true
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.11"
+            security_groups = ["sg-web"]
+          }
+        ]
+
+        tags = {
+          Function = "web"
+        }
+      },
+      {
+        region            = "us-west-2"
+        hostname          = "api-a"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-api-a"
+        key_name          = "test-key"
+        aws_kms_alias     = "ebs"
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.12"
+            security_groups = ["sg-api"]
+          }
+        ]
+
+        tags = {
+          Function = "api"
+        }
+      }
+    ]
+
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "function_alb"
+        name            = "function-alb"
+        security_groups = ["sg-lb"]
+        subnets         = ["subnet-web-a", "subnet-web-b"]
+
+        target_groups = [
+          {
+            resource_key = "web"
+            function     = "web"
+            vpc_id       = "vpc-test"
+            port         = 443
+            protocol     = "HTTPS"
+          },
+          {
+            resource_key = "cache"
+            function     = "cache"
+            vpc_id       = "vpc-test"
+            port         = 6379
+            protocol     = "TCP"
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_target_group.us_west_2), "function_alb/web")
+    error_message = "The web target group should be planned with the composite function_alb/web key."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.us_west_2["function_alb/web"].port == 443
+    error_message = "The web target group should preserve its configured target port."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_target_group.us_west_2), "function_alb/cache")
+    error_message = "The zero-match cache target group should still be planned."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/web-a")
+    error_message = "The normal web instance should attach to the web target group."
+  }
+
+  assert {
+    condition     = contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/web-refresh")
+    error_message = "The refresh web instance should attach to the web target group."
+  }
+
+  assert {
+    condition     = length([for k, _ in aws_lb_target_group_attachment.us_west_2 : k if startswith(k, "function_alb/web/")]) == 2
+    error_message = "Exactly the two Function=web systems should attach to the web target group."
+  }
+
+  assert {
+    condition     = !contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/api-a")
+    error_message = "The non-matching api system should not attach to the web target group."
+  }
+
+  assert {
+    condition     = length([for k, _ in aws_lb_target_group_attachment.us_west_2 : k if startswith(k, "function_alb/cache/")]) == 0
+    error_message = "A target group with no matching Function should produce zero attachments."
+  }
 }
 
 run "load_balancer_rejects_missing_default_target_group_key_reference" {

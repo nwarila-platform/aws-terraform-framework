@@ -210,6 +210,65 @@ locals {
     }
   }
 
+  lb_target_groups = {
+    for region in var.aws_config.regions : region => merge([
+      for load_balancer in var.all_load_balancers : {
+        for target_group in load_balancer.target_groups :
+        "${load_balancer.resource_key}/${target_group.resource_key}" => {
+
+          lb_key                            = load_balancer.resource_key
+          tg_key                            = target_group.resource_key
+          function                          = target_group.function
+          vpc_id                            = target_group.vpc_id
+          port                              = target_group.port
+          protocol                          = target_group.protocol
+          protocol_version                  = target_group.protocol_version
+          target_type                       = target_group.target_type
+          deregistration_delay              = target_group.deregistration_delay
+          slow_start                        = target_group.slow_start
+          load_balancing_algorithm_type     = target_group.load_balancing_algorithm_type
+          load_balancing_anomaly_mitigation = target_group.load_balancing_anomaly_mitigation
+          load_balancing_cross_zone_enabled = target_group.load_balancing_cross_zone_enabled
+          preserve_client_ip                = target_group.preserve_client_ip
+          proxy_protocol_v2                 = target_group.proxy_protocol_v2
+          connection_termination            = target_group.connection_termination
+          ip_address_type                   = target_group.ip_address_type
+          health_check                      = target_group.health_check
+          stickiness                        = target_group.stickiness
+
+          tags = merge(
+            target_group.tags,
+            {
+              Name        = "${load_balancer.resource_key}/${target_group.resource_key}"
+              Environment = var.environment
+              Terraform   = "True"
+            }
+          )
+        }
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ]...)
+  }
+
+  lb_target_group_attachments = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups : {
+          for system in var.all_systems :
+          "${load_balancer.resource_key}/${target_group.resource_key}/${system.hostname}" => {
+            tg_key   = "${load_balancer.resource_key}/${target_group.resource_key}"
+            hostname = system.hostname
+            port     = target_group.port
+          }
+          if replace(system.region, "-", "_") == region && system.tags.Function == target_group.function
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
 
   relational_database_service = {
     for region in var.aws_config.regions : region => {
