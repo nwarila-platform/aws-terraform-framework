@@ -451,6 +451,40 @@ run "systems_reject_unknown_ami_keys" {
   ]
 }
 
+run "systems_accept_windows_server_2025_base_ami" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "win2025-01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2025_base"
+
+        tags = {
+          Function = "Windows Server 2025"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.3.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = contains(keys(aws_instance.us_west_2), "win2025-01")
+    error_message = "Windows Server 2025 AMI should plan a west-region instance."
+  }
+}
+
 run "systems_reject_windows_hostnames_over_15_characters" {
   command = plan
 

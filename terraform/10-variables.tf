@@ -118,9 +118,9 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      contains(["red_hat_enterprise_linux_8", "windows_server_2022_base"], system.ami)
+      contains(["red_hat_enterprise_linux_8", "windows_server_2022_base", "windows_server_2025_base"], system.ami)
     ])
-    error_message = "Each all_systems entry ami must be red_hat_enterprise_linux_8 or windows_server_2022_base."
+    error_message = "Each all_systems entry ami must be red_hat_enterprise_linux_8, windows_server_2022_base, or windows_server_2025_base."
   }
 
   validation {
