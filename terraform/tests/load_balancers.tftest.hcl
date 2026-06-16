@@ -437,6 +437,27 @@ run "load_balancer_rejects_missing_default_target_group_key_reference" {
   ]
 }
 
+run "load_balancer_rejects_public_internal_false" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-west-2"
+        resource_key    = "public_alb"
+        name            = "public-alb"
+        internal        = false
+        security_groups = ["sg-public"]
+        subnets         = ["subnet-public-a", "subnet-public-b"]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
 run "load_balancer_rejects_duplicate_target_group_resource_keys" {
   command = plan
 

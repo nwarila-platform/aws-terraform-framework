@@ -16,7 +16,7 @@ variables {
       availability_zone = "us-west-2a"
       subnet_id         = "subnet-west-a"
       key_name          = "west-key"
-      aws_kms_alias     = "alias/west"
+      aws_kms_alias     = "west"
       set_state         = "stopped"
 
       tags = {
@@ -35,7 +35,7 @@ variables {
       availability_zone = "us-west-2a"
       subnet_id         = "subnet-west-b"
       key_name          = "west-key"
-      aws_kms_alias     = "alias/west"
+      aws_kms_alias     = "west"
 
       tags = {
         Function = "West instance without state control"
@@ -53,7 +53,7 @@ variables {
       availability_zone = "us-west-2b"
       subnet_id         = "subnet-west-c"
       key_name          = "west-key"
-      aws_kms_alias     = "alias/west"
+      aws_kms_alias     = "west"
       refresh           = true
 
       tags = {
@@ -72,7 +72,7 @@ variables {
       availability_zone = "us-east-1a"
       subnet_id         = "subnet-east-a"
       key_name          = "east-key"
-      aws_kms_alias     = "alias/east"
+      aws_kms_alias     = "east"
       set_state         = "running"
 
       tags = {
@@ -120,6 +120,252 @@ run "instance_state_created_only_when_set_state_is_not_null" {
     condition     = aws_ec2_instance_state.us_east_1["east-state"].state == "running"
     error_message = "east-state should preserve the requested running state."
   }
+}
+
+run "systems_reject_duplicate_hostnames" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "duplicate-host"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-west-a"
+        key_name          = "west-key"
+        aws_kms_alias     = "west"
+
+        tags = {
+          Function = "Duplicate host A"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.2.10"
+          }
+        ]
+      },
+      {
+        region            = "us-west-2"
+        hostname          = "duplicate-host"
+        availability_zone = "us-west-2b"
+        subnet_id         = "subnet-west-b"
+        key_name          = "west-key"
+        aws_kms_alias     = "west"
+
+        tags = {
+          Function = "Duplicate host B"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.2.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_regions_outside_aws_config" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "eu-west-1"
+        hostname          = "bad-region"
+        availability_zone = "eu-west-1a"
+        subnet_id         = "subnet-eu-a"
+        key_name          = "eu-key"
+        aws_kms_alias     = "eu"
+
+        tags = {
+          Function = "Unsupported region"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.2.0.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_unknown_ami_keys" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "unknown-ami"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-west-a"
+        key_name          = "west-key"
+        aws_kms_alias     = "west"
+        ami               = "amazon_linux_2023"
+
+        tags = {
+          Function = "Unsupported AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.3.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_kms_alias_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region            = "us-west-2"
+        hostname          = "prefixed-kms"
+        availability_zone = "us-west-2a"
+        subnet_id         = "subnet-west-a"
+        key_name          = "west-key"
+        aws_kms_alias     = "alias/west"
+
+        tags = {
+          Function = "Prefixed KMS alias"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.4.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "databases_reject_duplicate_db_names" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "duplicate_db"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Duplicate database A"
+        }
+      },
+      {
+        region               = "us-east-1"
+        availability_zone    = "us-east-1a"
+        db_name              = "duplicate_db"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "east"
+
+        tags = {
+          Function = "Duplicate database B"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_regions_outside_aws_config" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "eu-west-1"
+        availability_zone    = "eu-west-1a"
+        db_name              = "bad_region_db"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "eu"
+
+        tags = {
+          Function = "Unsupported database region"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_kms_alias_prefix" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "prefixed_kms_db"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "alias/west"
+
+        tags = {
+          Function = "Prefixed database KMS alias"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
 }
 
 run "instances_enforce_imdsv2_and_password_data_default" {
