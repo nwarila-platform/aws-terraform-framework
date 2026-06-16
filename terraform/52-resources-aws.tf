@@ -1252,36 +1252,36 @@ resource "aws_db_instance" "us_west_2" {
   provider = aws.us_west_2
 
   # Itterate through all network interfaces in the target region.
-  for_each = local.relational_database_service.us_west_2
+  for_each = nonsensitive(toset(keys(local.relational_database_service.us_west_2)))
 
-  allocated_storage         = each.value.allocated_storage
-  availability_zone         = each.value.availability_zone
-  backup_retention_period   = each.value.backup_retention_period
-  backup_window             = each.value.backup_window
-  ca_cert_identifier        = each.value.ca_cert_identifier
-  db_name                   = each.value.db_name
-  db_subnet_group_name      = each.value.db_subnet_group_name
-  dedicated_log_volume      = each.value.dedicated_log_volume
-  delete_automated_backups  = each.value.delete_automated_backups
-  deletion_protection       = each.value.deletion_protection
-  engine                    = each.value.engine
-  engine_version            = each.value.engine_version
-  final_snapshot_identifier = each.value.final_snapshot_identifier
-  identifier                = each.value.identifier
-  instance_class            = each.value.instance_class
-  max_allocated_storage     = each.value.max_allocated_storage
-  password                  = each.value.password
-  skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = each.value.storage_encrypted
-  storage_type              = each.value.storage_type
-  tags                      = each.value.tags
-  username                  = each.value.username
-  vpc_security_group_ids    = each.value.vpc_security_group_ids
+  allocated_storage         = nonsensitive(local.relational_database_service.us_west_2[each.value].allocated_storage)
+  availability_zone         = nonsensitive(local.relational_database_service.us_west_2[each.value].availability_zone)
+  backup_retention_period   = nonsensitive(local.relational_database_service.us_west_2[each.value].backup_retention_period)
+  backup_window             = nonsensitive(local.relational_database_service.us_west_2[each.value].backup_window)
+  ca_cert_identifier        = nonsensitive(local.relational_database_service.us_west_2[each.value].ca_cert_identifier)
+  db_name                   = nonsensitive(local.relational_database_service.us_west_2[each.value].db_name)
+  db_subnet_group_name      = nonsensitive(local.relational_database_service.us_west_2[each.value].db_subnet_group_name)
+  dedicated_log_volume      = nonsensitive(local.relational_database_service.us_west_2[each.value].dedicated_log_volume)
+  delete_automated_backups  = nonsensitive(local.relational_database_service.us_west_2[each.value].delete_automated_backups)
+  deletion_protection       = nonsensitive(local.relational_database_service.us_west_2[each.value].deletion_protection)
+  engine                    = nonsensitive(local.relational_database_service.us_west_2[each.value].engine)
+  engine_version            = nonsensitive(local.relational_database_service.us_west_2[each.value].engine_version)
+  final_snapshot_identifier = nonsensitive(local.relational_database_service.us_west_2[each.value].final_snapshot_identifier)
+  identifier                = nonsensitive(local.relational_database_service.us_west_2[each.value].identifier)
+  instance_class            = nonsensitive(local.relational_database_service.us_west_2[each.value].instance_class)
+  max_allocated_storage     = nonsensitive(local.relational_database_service.us_west_2[each.value].max_allocated_storage)
+  password                  = local.relational_database_service.us_west_2[each.value].password
+  skip_final_snapshot       = nonsensitive(local.relational_database_service.us_west_2[each.value].skip_final_snapshot)
+  storage_encrypted         = nonsensitive(local.relational_database_service.us_west_2[each.value].storage_encrypted)
+  storage_type              = nonsensitive(local.relational_database_service.us_west_2[each.value].storage_type)
+  tags                      = nonsensitive(local.relational_database_service.us_west_2[each.value].tags)
+  username                  = local.relational_database_service.us_west_2[each.value].username
+  vpc_security_group_ids    = nonsensitive(local.relational_database_service.us_west_2[each.value].vpc_security_group_ids)
 
-  kms_key_id = data.aws_kms_alias.us_west_2[each.value.kms_key_id].target_key_arn
+  kms_key_id = data.aws_kms_alias.us_west_2[nonsensitive(local.relational_database_service.us_west_2[each.value].kms_key_id)].target_key_arn
 
   dynamic "blue_green_update" {
-    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+    for_each = nonsensitive(local.relational_database_service.us_west_2[each.value].blue_green_update) ? [nonsensitive(local.relational_database_service.us_west_2[each.value].blue_green_update)] : []
 
     content {
       enabled = blue_green_update.value
@@ -1297,36 +1297,36 @@ resource "aws_db_instance" "us_east_1" {
   provider = aws.us_east_1
 
   # Itterate through all network interfaces in the target region.
-  for_each = local.relational_database_service.us_east_1
+  for_each = nonsensitive(toset(keys(local.relational_database_service.us_east_1)))
 
-  allocated_storage         = each.value.allocated_storage
-  availability_zone         = each.value.availability_zone
-  backup_retention_period   = each.value.backup_retention_period
-  backup_window             = each.value.backup_window
-  ca_cert_identifier        = each.value.ca_cert_identifier
-  db_name                   = each.value.db_name
-  db_subnet_group_name      = each.value.db_subnet_group_name
-  dedicated_log_volume      = each.value.dedicated_log_volume
-  delete_automated_backups  = each.value.delete_automated_backups
-  deletion_protection       = each.value.deletion_protection
-  engine                    = each.value.engine
-  engine_version            = each.value.engine_version
-  final_snapshot_identifier = each.value.final_snapshot_identifier
-  identifier                = each.value.identifier
-  instance_class            = each.value.instance_class
-  max_allocated_storage     = each.value.max_allocated_storage
-  password                  = each.value.password
-  skip_final_snapshot       = each.value.skip_final_snapshot
-  storage_encrypted         = each.value.storage_encrypted
-  storage_type              = each.value.storage_type
-  tags                      = each.value.tags
-  username                  = each.value.username
-  vpc_security_group_ids    = each.value.vpc_security_group_ids
+  allocated_storage         = nonsensitive(local.relational_database_service.us_east_1[each.value].allocated_storage)
+  availability_zone         = nonsensitive(local.relational_database_service.us_east_1[each.value].availability_zone)
+  backup_retention_period   = nonsensitive(local.relational_database_service.us_east_1[each.value].backup_retention_period)
+  backup_window             = nonsensitive(local.relational_database_service.us_east_1[each.value].backup_window)
+  ca_cert_identifier        = nonsensitive(local.relational_database_service.us_east_1[each.value].ca_cert_identifier)
+  db_name                   = nonsensitive(local.relational_database_service.us_east_1[each.value].db_name)
+  db_subnet_group_name      = nonsensitive(local.relational_database_service.us_east_1[each.value].db_subnet_group_name)
+  dedicated_log_volume      = nonsensitive(local.relational_database_service.us_east_1[each.value].dedicated_log_volume)
+  delete_automated_backups  = nonsensitive(local.relational_database_service.us_east_1[each.value].delete_automated_backups)
+  deletion_protection       = nonsensitive(local.relational_database_service.us_east_1[each.value].deletion_protection)
+  engine                    = nonsensitive(local.relational_database_service.us_east_1[each.value].engine)
+  engine_version            = nonsensitive(local.relational_database_service.us_east_1[each.value].engine_version)
+  final_snapshot_identifier = nonsensitive(local.relational_database_service.us_east_1[each.value].final_snapshot_identifier)
+  identifier                = nonsensitive(local.relational_database_service.us_east_1[each.value].identifier)
+  instance_class            = nonsensitive(local.relational_database_service.us_east_1[each.value].instance_class)
+  max_allocated_storage     = nonsensitive(local.relational_database_service.us_east_1[each.value].max_allocated_storage)
+  password                  = local.relational_database_service.us_east_1[each.value].password
+  skip_final_snapshot       = nonsensitive(local.relational_database_service.us_east_1[each.value].skip_final_snapshot)
+  storage_encrypted         = nonsensitive(local.relational_database_service.us_east_1[each.value].storage_encrypted)
+  storage_type              = nonsensitive(local.relational_database_service.us_east_1[each.value].storage_type)
+  tags                      = nonsensitive(local.relational_database_service.us_east_1[each.value].tags)
+  username                  = local.relational_database_service.us_east_1[each.value].username
+  vpc_security_group_ids    = nonsensitive(local.relational_database_service.us_east_1[each.value].vpc_security_group_ids)
 
-  kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  kms_key_id = data.aws_kms_alias.us_east_1[nonsensitive(local.relational_database_service.us_east_1[each.value].kms_key_id)].target_key_arn
 
   dynamic "blue_green_update" {
-    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+    for_each = nonsensitive(local.relational_database_service.us_east_1[each.value].blue_green_update) ? [nonsensitive(local.relational_database_service.us_east_1[each.value].blue_green_update)] : []
 
     content {
       enabled = blue_green_update.value

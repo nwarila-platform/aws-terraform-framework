@@ -368,6 +368,63 @@ run "databases_reject_kms_alias_prefix" {
   ]
 }
 
+run "databases_keep_credentials_sensitive" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "sensitivedb"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        password             = "test-password"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Sensitive database credentials"
+        }
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_west_2
+    values = {
+      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  assert {
+    condition     = issensitive(var.all_databases)
+    error_message = "all_databases should be marked sensitive."
+  }
+
+  assert {
+    condition     = issensitive(local.relational_database_service.us_west_2["sensitivedb"].username)
+    error_message = "RDS username should stay sensitive in the local database object."
+  }
+
+  assert {
+    condition     = issensitive(local.relational_database_service.us_west_2["sensitivedb"].password)
+    error_message = "RDS password should stay sensitive in the local database object."
+  }
+
+  assert {
+    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].username)
+    error_message = "RDS username should stay sensitive in the planned aws_db_instance."
+  }
+
+  assert {
+    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].password)
+    error_message = "RDS password should stay sensitive in the planned aws_db_instance."
+  }
+}
+
 run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 

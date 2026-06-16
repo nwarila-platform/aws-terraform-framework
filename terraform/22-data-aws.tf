@@ -316,15 +316,15 @@ data "aws_kms_alias" "us_west_2" {
   # ?Note: This for_each loop itterates through all system definitions, creates a list of
   # ?  of aws_kms_aliases, removes any duplicates, and converts the list of alises to a set
   # ?  so it can be itterated over and queried automatically for use in the AWS resources.
-  for_each = toset(
+  for_each = nonsensitive(toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
       if contains(["us_west_2", "us-west-2"], system.region)
       ], [
-      for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_west_2", "us-west-2"], database.region)
+      for database in var.all_databases : nonsensitive(database.aws_kms_alias)
+      if contains(["us_west_2", "us-west-2"], nonsensitive(database.region))
     ]))
-  )
+  ))
 
   name = "alias/${each.value}"
 
@@ -337,15 +337,15 @@ data "aws_kms_alias" "us_east_1" {
   provider = aws.us_east_1
 
   # Itterate through all network interfaces in the target region.
-  for_each = toset(
+  for_each = nonsensitive(toset(
     distinct(concat([
       for system in var.all_systems : system.aws_kms_alias
       if contains(["us_east_1", "us-east-1"], system.region)
       ], [
-      for database in var.all_databases : database.aws_kms_alias
-      if contains(["us_east_1", "us-east-1"], database.region)
+      for database in var.all_databases : nonsensitive(database.aws_kms_alias)
+      if contains(["us_east_1", "us-east-1"], nonsensitive(database.region))
     ]))
-  )
+  ))
 
   name = "alias/${each.value}"
 
