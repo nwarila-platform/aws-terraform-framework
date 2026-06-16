@@ -552,6 +552,80 @@ run "systems_accept_valid_windows_hostnames" {
   }
 }
 
+run "systems_render_ssm_agent_user_data_per_os" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "linux-ssm"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-linux"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "red_hat_enterprise_linux_8"
+
+        tags = {
+          Function = "Linux SSM user data"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.8.10"
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "win-ssm-01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-windows"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Windows SSM user data"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.8.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["linux-ssm"].user_data != null
+    error_message = "Linux instances should receive rendered SSM Agent user_data."
+  }
+
+  assert {
+    condition     = strcontains(local.elastic_compute_cloud.us_west_2["linux-ssm"].user_data, "systemctl enable --now amazon-ssm-agent")
+    error_message = "Linux user_data should enable and start amazon-ssm-agent."
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["win-ssm-01"].user_data != null
+    error_message = "Windows instances should receive rendered SSM Agent user_data."
+  }
+
+  assert {
+    condition     = strcontains(local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data, "Set-Service -Name AmazonSSMAgent -StartupType Automatic") && strcontains(local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data, "Start-Service -Name AmazonSSMAgent")
+    error_message = "Windows user_data should enable and start AmazonSSMAgent."
+  }
+
+  assert {
+    condition     = local.elastic_compute_cloud.us_west_2["linux-ssm"].user_data != local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data
+    error_message = "Linux and Windows user_data should differ so the AMI regex split is covered."
+  }
+}
+
 run "systems_reject_kms_alias_prefix" {
   command = plan
 

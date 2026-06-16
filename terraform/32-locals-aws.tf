@@ -39,10 +39,22 @@ locals {
         get_password_data    = system.get_password_data
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        hostname             = system.hostname
-        instance_type        = system.instance_type
-        refresh              = system.refresh
-        set_state            = system.set_state
+        user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
+          <powershell>
+          Set-Service -Name AmazonSSMAgent -StartupType Automatic
+          Start-Service -Name AmazonSSMAgent
+          </powershell>
+        WINDOWS_USER_DATA
+          : <<-LINUX_USER_DATA
+          #cloud-config
+          runcmd:
+            - systemctl enable --now amazon-ssm-agent
+        LINUX_USER_DATA
+        )
+        hostname      = system.hostname
+        instance_type = system.instance_type
+        refresh       = system.refresh
+        set_state     = system.set_state
 
         root_block_device = {
           volume_size           = system.root_block_device.volume_size
