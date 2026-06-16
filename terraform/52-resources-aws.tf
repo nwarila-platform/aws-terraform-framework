@@ -887,13 +887,15 @@ resource "aws_instance" "us_west_2" {
     if v.refresh == false
   }
 
-  ami                  = local.amazon_machine_images[each.value.ami]["us_west_2"].id
-  instance_type        = each.value.instance_type
-  availability_zone    = each.value.availability_zone
-  get_password_data    = each.value.get_password_data
-  tags                 = each.value.tags
-  key_name             = data.aws_key_pair.us_west_2[each.value.key_name].key_name
-  iam_instance_profile = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
+  ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
+  instance_type               = each.value.instance_type
+  availability_zone           = each.value.availability_zone
+  get_password_data           = each.value.get_password_data
+  tags                        = each.value.tags
+  key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
+  iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
+  user_data                   = each.value.user_data
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -960,13 +962,15 @@ resource "aws_instance" "us_west_2_refresh" {
     if v.refresh == true
   }
 
-  ami                  = local.amazon_machine_images[each.value.ami]["us_west_2"].id
-  instance_type        = each.value.instance_type
-  availability_zone    = each.value.availability_zone
-  get_password_data    = each.value.get_password_data
-  tags                 = each.value.tags
-  key_name             = data.aws_key_pair.us_west_2[each.value.key_name].key_name
-  iam_instance_profile = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
+  ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
+  instance_type               = each.value.instance_type
+  availability_zone           = each.value.availability_zone
+  get_password_data           = each.value.get_password_data
+  tags                        = each.value.tags
+  key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
+  iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
+  user_data                   = each.value.user_data
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -1031,13 +1035,15 @@ resource "aws_instance" "us_east_1" {
     if v.refresh == false
   }
 
-  ami                  = local.amazon_machine_images[each.value.ami]["us_east_1"].id
-  instance_type        = each.value.instance_type
-  availability_zone    = each.value.availability_zone
-  get_password_data    = each.value.get_password_data
-  tags                 = each.value.tags
-  key_name             = data.aws_key_pair.us_east_1[each.value.key_name].key_name
-  iam_instance_profile = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  instance_type               = each.value.instance_type
+  availability_zone           = each.value.availability_zone
+  get_password_data           = each.value.get_password_data
+  tags                        = each.value.tags
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+  iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  user_data                   = each.value.user_data
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -1104,13 +1110,15 @@ resource "aws_instance" "us_east_1_refresh" {
     if v.refresh == true
   }
 
-  ami                  = local.amazon_machine_images[each.value.ami]["us_east_1"].id
-  instance_type        = each.value.instance_type
-  availability_zone    = each.value.availability_zone
-  get_password_data    = each.value.get_password_data
-  tags                 = each.value.tags
-  key_name             = data.aws_key_pair.us_east_1[each.value.key_name].key_name
-  iam_instance_profile = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  instance_type               = each.value.instance_type
+  availability_zone           = each.value.availability_zone
+  get_password_data           = each.value.get_password_data
+  tags                        = each.value.tags
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+  iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  user_data                   = each.value.user_data
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
