@@ -131,6 +131,151 @@ run "instance_state_created_only_when_set_state_is_not_null" {
   }
 }
 
+run "aws_instances_output_exposes_non_secret_inventory" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "inv-linux-west"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-inventory-linux"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "red_hat_enterprise_linux_8"
+
+        tags = {
+          Function = "Inventory Linux"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.9.10"
+          }
+        ]
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "inv-win-east"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-east-inventory-windows"
+        key_name             = "east-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "east"
+        ami                  = "windows_server_2025_base"
+
+        tags = {
+          Function = "Inventory Windows"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.1.9.10"
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "inv-refresh"
+        availability_zone    = "us-west-2b"
+        subnet_id            = "subnet-west-inventory-refresh"
+        key_name             = "west-key"
+        iam_instance_profile = "example-ssm-profile"
+        aws_kms_alias        = "west"
+        ami                  = "red_hat_enterprise_linux_8"
+        refresh              = true
+
+        tags = {
+          Function = "Inventory Refresh"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.9.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = contains(keys(output.aws_instances), "inv-linux-west")
+    error_message = "aws_instances output should include the normal Linux hostname key."
+  }
+
+  assert {
+    condition     = contains(keys(output.aws_instances), "inv-win-east")
+    error_message = "aws_instances output should include the Windows hostname key."
+  }
+
+  assert {
+    condition     = contains(keys(output.aws_instances), "inv-refresh")
+    error_message = "aws_instances output should include the refresh hostname key."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-linux-west"].platform == "linux"
+    error_message = "Linux inventory entries should expose platform = linux."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-linux-west"].function == "Inventory Linux"
+    error_message = "Linux inventory entries should expose the Function tag value."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-linux-west"].region == "us_west_2"
+    error_message = "Linux inventory entries should expose the normalized region."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-linux-west"].name == "inv-linux-west"
+    error_message = "Linux inventory entries should expose the hostname as name."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-win-east"].platform == "windows"
+    error_message = "Windows inventory entries should expose platform = windows."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-win-east"].function == "Inventory Windows"
+    error_message = "Windows inventory entries should expose the Function tag value."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-win-east"].region == "us_east_1"
+    error_message = "Windows inventory entries should expose the normalized region."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-win-east"].name == "inv-win-east"
+    error_message = "Windows inventory entries should expose the hostname as name."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-refresh"].platform == "linux"
+    error_message = "Refresh inventory entries should expose platform = linux."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-refresh"].function == "Inventory Refresh"
+    error_message = "Refresh inventory entries should expose the Function tag value."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-refresh"].region == "us_west_2"
+    error_message = "Refresh inventory entries should expose the normalized region."
+  }
+
+  assert {
+    condition     = output.aws_instances["inv-refresh"].name == "inv-refresh"
+    error_message = "Refresh inventory entries should expose the hostname as name."
+  }
+}
+
 run "ebs_volume_attachments_use_structured_wiring" {
   command = plan
 
