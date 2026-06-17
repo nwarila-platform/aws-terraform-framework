@@ -1,4 +1,5 @@
 PYTHON ?= python3
+TFLINT ?= tflint
 
 .PHONY: fmt fmt-check init validate test docs docs-diff docs-check tflint opa-test opa-plan ci
 
@@ -31,7 +32,7 @@ docs-check:
 	$(PYTHON) tools/check_docs_layout.py
 
 tflint:
-	tflint --chdir=terraform
+	$(TFLINT) --config "$(CURDIR)/.tflint.hcl" --chdir terraform
 
 opa-test:
 	@if find policies/opa -name '*.rego' -print -quit | grep -q .; then \
