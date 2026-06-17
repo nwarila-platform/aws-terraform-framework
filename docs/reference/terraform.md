@@ -55,6 +55,7 @@ This file is overwritten by `terraform-docs` on every PR via the
 
 | Name | Description |
 | ---- | ----------- |
+| aws\_instances | Stable non-secret EC2 inventory keyed by hostname for the Ansible aws\_ec2 hand-off + readiness gate. |
 | aws\_listener\_arns | Elastic Load Balancer Listener ARNs keyed by all\_load\_balancers and listeners resource\_key. |
 | aws\_listeners | Stable Elastic Load Balancer Listener attributes keyed by all\_load\_balancers and listeners resource\_key. |
 | aws\_load\_balancer\_arn\_suffixes | Elastic Load Balancer ARN suffixes keyed by all\_load\_balancers resource\_key. |

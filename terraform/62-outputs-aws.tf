@@ -425,6 +425,53 @@
 # #endregion --- [ Resource(s) ] -------------------------------------------------------------- #
 
 
+#region ------ [ Resource(s): aws_instance ] -------------------------------------------------- #
+
+output "aws_instances" {
+  description = "Stable non-secret EC2 inventory keyed by hostname for the Ansible aws_ec2 hand-off + readiness gate."
+  value = merge(
+    {
+      for key, inst in aws_instance.us_west_2 : key => {
+        instance_id = inst.id
+        region      = "us_west_2"
+        name        = key
+        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        platform    = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+      }
+    },
+    {
+      for key, inst in aws_instance.us_west_2_refresh : key => {
+        instance_id = inst.id
+        region      = "us_west_2"
+        name        = key
+        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        platform    = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+      }
+    },
+    {
+      for key, inst in aws_instance.us_east_1 : key => {
+        instance_id = inst.id
+        region      = "us_east_1"
+        name        = key
+        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        platform    = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+      }
+    },
+    {
+      for key, inst in aws_instance.us_east_1_refresh : key => {
+        instance_id = inst.id
+        region      = "us_east_1"
+        name        = key
+        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        platform    = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+      }
+    }
+  )
+}
+
+#endregion --- [ Resource(s): aws_instance ] -------------------------------------------------- #
+
+
 #region ------ [ Resource(s): aws_lb ] -------------------------------------------------------- #
 
 output "aws_load_balancers" {
