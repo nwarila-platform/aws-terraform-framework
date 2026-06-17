@@ -39,6 +39,7 @@ locals {
         get_password_data    = system.get_password_data
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
+        ansible_group        = system.ansible_group
         user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
           <powershell>
           Set-Service -Name AmazonSSMAgent -StartupType Automatic
@@ -83,10 +84,13 @@ locals {
           system.tags,
           # Non-Overwritable Default Tags
           {
-            Name        = system.hostname
-            Environment = var.environment
-            Terraform   = "True"
-            OS          = local.amazon_machine_images[system.ami][region].platform_details
+            Name             = system.hostname
+            Environment      = var.environment
+            Terraform        = "True"
+            ManagedBy        = "Terraform"
+            AnsibleTransport = "ssm"
+            AnsibleGroup     = system.ansible_group
+            OS               = local.amazon_machine_images[system.ami][region].platform_details
           }
         )
       }
