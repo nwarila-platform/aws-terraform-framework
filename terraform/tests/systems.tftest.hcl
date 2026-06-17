@@ -162,7 +162,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-west-inventory-linux"
         key_name             = "west-key"
         iam_instance_profile = "example-ssm-profile"
-        ansible_group        = "jenkins"
+        ansible_group        = "linux_app"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
 
@@ -183,7 +183,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-east-inventory-windows"
         key_name             = "east-key"
         iam_instance_profile = "example-ssm-profile"
-        ansible_group        = "jenkins"
+        ansible_group        = "windows_ops"
         aws_kms_alias        = "east"
         ami                  = "windows_server_2025_base"
 
@@ -204,7 +204,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-west-inventory-refresh"
         key_name             = "west-key"
         iam_instance_profile = "example-ssm-profile"
-        ansible_group        = "jenkins"
+        ansible_group        = "refresh_group"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
         refresh              = true
@@ -238,63 +238,77 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   }
 
   assert {
-    condition     = output.aws_instances["inv-linux-west"].platform == "linux"
-    error_message = "Linux inventory entries should expose platform = linux."
+    condition = alltrue([
+      output.aws_instances["inv-linux-west"].hostname == "inv-linux-west",
+      output.aws_instances["inv-linux-west"].region == "us_west_2",
+      output.aws_instances["inv-linux-west"].function == "Inventory Linux",
+      output.aws_instances["inv-linux-west"].ansible_group == "linux_app",
+      output.aws_instances["inv-linux-west"].environment == "TEST",
+      output.aws_instances["inv-linux-west"].transport == "ssm",
+      output.aws_instances["inv-linux-west"].os_family == "linux",
+      output.aws_instances["inv-linux-west"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-linux-west"].ansible_shell_type == null,
+    ])
+    error_message = "Linux inventory entries should expose plan-known target facts."
   }
 
   assert {
-    condition     = output.aws_instances["inv-linux-west"].function == "Inventory Linux"
-    error_message = "Linux inventory entries should expose the Function tag value."
+    condition = alltrue([
+      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      contains(keys(output.aws_instances["inv-linux-west"]), field)
+    ])
+    error_message = "Linux inventory entries should include apply-known target fact keys."
   }
 
   assert {
-    condition     = output.aws_instances["inv-linux-west"].region == "us_west_2"
-    error_message = "Linux inventory entries should expose the normalized region."
+    condition = alltrue([
+      output.aws_instances["inv-win-east"].hostname == "inv-win-east",
+      output.aws_instances["inv-win-east"].region == "us_east_1",
+      output.aws_instances["inv-win-east"].function == "Inventory Windows",
+      output.aws_instances["inv-win-east"].ansible_group == "windows_ops",
+      output.aws_instances["inv-win-east"].environment == "TEST",
+      output.aws_instances["inv-win-east"].transport == "ssm",
+      output.aws_instances["inv-win-east"].os_family == "windows",
+      output.aws_instances["inv-win-east"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-win-east"].ansible_shell_type == "powershell",
+    ])
+    error_message = "Windows inventory entries should expose plan-known target facts."
   }
 
   assert {
-    condition     = output.aws_instances["inv-linux-west"].name == "inv-linux-west"
-    error_message = "Linux inventory entries should expose the hostname as name."
+    condition = alltrue([
+      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      contains(keys(output.aws_instances["inv-win-east"]), field)
+    ])
+    error_message = "Windows inventory entries should include apply-known target fact keys."
   }
 
   assert {
-    condition     = output.aws_instances["inv-win-east"].platform == "windows"
-    error_message = "Windows inventory entries should expose platform = windows."
+    condition = alltrue([
+      output.aws_instances["inv-refresh"].hostname == "inv-refresh",
+      output.aws_instances["inv-refresh"].region == "us_west_2",
+      output.aws_instances["inv-refresh"].function == "Inventory Refresh",
+      output.aws_instances["inv-refresh"].ansible_group == "refresh_group",
+      output.aws_instances["inv-refresh"].environment == "TEST",
+      output.aws_instances["inv-refresh"].transport == "ssm",
+      output.aws_instances["inv-refresh"].os_family == "linux",
+      output.aws_instances["inv-refresh"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-refresh"].ansible_shell_type == null,
+    ])
+    error_message = "Refresh inventory entries should expose plan-known target facts."
   }
 
   assert {
-    condition     = output.aws_instances["inv-win-east"].function == "Inventory Windows"
-    error_message = "Windows inventory entries should expose the Function tag value."
+    condition = alltrue([
+      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      contains(keys(output.aws_instances["inv-refresh"]), field)
+    ])
+    error_message = "Refresh inventory entries should include apply-known target fact keys."
   }
 
   assert {
-    condition     = output.aws_instances["inv-win-east"].region == "us_east_1"
-    error_message = "Windows inventory entries should expose the normalized region."
-  }
-
-  assert {
-    condition     = output.aws_instances["inv-win-east"].name == "inv-win-east"
-    error_message = "Windows inventory entries should expose the hostname as name."
-  }
-
-  assert {
-    condition     = output.aws_instances["inv-refresh"].platform == "linux"
-    error_message = "Refresh inventory entries should expose platform = linux."
-  }
-
-  assert {
-    condition     = output.aws_instances["inv-refresh"].function == "Inventory Refresh"
-    error_message = "Refresh inventory entries should expose the Function tag value."
-  }
-
-  assert {
-    condition     = output.aws_instances["inv-refresh"].region == "us_west_2"
-    error_message = "Refresh inventory entries should expose the normalized region."
-  }
-
-  assert {
-    condition     = output.aws_instances["inv-refresh"].name == "inv-refresh"
-    error_message = "Refresh inventory entries should expose the hostname as name."
+    condition     = !contains(keys(output.aws_instances["inv-linux-west"]), "platform") && !contains(keys(output.aws_instances["inv-linux-west"]), "name")
+    error_message = "aws_instances should replace the old platform/name fields with os_family/hostname."
   }
 }
 

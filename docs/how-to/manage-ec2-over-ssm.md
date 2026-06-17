@@ -102,11 +102,26 @@ Use this network posture:
 After apply, read the `aws_instances` output. It is keyed by hostname and
 contains only non-secret values:
 
-- `instance_id`
-- `region`
-- `name`
-- `function`
-- `platform`
+- `hostname`: the map key repeated as a fact.
+- `instance_id`: the EC2 instance ID.
+- `region`: the normalized framework region key.
+- `private_ip`: the primary private IP from the framework-owned
+  `<hostname>-eni-0` network interface.
+- `private_dns`: the EC2 private DNS name.
+- `function`: supplied by `all_systems[*].tags.Function`.
+- `ansible_group`: supplied by `all_systems[*].ansible_group`.
+- `environment`: supplied by `var.environment`.
+- `transport`: always `ssm`.
+- `os_family`: `linux` or `windows`, derived from the selected AMI key.
+- `ansible_host`: the EC2 instance ID, which `amazon.aws.aws_ssm` targets.
+- `ansible_connection`: always `amazon.aws.aws_ssm`.
+- `ansible_shell_type`: `powershell` for Windows and `null` for Linux.
+
+The `private_ip`, `private_dns`, `instance_id`, and `ansible_host` values are
+apply-known. They are included for hand-off and debugging, not for secret
+distribution. Refresh instances use the same primary ENI naming pattern as
+normal instances, so the output resolves their `<hostname>-eni-0` address from
+the shared regional ENI map.
 
 Example:
 
@@ -129,8 +144,8 @@ separate pipeline should use. It must contain only letters, numbers, and
 underscores, and it cannot start with a number. Hyphens and dots are rejected
 because they are significant in Ansible group names.
 
-For Windows, AWS-native `platform=windows` can drive Ansible connection settings
-such as `ansible_shell_type=powershell`. Connection details for
+For Windows, `os_family=windows` and `ansible_shell_type=powershell` can drive
+Ansible connection settings. Connection details for
 `amazon.aws.aws_ssm`, including `bucket_name`, controller region, shell type,
 and any transfer-bucket settings, live in the Ansible pipeline job.
 
