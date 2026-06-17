@@ -54,6 +54,7 @@
 !/docs/reference/terraform.md
 !/docs/how-to/
 !/docs/how-to/develop-this-module.md
+!/docs/how-to/manage-ec2-over-ssm.md
 !/docs/decision-records/
 !/docs/decision-records/README.md
 !/docs/decision-records/org/

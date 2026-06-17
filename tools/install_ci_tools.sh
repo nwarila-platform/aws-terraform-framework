@@ -119,6 +119,8 @@ install_markdownlint_cli2() {
   local prefix="${HOME}/.local/markdownlint-cli2"
 
   mkdir -p "$prefix"
+  # npm packages are version-pinned here but not checksum-pinned; this installer
+  # avoids committing a generated lockfile into CI tool bootstrap state.
   npm install --silent --no-audit --no-fund --prefix "$prefix" "markdownlint-cli2@${v}"
   ln -sf "${prefix}/node_modules/.bin/markdownlint-cli2" "${bindir}/markdownlint-cli2"
   "${bindir}/markdownlint-cli2" --version

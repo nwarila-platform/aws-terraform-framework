@@ -18,6 +18,10 @@ locals {
       us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
       us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
     }
+    "windows_server_2025_base" = {
+      us_west_2 = try(data.aws_ami.us_west_2_windows_server_2025_base[0], null)
+      us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
+    }
   }
 }
 
@@ -30,14 +34,28 @@ locals {
       for system in var.all_systems : system.hostname => {
 
         #region           = < This is set statically >
-        ami               = system.ami
-        availability_zone = system.availability_zone
-        get_password_data = system.get_password_data
-        key_name          = system.key_name
-        hostname          = system.hostname
-        instance_type     = system.instance_type
-        refresh           = system.refresh
-        set_state         = system.set_state
+        ami                  = system.ami
+        availability_zone    = system.availability_zone
+        get_password_data    = system.get_password_data
+        key_name             = system.key_name
+        iam_instance_profile = system.iam_instance_profile
+        ansible_group        = system.ansible_group
+        user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
+          <powershell>
+          Set-Service -Name AmazonSSMAgent -StartupType Automatic
+          Start-Service -Name AmazonSSMAgent
+          </powershell>
+        WINDOWS_USER_DATA
+          : <<-LINUX_USER_DATA
+          #cloud-config
+          runcmd:
+            - systemctl enable --now amazon-ssm-agent
+        LINUX_USER_DATA
+        )
+        hostname      = system.hostname
+        instance_type = system.instance_type
+        refresh       = system.refresh
+        set_state     = system.set_state
 
         root_block_device = {
           volume_size           = system.root_block_device.volume_size
@@ -66,10 +84,13 @@ locals {
           system.tags,
           # Non-Overwritable Default Tags
           {
-            Name        = system.hostname
-            Environment = var.environment
-            Terraform   = "True"
-            OS          = local.amazon_machine_images[system.ami][region].platform_details
+            Name             = system.hostname
+            Environment      = var.environment
+            Terraform        = "True"
+            ManagedBy        = "Terraform"
+            AnsibleTransport = "ssm"
+            AnsibleGroup     = system.ansible_group
+            OS               = local.amazon_machine_images[system.ami][region].platform_details
           }
         )
       }
@@ -120,13 +141,21 @@ locals {
           # AWS Network Interface Properties
           availability_zone     = system.availability_zone
           delete_on_termination = system.ebs_block_devices[index].delete_on_termination
-          encrypted             = true
-          iops                  = system.ebs_block_devices[index].iops
-          refresh               = system.refresh
-          snapshot_id           = system.ebs_block_devices[index].snapshot_id
-          throughput            = system.ebs_block_devices[index].throughput
-          volume_size           = system.ebs_block_devices[index].volume_size
-          volume_type           = system.ebs_block_devices[index].volume_type
+          device_name = can(regex(
+            "[Ww]indows",
+            local.amazon_machine_images[system.ami][region].platform
+            )) ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
+            "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+          )
+          encrypted   = true
+          hostname    = system.hostname
+          index       = index
+          iops        = system.ebs_block_devices[index].iops
+          refresh     = system.refresh
+          snapshot_id = system.ebs_block_devices[index].snapshot_id
+          throughput  = system.ebs_block_devices[index].throughput
+          volume_size = system.ebs_block_devices[index].volume_size
+          volume_type = system.ebs_block_devices[index].volume_type
 
           # ?Note: This is property relies on a data lookup, which is region specific, so its
           # ?  final value is actually calculated in the 'aws_ebs_volume' resource.
@@ -210,53 +239,192 @@ locals {
     }
   }
 
+  lb_target_groups = {
+    for region in var.aws_config.regions : region => merge([
+      for load_balancer in var.all_load_balancers : {
+        for target_group in load_balancer.target_groups :
+        "${load_balancer.resource_key}/${target_group.resource_key}" => {
+
+          lb_key                            = load_balancer.resource_key
+          tg_key                            = target_group.resource_key
+          function                          = target_group.function
+          vpc_id                            = target_group.vpc_id
+          port                              = target_group.port
+          protocol                          = target_group.protocol
+          protocol_version                  = target_group.protocol_version
+          target_type                       = target_group.target_type
+          deregistration_delay              = target_group.deregistration_delay
+          slow_start                        = target_group.slow_start
+          load_balancing_algorithm_type     = target_group.load_balancing_algorithm_type
+          load_balancing_anomaly_mitigation = target_group.load_balancing_anomaly_mitigation
+          load_balancing_cross_zone_enabled = target_group.load_balancing_cross_zone_enabled
+          preserve_client_ip                = target_group.preserve_client_ip
+          proxy_protocol_v2                 = target_group.proxy_protocol_v2
+          connection_termination            = target_group.connection_termination
+          ip_address_type                   = target_group.ip_address_type
+          health_check                      = target_group.health_check
+          stickiness                        = target_group.stickiness
+
+          tags = merge(
+            target_group.tags,
+            {
+              Name        = "${load_balancer.resource_key}/${target_group.resource_key}"
+              Environment = var.environment
+              Terraform   = "True"
+            }
+          )
+        }
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ]...)
+  }
+
+  lb_target_group_attachments = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups : {
+          for system in var.all_systems :
+          "${load_balancer.resource_key}/${target_group.resource_key}/${system.hostname}" => {
+            tg_key   = "${load_balancer.resource_key}/${target_group.resource_key}"
+            hostname = system.hostname
+            port     = target_group.port
+          }
+          if replace(system.region, "-", "_") == region && system.tags.Function == target_group.function
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
+  lb_listeners = {
+    for region in var.aws_config.regions : region => merge([
+      for load_balancer in var.all_load_balancers : {
+        for listener in load_balancer.listeners :
+        "${load_balancer.resource_key}/${listener.resource_key}" => {
+
+          lb_key          = load_balancer.resource_key
+          listener_key    = listener.resource_key
+          port            = listener.port
+          protocol        = listener.protocol
+          ssl_policy      = listener.ssl_policy
+          alpn_policy     = listener.alpn_policy
+          certificate_arn = listener.certificate_arn
+
+          default_action = {
+            type             = listener.default_action.type
+            target_group_key = listener.default_action.target_group_key == null ? null : "${load_balancer.resource_key}/${listener.default_action.target_group_key}"
+            redirect         = listener.default_action.redirect
+            fixed_response   = listener.default_action.fixed_response
+          }
+        }
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ]...)
+  }
+
+  lb_listener_rules = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : {
+          for rule in listener.rules :
+          "${load_balancer.resource_key}/${listener.resource_key}/${rule.resource_key}" => {
+
+            listener_key = "${load_balancer.resource_key}/${listener.resource_key}"
+            priority     = rule.priority
+
+            action = {
+              type             = rule.action.type
+              target_group_key = rule.action.target_group_key == null ? null : "${load_balancer.resource_key}/${rule.action.target_group_key}"
+              redirect         = rule.action.redirect
+              fixed_response   = rule.action.fixed_response
+            }
+
+            conditions = rule.conditions
+          }
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
+  lb_listener_certificates = {
+    for region in var.aws_config.regions : region => merge(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : {
+          for certificate_arn in listener.additional_certificate_arns :
+          "${load_balancer.resource_key}/${listener.resource_key}/${certificate_arn}" => {
+
+            listener_key    = "${load_balancer.resource_key}/${listener.resource_key}"
+            certificate_arn = certificate_arn
+          }
+        }
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])...)
+  }
+
 
   relational_database_service = {
-    for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+    for region in var.aws_config.regions : region => nonsensitive({
+      for database in var.all_databases : nonsensitive(database.db_name) => {
 
-        allocated_storage         = database.allocated_storage
-        availability_zone         = database.availability_zone
-        backup_retention_period   = database.backup_retention_period
-        backup_window             = database.backup_window
-        blue_green_update         = database.blue_green_update
-        ca_cert_identifier        = database.ca_cert_identifier
-        db_name                   = database.db_name
-        db_subnet_group_name      = database.db_subnet_group_name
-        dedicated_log_volume      = database.dedicated_log_volume
-        delete_automated_backups  = database.delete_automated_backups
-        deletion_protection       = database.deletion_protection
-        engine                    = database.engine
-        engine_version            = database.engine_version
-        final_snapshot_identifier = "${database.db_name}-FINAL"
-        identifier                = lower(database.db_name)
-        instance_class            = database.instance_class
-        kms_key_id                = database.aws_kms_alias
-        max_allocated_storage     = database.max_allocated_storage
-        password                  = sensitive(database.password)
+        allocated_storage           = nonsensitive(database.allocated_storage)
+        availability_zone           = nonsensitive(database.availability_zone)
+        backup_retention_period     = nonsensitive(database.backup_retention_period)
+        backup_window               = nonsensitive(database.backup_window)
+        blue_green_update           = nonsensitive(database.blue_green_update)
+        ca_cert_identifier          = nonsensitive(database.ca_cert_identifier)
+        db_name                     = nonsensitive(database.db_name)
+        db_subnet_group_name        = nonsensitive(database.db_subnet_group_name)
+        dedicated_log_volume        = nonsensitive(database.dedicated_log_volume)
+        delete_automated_backups    = nonsensitive(database.delete_automated_backups)
+        deletion_protection         = nonsensitive(database.deletion_protection)
+        engine                      = nonsensitive(database.engine)
+        engine_version              = nonsensitive(database.engine_version)
+        final_snapshot_identifier   = "${nonsensitive(database.db_name)}-FINAL"
+        identifier                  = lower(nonsensitive(database.db_name))
+        instance_class              = nonsensitive(database.instance_class)
+        kms_key_id                  = nonsensitive(database.aws_kms_alias)
+        manage_master_user_password = nonsensitive(database.manage_master_user_password)
+        max_allocated_storage       = nonsensitive(database.max_allocated_storage)
         #region                     = < This is set statically >
-        skip_final_snapshot    = database.skip_final_snapshot
+        skip_final_snapshot    = nonsensitive(database.skip_final_snapshot)
         storage_encrypted      = true
-        storage_type           = try(database.storage_type, "gp3")
-        username               = database.username
-        vpc_security_group_ids = database.vpc_security_group_ids
+        storage_type           = nonsensitive(try(database.storage_type, "gp3"))
+        vpc_security_group_ids = nonsensitive(database.vpc_security_group_ids)
 
         tags = merge(
           # Overwriteable Default Tags
           {
-            Backup = try(database.tags["Backup"], "True")
+            Backup = try(nonsensitive(database.tags["Backup"]), "True")
           },
-          database.tags,
+          nonsensitive(database.tags),
           # Non-Overwritable Default Tags
           {
-            Name        = database.db_name
+            Name        = nonsensitive(database.db_name)
             Environment = var.environment
             Terraform   = "True"
           }
         )
       }
       # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
+      if replace(nonsensitive(database.region), "-", "_") == region
+    })
+  }
+
+  relational_database_service_credentials = {
+    for region in var.aws_config.regions : region => {
+      for database in var.all_databases : nonsensitive(database.db_name) => {
+        password = database.password == null ? null : sensitive(database.password)
+        username = sensitive(database.username)
+      }
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(nonsensitive(database.region), "-", "_") == region
     }
   }
 

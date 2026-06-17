@@ -3,12 +3,14 @@ environment = "DEV"
 all_systems = [
   {
     /* Required Parameters */
-    hostname               = "tcnhq-jnk01"
+    hostname               = "example-app-01"
     region                 = "us-west-2"
     availability_zone      = "us-west-2c"
     # Match this subnet to the selected availability zone when adapting the example.
     subnet_id              = "subnet-000a0000000000aaa"
-    key_name               = "example-admin-int"
+    key_name               = "example-admin-key"
+    iam_instance_profile   = "example-ssm-profile"
+    ansible_group          = "jenkins"
     aws_kms_alias          = "aws/ebs"
     refresh                = false
 
@@ -35,7 +37,7 @@ all_systems = [
     network_interfaces = [
       {
         description     = "Primary Network Interface"
-        private_ip      = "1.2.3.4"
+        private_ip      = "10.0.0.10"
         security_groups = [
             "sg-000a000aa000aaaaa",
             "sg-0aaa00a0a000a0000"
@@ -71,6 +73,67 @@ all_load_balancers = [
 
     security_groups = [
       "sg-000a000aa000aaaaa"
+    ]
+
+    target_groups = [
+      {
+        resource_key = "jenkins"
+        function     = "Jenkins Server"
+        vpc_id       = "vpc-000a0000000000aaa"
+        port         = 8080
+        protocol     = "HTTP"
+
+        health_check = {
+          path = "/login"
+        }
+      }
+    ]
+
+    listeners = [
+      {
+        resource_key    = "https"
+        port            = 443
+        protocol        = "HTTPS"
+        certificate_arn = "arn:aws:acm:us-west-2:111122223333:certificate/EXAMPLE"
+
+        default_action = {
+          type             = "forward"
+          target_group_key = "jenkins"
+        }
+
+        rules = [
+          {
+            resource_key = "jenkins_path"
+            priority     = 100
+
+            action = {
+              type             = "forward"
+              target_group_key = "jenkins"
+            }
+
+            conditions = [
+              {
+                path_pattern = ["/jenkins/*"]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        resource_key = "http"
+        port         = 80
+        protocol     = "HTTP"
+
+        default_action = {
+          type = "redirect"
+
+          redirect = {
+            port        = "443"
+            protocol    = "HTTPS"
+            status_code = "HTTP_301"
+          }
+        }
+      }
     ]
 
     tags = {

@@ -27,6 +27,11 @@ def include_resource(change: dict[str, Any]) -> bool:
 
 def normalize_resource(change: dict[str, Any]) -> dict[str, Any]:
     detail = change.get("change", {})
+    values = planned_values(detail)
+    if change.get("type") == "aws_instance":
+        values = dict(values)
+        values["metadata_options"] = normalize_metadata_options(values)
+
     return {
         "address": change.get("address", ""),
         "mode": change.get("mode", ""),
@@ -34,7 +39,20 @@ def normalize_resource(change: dict[str, Any]) -> dict[str, Any]:
         "name": change.get("name", ""),
         "actions": detail.get("actions", []),
         "change": detail,
-        "values": planned_values(detail),
+        "values": values,
+    }
+
+
+def normalize_metadata_options(values: dict[str, Any]) -> dict[str, Any]:
+    metadata_options = values.get("metadata_options", {})
+    if isinstance(metadata_options, list):
+        metadata_options = metadata_options[0] if metadata_options else {}
+    if not isinstance(metadata_options, dict):
+        return {}
+    return {
+        key: metadata_options[key]
+        for key in ("http_tokens", "http_endpoint")
+        if key in metadata_options
     }
 
 

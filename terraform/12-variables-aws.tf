@@ -16,6 +16,13 @@ variable "aws_config" {
   nullable = false
 }
 
+variable "windows_ami_owners" {
+  description = "AWS account IDs that own the custom Windows base AMI (TPM-Windows_Server-2022). Defaults to the calling account; override if the AMI lives elsewhere."
+  type        = list(string)
+  default     = ["self"]
+  nullable    = false
+}
+
 variable "all_load_balancers" {
   description = "Define all Elastic Load Balancers managed by this framework."
 
@@ -75,7 +82,104 @@ variable "all_load_balancers" {
       subnet_id            = string
     })), [])
     subnets = optional(list(string), [])
-    tags    = optional(map(string), {})
+    target_groups = optional(list(object({
+      resource_key                      = string
+      function                          = string
+      vpc_id                            = string
+      port                              = number
+      protocol                          = string
+      protocol_version                  = optional(string)
+      target_type                       = optional(string, "instance")
+      deregistration_delay              = optional(number)
+      slow_start                        = optional(number)
+      load_balancing_algorithm_type     = optional(string)
+      load_balancing_anomaly_mitigation = optional(string)
+      load_balancing_cross_zone_enabled = optional(string)
+      preserve_client_ip                = optional(string)
+      proxy_protocol_v2                 = optional(bool)
+      connection_termination            = optional(bool)
+      ip_address_type                   = optional(string)
+      health_check = optional(object({
+        enabled             = optional(bool)
+        healthy_threshold   = optional(number)
+        interval            = optional(number)
+        matcher             = optional(string)
+        path                = optional(string)
+        port                = optional(string)
+        protocol            = optional(string)
+        timeout             = optional(number)
+        unhealthy_threshold = optional(number)
+      }))
+      stickiness = optional(object({
+        type            = string
+        cookie_duration = optional(number)
+        cookie_name     = optional(string)
+        enabled         = optional(bool, true)
+      }))
+      tags = optional(map(string), {})
+    })), [])
+    listeners = optional(list(object({
+      resource_key                = string
+      port                        = number
+      protocol                    = optional(string)
+      ssl_policy                  = optional(string)
+      alpn_policy                 = optional(string)
+      certificate_arn             = optional(string)
+      additional_certificate_arns = optional(list(string), [])
+      default_action = object({
+        type             = optional(string, "forward")
+        target_group_key = optional(string)
+        redirect = optional(object({
+          status_code = string
+          host        = optional(string)
+          path        = optional(string)
+          port        = optional(string)
+          protocol    = optional(string)
+          query       = optional(string)
+        }))
+        fixed_response = optional(object({
+          content_type = string
+          message_body = optional(string)
+          status_code  = optional(string)
+        }))
+      })
+      rules = optional(list(object({
+        resource_key = string
+        priority     = number
+        action = object({
+          type             = optional(string, "forward")
+          target_group_key = optional(string)
+          redirect = optional(object({
+            status_code = string
+            host        = optional(string)
+            path        = optional(string)
+            port        = optional(string)
+            protocol    = optional(string)
+            query       = optional(string)
+          }))
+          fixed_response = optional(object({
+            content_type = string
+            message_body = optional(string)
+            status_code  = optional(string)
+          }))
+        })
+        conditions = list(object({
+          host_header         = optional(list(string))
+          path_pattern        = optional(list(string))
+          http_request_method = optional(list(string))
+          source_ip           = optional(list(string))
+          http_header = optional(object({
+            http_header_name = string
+            values           = list(string)
+          }))
+          query_string = optional(list(object({
+            key   = optional(string)
+            value = string
+          })))
+        }))
+      })), [])
+    })), [])
+    tags = optional(map(string), {})
     timeouts = optional(object({
       create = optional(string)
       delete = optional(string)
@@ -164,6 +268,14 @@ variable "all_load_balancers" {
       !load_balancer.internal || load_balancer.ip_address_type == "ipv4"
     ])
     error_message = "Internal load balancers must use ip_address_type ipv4."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
+      load_balancer.internal == true
+    ])
+    error_message = "Each all_load_balancers entry must be internal; public load balancers are not allowed."
   }
 
   validation {
@@ -332,5 +444,235 @@ variable "all_load_balancers" {
       load_balancer.xff_header_processing_mode == null || contains(["append", "preserve", "remove"], load_balancer.xff_header_processing_mode)
     ])
     error_message = "xff_header_processing_mode must be append, preserve, or remove."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
+      length(distinct([
+        for target_group in load_balancer.target_groups : target_group.resource_key
+      ])) == length(load_balancer.target_groups)
+    ])
+    error_message = "Each all_load_balancers target_groups entry must have a unique resource_key within its load balancer."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups :
+        can(regex("^[0-9A-Za-z][0-9A-Za-z_-]*$", target_group.resource_key))
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups resource_key must start with a letter or number and contain only letters, numbers, underscores, or hyphens."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
+      length(distinct([
+        for listener in load_balancer.listeners : listener.resource_key
+      ])) == length(load_balancer.listeners)
+    ])
+    error_message = "Each all_load_balancers listeners entry must have a unique resource_key within its load balancer."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners :
+        length(distinct([
+          for rule in listener.rules : rule.resource_key
+        ])) == length(listener.rules)
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule must have a unique resource_key within its listener."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners :
+        length(distinct([
+          for rule in listener.rules : rule.priority
+        ])) == length(listener.rules)
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule must have a unique priority within its listener."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules :
+          rule.priority >= 1 && rule.priority <= 50000
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule priority must be between 1 and 50000."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners :
+        listener.default_action.target_group_key == null ? true : contains([
+          for target_group in load_balancer.target_groups : target_group.resource_key
+        ], listener.default_action.target_group_key)
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener default_action target_group_key must reference a target_groups resource_key on the same load balancer."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules :
+          rule.action.target_group_key == null ? true : contains([
+            for target_group in load_balancer.target_groups : target_group.resource_key
+          ], rule.action.target_group_key)
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule action target_group_key must reference a target_groups resource_key on the same load balancer."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners :
+        listener.default_action.type == "forward" ? (
+          listener.default_action.target_group_key != null &&
+          listener.default_action.redirect == null &&
+          listener.default_action.fixed_response == null
+          ) : listener.default_action.type == "redirect" ? (
+          listener.default_action.target_group_key == null &&
+          listener.default_action.redirect != null &&
+          listener.default_action.fixed_response == null
+          ) : listener.default_action.type == "fixed-response" ? (
+          listener.default_action.target_group_key == null &&
+          listener.default_action.redirect == null &&
+          listener.default_action.fixed_response != null
+        ) : false
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener default_action must set exactly one payload matching type: forward requires target_group_key only, redirect requires redirect only, and fixed-response requires fixed_response only."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules :
+          rule.action.type == "forward" ? (
+            rule.action.target_group_key != null &&
+            rule.action.redirect == null &&
+            rule.action.fixed_response == null
+            ) : rule.action.type == "redirect" ? (
+            rule.action.target_group_key == null &&
+            rule.action.redirect != null &&
+            rule.action.fixed_response == null
+            ) : rule.action.type == "fixed-response" ? (
+            rule.action.target_group_key == null &&
+            rule.action.redirect == null &&
+            rule.action.fixed_response != null
+          ) : false
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule action must set exactly one payload matching type: forward requires target_group_key only, redirect requires redirect only, and fixed-response requires fixed_response only."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups :
+        trimspace(target_group.function) != ""
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups entry must set a non-empty function."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups :
+        trimspace(target_group.vpc_id) != ""
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups entry must set a non-empty vpc_id."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for target_group in load_balancer.target_groups :
+        target_group.target_type == "instance"
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups target_type must be instance."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules :
+          length(rule.conditions) >= 1
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule must set at least one condition."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules : [
+            for condition in rule.conditions :
+            length(compact([
+              condition.host_header == null ? "" : "host_header",
+              condition.http_header == null ? "" : "http_header",
+              condition.http_request_method == null ? "" : "http_request_method",
+              condition.path_pattern == null ? "" : "path_pattern",
+              condition.query_string == null ? "" : "query_string",
+              condition.source_ip == null ? "" : "source_ip",
+            ])) == 1
+          ]
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule condition must set exactly one of host_header, http_header, http_request_method, path_pattern, query_string, or source_ip."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules : [
+            for condition in rule.conditions :
+            (condition.host_header == null ? true : length(condition.host_header) > 0) &&
+            (condition.path_pattern == null ? true : length(condition.path_pattern) > 0) &&
+            (condition.http_request_method == null ? true : length(condition.http_request_method) > 0) &&
+            (condition.source_ip == null ? true : length(condition.source_ip) > 0) &&
+            (condition.http_header == null ? true : length(condition.http_header.values) > 0) &&
+            (condition.query_string == null ? true : length(condition.query_string) > 0)
+          ]
+        ]
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener rule condition value list must be non-empty when set."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners :
+        length(distinct(listener.additional_certificate_arns)) == length(listener.additional_certificate_arns)
+      ]
+    ]))
+    error_message = "Each all_load_balancers listener additional_certificate_arns list must not contain duplicates."
   }
 }

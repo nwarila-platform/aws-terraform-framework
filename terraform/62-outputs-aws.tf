@@ -66,7 +66,7 @@
 #      security_groups = [
 #        "sg-000a000aa000aaaaa",
 #      ]
-#      subnet_id       = "subnet-069e5602626840cae"
+#      subnet_id       = "subnet-000a0000000000ccc"
 #      tags                  = {
 #        Environment = "INT"
 #        Name        = "FirstSystem"
@@ -425,6 +425,85 @@
 # #endregion --- [ Resource(s) ] -------------------------------------------------------------- #
 
 
+#region ------ [ Resource(s): aws_instance ] -------------------------------------------------- #
+
+output "aws_instances" {
+  description = "Stable non-secret EC2 inventory keyed by hostname for the Ansible aws_ec2 hand-off + readiness gate."
+  value = merge(
+    {
+      for key, inst in aws_instance.us_west_2 : key => {
+        hostname           = key
+        instance_id        = inst.id
+        region             = "us_west_2"
+        private_ip         = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
+        private_dns        = inst.private_dns
+        function           = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        ansible_group      = local.elastic_compute_cloud.us_west_2[key].ansible_group
+        environment        = var.environment
+        transport          = "ssm"
+        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        ansible_host       = inst.id
+        ansible_connection = "amazon.aws.aws_ssm"
+        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "powershell" : null
+      }
+    },
+    {
+      for key, inst in aws_instance.us_west_2_refresh : key => {
+        hostname           = key
+        instance_id        = inst.id
+        region             = "us_west_2"
+        private_ip         = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
+        private_dns        = inst.private_dns
+        function           = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        ansible_group      = local.elastic_compute_cloud.us_west_2[key].ansible_group
+        environment        = var.environment
+        transport          = "ssm"
+        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        ansible_host       = inst.id
+        ansible_connection = "amazon.aws.aws_ssm"
+        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "powershell" : null
+      }
+    },
+    {
+      for key, inst in aws_instance.us_east_1 : key => {
+        hostname           = key
+        instance_id        = inst.id
+        region             = "us_east_1"
+        private_ip         = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
+        private_dns        = inst.private_dns
+        function           = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        ansible_group      = local.elastic_compute_cloud.us_east_1[key].ansible_group
+        environment        = var.environment
+        transport          = "ssm"
+        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        ansible_host       = inst.id
+        ansible_connection = "amazon.aws.aws_ssm"
+        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "powershell" : null
+      }
+    },
+    {
+      for key, inst in aws_instance.us_east_1_refresh : key => {
+        hostname           = key
+        instance_id        = inst.id
+        region             = "us_east_1"
+        private_ip         = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
+        private_dns        = inst.private_dns
+        function           = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        ansible_group      = local.elastic_compute_cloud.us_east_1[key].ansible_group
+        environment        = var.environment
+        transport          = "ssm"
+        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        ansible_host       = inst.id
+        ansible_connection = "amazon.aws.aws_ssm"
+        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "powershell" : null
+      }
+    }
+  )
+}
+
+#endregion --- [ Resource(s): aws_instance ] -------------------------------------------------- #
+
+
 #region ------ [ Resource(s): aws_lb ] -------------------------------------------------------- #
 
 output "aws_load_balancers" {
@@ -490,3 +569,65 @@ output "aws_load_balancer_zone_ids" {
 }
 
 #endregion --- [ Resource(s): aws_lb ] -------------------------------------------------------- #
+
+
+#region ------ [ Resource(s): aws_lb_target_group ] ------------------------------------------ #
+
+output "aws_target_groups" {
+  description = "Stable Elastic Load Balancer Target Group attributes keyed by all_load_balancers and target_groups resource_key."
+  value = merge(
+    {
+      for key, target_group in aws_lb_target_group.us_west_2 : key => {
+        arn        = target_group.arn
+        arn_suffix = target_group.arn_suffix
+        name       = target_group.name
+      }
+    },
+    {
+      for key, target_group in aws_lb_target_group.us_east_1 : key => {
+        arn        = target_group.arn
+        arn_suffix = target_group.arn_suffix
+        name       = target_group.name
+      }
+    }
+  )
+}
+
+output "aws_target_group_arns" {
+  description = "Elastic Load Balancer Target Group ARNs keyed by all_load_balancers and target_groups resource_key."
+  value = merge(
+    { for key, target_group in aws_lb_target_group.us_west_2 : key => target_group.arn },
+    { for key, target_group in aws_lb_target_group.us_east_1 : key => target_group.arn }
+  )
+}
+
+#endregion --- [ Resource(s): aws_lb_target_group ] ------------------------------------------ #
+
+
+#region ------ [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
+
+output "aws_listeners" {
+  description = "Stable Elastic Load Balancer Listener attributes keyed by all_load_balancers and listeners resource_key."
+  value = merge(
+    {
+      for key, listener in aws_lb_listener.us_west_2 : key => {
+        arn = listener.arn
+      }
+    },
+    {
+      for key, listener in aws_lb_listener.us_east_1 : key => {
+        arn = listener.arn
+      }
+    }
+  )
+}
+
+output "aws_listener_arns" {
+  description = "Elastic Load Balancer Listener ARNs keyed by all_load_balancers and listeners resource_key."
+  value = merge(
+    { for key, listener in aws_lb_listener.us_west_2 : key => listener.arn },
+    { for key, listener in aws_lb_listener.us_east_1 : key => listener.arn }
+  )
+}
+
+#endregion --- [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
