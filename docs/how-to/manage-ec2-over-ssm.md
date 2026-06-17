@@ -35,6 +35,7 @@ all_systems = [
     subnet_id            = "subnet-0123456789abcdef0"
     key_name             = "break-glass-key"
     iam_instance_profile = "ec2-ssm-core"
+    ansible_group        = "app"
     aws_kms_alias        = "ebs-default"
 
     tags = {
@@ -119,6 +120,14 @@ dynamic inventory should group on these AWS tags:
 - `Function`: supplied by `all_systems[*].tags.Function`
 - `Environment`: supplied by `var.environment`
 - `OS`: derived from the selected AMI data source
+- `ManagedBy`: set by this framework to `Terraform`
+- `AnsibleTransport`: set by this framework to `ssm`
+- `AnsibleGroup`: supplied by `all_systems[*].ansible_group`
+
+Set `ansible_group` on every system to the Ansible inventory group token the
+separate pipeline should use. It must contain only letters, numbers, and
+underscores, and it cannot start with a number. Hyphens and dots are rejected
+because they are significant in Ansible group names.
 
 For Windows, AWS-native `platform=windows` can drive Ansible connection settings
 such as `ansible_shell_type=powershell`. Connection details for

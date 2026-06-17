@@ -10,6 +10,7 @@ all_systems = [
     subnet_id              = "subnet-000a0000000000aaa"
     key_name               = "example-admin-key"
     iam_instance_profile   = "example-ssm-profile"
+    ansible_group          = "jenkins"
     aws_kms_alias          = "aws/ebs"
     refresh                = false
 
