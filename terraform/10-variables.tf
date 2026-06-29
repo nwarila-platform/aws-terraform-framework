@@ -37,7 +37,7 @@ variable "all_systems" {
       #Terraform            = <Set Automatically to 'True'>
       #Environment          = <Set Automatically From 'var.environment'>
       #ManagedBy            = <Statically Set To 'Terraform'>
-      #AnsibleTransport     = <Statically Set To 'ssm'>
+      #AnsibleTransport     = <Statically Set To 'ssh'>
       #AnsibleGroup         = <Set Automatically From 'ansible_group'>
     })
 

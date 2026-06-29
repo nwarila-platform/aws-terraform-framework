@@ -42,14 +42,14 @@ locals {
         ansible_group        = system.ansible_group
         user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
           <powershell>
-          Set-Service -Name AmazonSSMAgent -StartupType Automatic
-          Start-Service -Name AmazonSSMAgent
+          Set-Service -Name sshd -StartupType Automatic
+          Start-Service -Name sshd
           </powershell>
         WINDOWS_USER_DATA
           : <<-LINUX_USER_DATA
           #cloud-config
           runcmd:
-            - systemctl enable --now amazon-ssm-agent
+            - systemctl enable --now sshd
         LINUX_USER_DATA
         )
         hostname      = system.hostname
@@ -88,7 +88,7 @@ locals {
             Environment      = var.environment
             Terraform        = "True"
             ManagedBy        = "Terraform"
-            AnsibleTransport = "ssm"
+            AnsibleTransport = "ssh"
             AnsibleGroup     = system.ansible_group
             OS               = local.amazon_machine_images[system.ami][region].platform_details
           }

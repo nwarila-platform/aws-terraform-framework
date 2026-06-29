@@ -16,7 +16,7 @@ variables {
       availability_zone    = "us-west-2a"
       subnet_id            = "subnet-west-a"
       key_name             = "west-key"
-      iam_instance_profile = "example-ssm-profile"
+      iam_instance_profile = "example-instance-profile"
       ansible_group        = "jenkins"
       aws_kms_alias        = "west"
       set_state            = "stopped"
@@ -37,7 +37,7 @@ variables {
       availability_zone    = "us-west-2a"
       subnet_id            = "subnet-west-b"
       key_name             = "west-key"
-      iam_instance_profile = "example-ssm-profile"
+      iam_instance_profile = "example-instance-profile"
       ansible_group        = "jenkins"
       aws_kms_alias        = "west"
 
@@ -57,7 +57,7 @@ variables {
       availability_zone    = "us-west-2b"
       subnet_id            = "subnet-west-c"
       key_name             = "west-key"
-      iam_instance_profile = "example-ssm-profile"
+      iam_instance_profile = "example-instance-profile"
       ansible_group        = "jenkins"
       aws_kms_alias        = "west"
       refresh              = true
@@ -78,7 +78,7 @@ variables {
       availability_zone    = "us-east-1a"
       subnet_id            = "subnet-east-a"
       key_name             = "east-key"
-      iam_instance_profile = "example-ssm-profile"
+      iam_instance_profile = "example-instance-profile"
       ansible_group        = "jenkins"
       aws_kms_alias        = "east"
       set_state            = "running"
@@ -140,8 +140,8 @@ run "instance_state_created_only_when_set_state_is_not_null" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["west-state"].tags["AnsibleTransport"] == "ssm" && aws_instance.us_west_2_refresh["west-refresh"].tags["AnsibleTransport"] == "ssm" && aws_instance.us_east_1["east-state"].tags["AnsibleTransport"] == "ssm"
-    error_message = "EC2 instances should carry a non-overwritable AnsibleTransport=ssm discovery tag."
+    condition     = aws_instance.us_west_2["west-state"].tags["AnsibleTransport"] == "ssh" && aws_instance.us_west_2_refresh["west-refresh"].tags["AnsibleTransport"] == "ssh" && aws_instance.us_east_1["east-state"].tags["AnsibleTransport"] == "ssh"
+    error_message = "EC2 instances should carry a non-overwritable AnsibleTransport=ssh discovery tag."
   }
 
   assert {
@@ -161,7 +161,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-inventory-linux"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "linux_app"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
@@ -182,7 +182,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         availability_zone    = "us-east-1a"
         subnet_id            = "subnet-east-inventory-windows"
         key_name             = "east-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "windows_ops"
         aws_kms_alias        = "east"
         ami                  = "windows_server_2025_base"
@@ -203,7 +203,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         availability_zone    = "us-west-2b"
         subnet_id            = "subnet-west-inventory-refresh"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "refresh_group"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
@@ -244,9 +244,10 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-linux-west"].function == "Inventory Linux",
       output.aws_instances["inv-linux-west"].ansible_group == "linux_app",
       output.aws_instances["inv-linux-west"].environment == "TEST",
-      output.aws_instances["inv-linux-west"].transport == "ssm",
+      output.aws_instances["inv-linux-west"].transport == "ssh",
       output.aws_instances["inv-linux-west"].os_family == "linux",
-      output.aws_instances["inv-linux-west"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-linux-west"].ansible_connection == "ssh",
+      output.aws_instances["inv-linux-west"].ansible_user == "ec2-user",
       output.aws_instances["inv-linux-west"].ansible_shell_type == null,
     ])
     error_message = "Linux inventory entries should expose plan-known target facts."
@@ -267,9 +268,10 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-win-east"].function == "Inventory Windows",
       output.aws_instances["inv-win-east"].ansible_group == "windows_ops",
       output.aws_instances["inv-win-east"].environment == "TEST",
-      output.aws_instances["inv-win-east"].transport == "ssm",
+      output.aws_instances["inv-win-east"].transport == "ssh",
       output.aws_instances["inv-win-east"].os_family == "windows",
-      output.aws_instances["inv-win-east"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-win-east"].ansible_connection == "ssh",
+      output.aws_instances["inv-win-east"].ansible_user == null,
       output.aws_instances["inv-win-east"].ansible_shell_type == "powershell",
     ])
     error_message = "Windows inventory entries should expose plan-known target facts."
@@ -290,9 +292,10 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-refresh"].function == "Inventory Refresh",
       output.aws_instances["inv-refresh"].ansible_group == "refresh_group",
       output.aws_instances["inv-refresh"].environment == "TEST",
-      output.aws_instances["inv-refresh"].transport == "ssm",
+      output.aws_instances["inv-refresh"].transport == "ssh",
       output.aws_instances["inv-refresh"].os_family == "linux",
-      output.aws_instances["inv-refresh"].ansible_connection == "amazon.aws.aws_ssm",
+      output.aws_instances["inv-refresh"].ansible_connection == "ssh",
+      output.aws_instances["inv-refresh"].ansible_user == "ec2-user",
       output.aws_instances["inv-refresh"].ansible_shell_type == null,
     ])
     error_message = "Refresh inventory entries should expose plan-known target facts."
@@ -323,7 +326,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-ebs"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
@@ -353,7 +356,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         availability_zone    = "us-west-2b"
         subnet_id            = "subnet-west-ebs-refresh"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         refresh              = true
@@ -380,7 +383,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         availability_zone    = "us-east-1a"
         subnet_id            = "subnet-east-ebs"
         key_name             = "east-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "east"
 
@@ -530,7 +533,7 @@ run "systems_reject_duplicate_hostnames" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
@@ -550,7 +553,7 @@ run "systems_reject_duplicate_hostnames" {
         availability_zone    = "us-west-2b"
         subnet_id            = "subnet-west-b"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
@@ -583,7 +586,7 @@ run "systems_reject_regions_outside_aws_config" {
         availability_zone    = "eu-west-1a"
         subnet_id            = "subnet-eu-a"
         key_name             = "eu-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "eu"
 
@@ -616,7 +619,7 @@ run "systems_reject_unknown_ami_keys" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "amazon_linux_2023"
@@ -650,7 +653,7 @@ run "systems_accept_windows_server_2025_base_ami" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2025_base"
@@ -685,7 +688,7 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
@@ -719,7 +722,7 @@ run "systems_accept_valid_windows_hostnames" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
@@ -743,24 +746,24 @@ run "systems_accept_valid_windows_hostnames" {
   }
 }
 
-run "systems_render_ssm_agent_user_data_per_os" {
+run "systems_render_ssh_user_data_per_os" {
   command = plan
 
   variables {
     all_systems = [
       {
         region               = "us-west-2"
-        hostname             = "linux-ssm"
+        hostname             = "linux-ssh"
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-linux"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
 
         tags = {
-          Function = "Linux SSM user data"
+          Function = "Linux SSH user data"
         }
 
         network_interfaces = [
@@ -771,17 +774,17 @@ run "systems_render_ssm_agent_user_data_per_os" {
       },
       {
         region               = "us-west-2"
-        hostname             = "win-ssm-01"
+        hostname             = "win-ssh-01"
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-windows"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
         tags = {
-          Function = "Windows SSM user data"
+          Function = "Windows SSH user data"
         }
 
         network_interfaces = [
@@ -794,27 +797,27 @@ run "systems_render_ssm_agent_user_data_per_os" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["linux-ssm"].user_data != null
-    error_message = "Linux instances should receive rendered SSM Agent user_data."
+    condition     = aws_instance.us_west_2["linux-ssh"].user_data != null
+    error_message = "Linux instances should receive rendered SSH user_data."
   }
 
   assert {
-    condition     = strcontains(local.elastic_compute_cloud.us_west_2["linux-ssm"].user_data, "systemctl enable --now amazon-ssm-agent")
-    error_message = "Linux user_data should enable and start amazon-ssm-agent."
+    condition     = strcontains(local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data, "systemctl enable --now sshd")
+    error_message = "Linux user_data should enable and start sshd."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["win-ssm-01"].user_data != null
-    error_message = "Windows instances should receive rendered SSM Agent user_data."
+    condition     = aws_instance.us_west_2["win-ssh-01"].user_data != null
+    error_message = "Windows instances should receive rendered SSH user_data."
   }
 
   assert {
-    condition     = strcontains(local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data, "Set-Service -Name AmazonSSMAgent -StartupType Automatic") && strcontains(local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data, "Start-Service -Name AmazonSSMAgent")
-    error_message = "Windows user_data should enable and start AmazonSSMAgent."
+    condition     = strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic") && strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Start-Service -Name sshd")
+    error_message = "Windows user_data should enable and start sshd."
   }
 
   assert {
-    condition     = local.elastic_compute_cloud.us_west_2["linux-ssm"].user_data != local.elastic_compute_cloud.us_west_2["win-ssm-01"].user_data
+    condition     = local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data != local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data
     error_message = "Linux and Windows user_data should differ so the AMI regex split is covered."
   }
 }
@@ -830,7 +833,7 @@ run "systems_reject_kms_alias_prefix" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "jenkins"
         aws_kms_alias        = "alias/west"
 
@@ -896,7 +899,7 @@ run "systems_reject_invalid_ansible_group" {
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
-        iam_instance_profile = "example-ssm-profile"
+        iam_instance_profile = "example-instance-profile"
         ansible_group        = "bad-group"
         aws_kms_alias        = "west"
 
