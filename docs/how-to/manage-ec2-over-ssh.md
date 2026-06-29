@@ -1,19 +1,17 @@
-# Manage EC2 over SSM
+# Manage EC2 over SSH
 
 Use this guide when adding Linux or Windows EC2 instances that will be managed
-by a separate Ansible pipeline over AWS Systems Manager Session Manager.
+by a separate Ansible pipeline over SSH.
 
 ## Operating model
 
-SSM Session Manager is the only management transport for EC2 instances created
-by this framework. Do not open SSH on port 22 or WinRM on ports 5985 or 5986 for
-normal management. Ansible runs outside this repository, in a separate pipeline
-job, using the `amazon.aws.aws_ssm` connection plugin.
+SSH on TCP 22 is the only management transport for EC2 instances created by this
+framework. Do not use WinRM for normal management. Ansible runs outside this
+repository, in a separate pipeline job, using the default `ssh` connection.
 
-This repository stops at creating SSM-manageable instances and emitting a
+This repository stops at creating SSH-reachable instances and emitting a
 non-secret inventory hand-off. It does not run Ansible, poll instance readiness,
-create IAM roles, create networking, or create the S3 transfer bucket used by
-the Ansible connection plugin.
+create IAM roles, create networking, or create security group rules.
 
 ## Configure the instance profile
 
@@ -21,10 +19,9 @@ Set `iam_instance_profile` on every `all_systems` entry. The framework validates
 that the named profile exists and attaches it to the EC2 instance, but it does
 not create IAM roles, instance profiles, or policies.
 
-The profile must include AWS managed policy `AmazonSSMManagedInstanceCore`. Add
-KMS permissions only when the separate Ansible job's S3 transfer bucket uses
-SSE-KMS. The instance does not need S3 IAM permissions for Ansible transfer
-objects because the controller uses presigned URLs.
+The profile is a general-purpose instance profile for workloads and platform
+agents, such as a CloudWatch agent, application AWS access, or patch management.
+Choose the least-privilege policies that match those instance responsibilities.
 
 ```hcl
 all_systems = [
@@ -33,8 +30,8 @@ all_systems = [
     hostname             = "app01"
     availability_zone    = "us-west-2a"
     subnet_id            = "subnet-0123456789abcdef0"
-    key_name             = "break-glass-key"
-    iam_instance_profile = "ec2-ssm-core"
+    key_name             = "app-ssh-key"
+    iam_instance_profile = "ec2-base-profile"
     ansible_group        = "app"
     aws_kms_alias        = "ebs-default"
 
@@ -52,18 +49,19 @@ all_systems = [
 ]
 ```
 
-## Use SSM-ready images
+## Use SSH-ready images
 
-Bake SSM Agent into the golden image before this framework launches instances.
-That image build happens outside this repository. The framework's `user_data`
-only enables and starts the service at boot:
+Bake the SSH server into the golden image before this framework launches
+instances. Windows images must include OpenSSH Server. That image build happens
+outside this repository. The framework's `user_data` only enables and starts the
+service at boot:
 
-- Linux: `systemctl enable --now amazon-ssm-agent`
-- Windows: `Set-Service -Name AmazonSSMAgent -StartupType Automatic` and
-  `Start-Service -Name AmazonSSMAgent`
+- Linux: `systemctl enable --now sshd`
+- Windows: `Set-Service -Name sshd -StartupType Automatic` and
+  `Start-Service -Name sshd`
 
-Runtime verification is also outside this repository. The pipeline should wait
-until SSM reports the emitted instance IDs online before it runs Ansible.
+Runtime verification is also outside this repository. The pipeline should check
+that each emitted SSH target is reachable before it runs Ansible.
 
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. Prefer `windows_server_2025_base` for new
@@ -81,7 +79,7 @@ This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
 belongs in the Ansible job.
 
-## Keep security groups SSM-only
+## Open SSH from the controller
 
 Attach consumer-supplied security groups through each network interface. The
 framework references those security groups and does not create security group
@@ -89,13 +87,11 @@ rules.
 
 Use this network posture:
 
-- No inbound management ports for SSH or WinRM.
-- Egress TCP 443 to SSM service endpoints: `ssm`, `ssmmessages`,
-  `ec2messages`, and `s3`.
-- Private subnet instances must reach those services through NAT or VPC
-  endpoints.
-- Break-glass SSH on 22 or RDP on 3389 is a consumer opt-in only, outside the
-  SSM-only management path.
+- Allow inbound TCP 22 from the management or controller source.
+- Ensure private subnet instances are reachable from the Ansible controller
+  through routing, VPN, a bastion path, or another consumer-managed path.
+- RDP on 3389 and WinRM on 5985 or 5986 remain consumer opt-in and are not the
+  management path for this framework.
 
 ## Hand off inventory to Ansible
 
@@ -111,10 +107,12 @@ contains only non-secret values:
 - `function`: supplied by `all_systems[*].tags.Function`.
 - `ansible_group`: supplied by `all_systems[*].ansible_group`.
 - `environment`: supplied by `var.environment`.
-- `transport`: always `ssm`.
+- `transport`: always `ssh`.
 - `os_family`: `linux` or `windows`, derived from the selected AMI key.
-- `ansible_host`: the EC2 instance ID, which `amazon.aws.aws_ssm` targets.
-- `ansible_connection`: always `amazon.aws.aws_ssm`.
+- `ansible_host`: the primary private IP from the framework-owned
+  `<hostname>-eni-0` network interface.
+- `ansible_connection`: always `ssh`.
+- `ansible_user`: `ec2-user` for Linux and `null` for Windows.
 - `ansible_shell_type`: `powershell` for Windows and `null` for Linux.
 
 The `private_ip`, `private_dns`, `instance_id`, and `ansible_host` values are
@@ -129,14 +127,14 @@ Example:
 terraform -chdir=terraform output -json aws_instances
 ```
 
-The Ansible pipeline can use the output for readiness polling. Its `aws_ec2`
+The Ansible pipeline can use the output for readiness checks. Its `aws_ec2`
 dynamic inventory should group on these AWS tags:
 
 - `Function`: supplied by `all_systems[*].tags.Function`
 - `Environment`: supplied by `var.environment`
 - `OS`: derived from the selected AMI data source
 - `ManagedBy`: set by this framework to `Terraform`
-- `AnsibleTransport`: set by this framework to `ssm`
+- `AnsibleTransport`: set by this framework to `ssh`
 - `AnsibleGroup`: supplied by `all_systems[*].ansible_group`
 
 Set `ansible_group` on every system to the Ansible inventory group token the
@@ -144,32 +142,37 @@ separate pipeline should use. It must contain only letters, numbers, and
 underscores, and it cannot start with a number. Hyphens and dots are rejected
 because they are significant in Ansible group names.
 
+The controller connects as `ansible_user` to `ansible_host` using the private
+key for the EC2 key pair named by `key_name`. That private key stays on the
+controller side and is outside this repository.
+
 For Windows, `os_family=windows` and `ansible_shell_type=powershell` can drive
-Ansible connection settings. Connection details for
-`amazon.aws.aws_ssm`, including `bucket_name`, controller region, shell type,
-and any transfer-bucket settings, live in the Ansible pipeline job.
+Ansible connection settings. The framework emits `ansible_user = null` for
+Windows pending the owner's Windows-over-OpenSSH user decision. Windows
+OpenSSH commonly uses `Administrator` with public keys in
+`administrators_authorized_keys`, but that is a golden-image and pipeline
+concern. Set the Windows user explicitly in the Ansible job.
 
 ## Gate readiness before Ansible
 
-The pipeline should poll SSM for the emitted instance IDs before it runs
-configuration management:
+The pipeline should check TCP 22 reachability for each `ansible_host` before it
+runs configuration management:
 
 ```sh
-aws ssm describe-instance-information
+nc -vz "$ansible_host" 22
 ```
 
-Filter the result to the `instance_id` values from `aws_instances` and continue
-only when each managed instance appears online. This repository intentionally
-does not add Terraform provisioners, `null_resource` polling, or runtime
-readiness gates.
+Continue only when every managed instance accepts SSH from the controller. This
+repository intentionally does not add Terraform provisioners, `null_resource`
+polling, or runtime readiness gates.
 
-## Keep the key pair in context
+## Treat the key pair as the management credential
 
-`key_name` remains required for every `all_systems` entry, but it has no
-management function in the SSM-only model. Treat it as a latent break-glass
-artifact.
+`key_name` is required for every `all_systems` entry. It names the EC2 key pair
+whose private key the controller uses to authenticate as `ec2-user` for Linux
+instances.
 
-The EC2 resources set `user_data_replace_on_change = true`. Adopting this SSM
+The EC2 resources set `user_data_replace_on_change = true`. Adopting this SSH
 service bootstrap or changing it later forces instance replacement so the boot
 payload actually runs.
 
@@ -177,13 +180,10 @@ payload actually runs.
 
 These responsibilities stay outside this repository:
 
-- SSH and WinRM management transports.
+- Non-SSH management transports, including WinRM.
 - Ansible execution.
-- The `amazon.aws.aws_ssm` S3 transfer bucket.
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.
 - IAM role, policy, and instance-profile creation.
 - Runtime readiness polling.
 - OS hostname setting.
-- Session Manager account preferences, including KMS session encryption and
-  S3 or CloudWatch session logging.
