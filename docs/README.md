@@ -12,4 +12,4 @@ per [org ADR-0002](https://github.com/nwarila-platform/.github/blob/main/docs/de
 
 ## How-to guides
 
-- [Manage EC2 over SSM](how-to/manage-ec2-over-ssm.md)
+- [Manage EC2 over SSH](how-to/manage-ec2-over-ssh.md)
