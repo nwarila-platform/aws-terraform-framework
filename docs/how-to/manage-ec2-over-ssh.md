@@ -5,9 +5,9 @@ by a separate Ansible pipeline over SSH.
 
 ## Operating model
 
-SSH on TCP 22 is the only management transport for EC2 instances created by this
-framework. Do not use WinRM for normal management. Ansible runs outside this
-repository, in a separate pipeline job, using the default `ssh` connection.
+SSH on TCP 22 is the only supported management path for EC2 instances created
+by this framework. Do not use WinRM for normal management. Ansible runs outside
+this repository, in a separate pipeline job, using its own SSH configuration.
 
 This repository stops at creating SSH-reachable instances and emitting a
 non-secret inventory hand-off. It does not run Ansible, poll instance readiness,
@@ -32,7 +32,6 @@ all_systems = [
     subnet_id            = "subnet-0123456789abcdef0"
     key_name             = "app-ssh-key"
     iam_instance_profile = "ec2-base-profile"
-    ansible_group        = "app"
     aws_kms_alias        = "ebs-default"
 
     tags = {
@@ -93,33 +92,26 @@ Use this network posture:
 - RDP on 3389 and WinRM on 5985 or 5986 remain consumer opt-in and are not the
   management path for this framework.
 
-## Hand off inventory to Ansible
+## Hand off inventory
 
 After apply, read the `aws_instances` output. It is keyed by hostname and
-contains only non-secret values:
+contains only neutral, non-secret values:
 
-- `hostname`: the map key repeated as a fact.
+- `hostname`: the map key repeated as an inventory fact.
 - `instance_id`: the EC2 instance ID.
 - `region`: the normalized framework region key.
 - `private_ip`: the primary private IP from the framework-owned
   `<hostname>-eni-0` network interface.
 - `private_dns`: the EC2 private DNS name.
 - `function`: supplied by `all_systems[*].tags.Function`.
-- `ansible_group`: supplied by `all_systems[*].ansible_group`.
-- `environment`: supplied by `var.environment`.
-- `transport`: always `ssh`.
 - `os_family`: `linux` or `windows`, derived from the selected AMI key.
-- `ansible_host`: the primary private IP from the framework-owned
-  `<hostname>-eni-0` network interface.
-- `ansible_connection`: always `ssh`.
-- `ansible_user`: `ec2-user` for Linux and `null` for Windows.
-- `ansible_shell_type`: `powershell` for Windows and `null` for Linux.
+- `environment`: supplied by `var.environment`.
 
-The `private_ip`, `private_dns`, `instance_id`, and `ansible_host` values are
-apply-known. They are included for hand-off and debugging, not for secret
-distribution. Refresh instances use the same primary ENI naming pattern as
-normal instances, so the output resolves their `<hostname>-eni-0` address from
-the shared regional ENI map.
+The `private_ip`, `private_dns`, and `instance_id` values are apply-known. They
+are included for hand-off and debugging, not for secret distribution. Refresh
+instances use the same primary ENI naming pattern as normal instances, so the
+output resolves their `<hostname>-eni-0` address from the shared regional ENI
+map.
 
 Example:
 
@@ -128,38 +120,23 @@ terraform -chdir=terraform output -json aws_instances
 ```
 
 The Ansible pipeline can use the output for readiness checks. Its `aws_ec2`
-dynamic inventory should group on these AWS tags:
+dynamic inventory can group on these generic AWS tags:
 
 - `Function`: supplied by `all_systems[*].tags.Function`
 - `Environment`: supplied by `var.environment`
 - `OS`: derived from the selected AMI data source
 - `ManagedBy`: set by this framework to `Terraform`
-- `AnsibleTransport`: set by this framework to `ssh`
-- `AnsibleGroup`: supplied by `all_systems[*].ansible_group`
 
-Set `ansible_group` on every system to the Ansible inventory group token the
-separate pipeline should use. It must contain only letters, numbers, and
-underscores, and it cannot start with a number. Hyphens and dots are rejected
-because they are significant in Ansible group names.
-
-The controller connects as `ansible_user` to `ansible_host` using the private
-key for the EC2 key pair named by `key_name`. That private key stays on the
-controller side and is outside this repository.
-
-For Windows, `os_family=windows` and `ansible_shell_type=powershell` can drive
-Ansible connection settings. The framework emits `ansible_user = null` for
-Windows pending the owner's Windows-over-OpenSSH user decision. Windows
-OpenSSH commonly uses `Administrator` with public keys in
-`administrators_authorized_keys`, but that is a golden-image and pipeline
-concern. Set the Windows user explicitly in the Ansible job.
+Ansible owns connection variables, login users, shell settings, and grouping.
+This module only prepares the EC2 systems and emits infrastructure facts.
 
 ## Gate readiness before Ansible
 
-The pipeline should check TCP 22 reachability for each `ansible_host` before it
-runs configuration management:
+The pipeline should check TCP 22 reachability for each emitted `private_ip`
+before it runs configuration management:
 
 ```sh
-nc -vz "$ansible_host" 22
+nc -vz "$private_ip" 22
 ```
 
 Continue only when every managed instance accepts SSH from the controller. This
@@ -169,8 +146,8 @@ polling, or runtime readiness gates.
 ## Treat the key pair as the management credential
 
 `key_name` is required for every `all_systems` entry. It names the EC2 key pair
-whose private key the controller uses to authenticate as `ec2-user` for Linux
-instances.
+whose private key the controller uses for SSH authentication. The login user and
+Ansible inventory variables stay in the separate pipeline job.
 
 The EC2 resources set `user_data_replace_on_change = true`. Adopting this SSH
 service bootstrap or changing it later forces instance replacement so the boot
@@ -180,7 +157,7 @@ payload actually runs.
 
 These responsibilities stay outside this repository:
 
-- Non-SSH management transports, including WinRM.
+- Non-SSH management methods, including WinRM.
 - Ansible execution.
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.

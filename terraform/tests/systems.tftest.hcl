@@ -17,7 +17,6 @@ variables {
       subnet_id            = "subnet-west-a"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
-      ansible_group        = "jenkins"
       aws_kms_alias        = "west"
       set_state            = "stopped"
 
@@ -38,7 +37,6 @@ variables {
       subnet_id            = "subnet-west-b"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
-      ansible_group        = "jenkins"
       aws_kms_alias        = "west"
 
       tags = {
@@ -58,7 +56,6 @@ variables {
       subnet_id            = "subnet-west-c"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
-      ansible_group        = "jenkins"
       aws_kms_alias        = "west"
       refresh              = true
 
@@ -79,7 +76,6 @@ variables {
       subnet_id            = "subnet-east-a"
       key_name             = "east-key"
       iam_instance_profile = "example-instance-profile"
-      ansible_group        = "jenkins"
       aws_kms_alias        = "east"
       set_state            = "running"
 
@@ -139,15 +135,6 @@ run "instance_state_created_only_when_set_state_is_not_null" {
     error_message = "EC2 instances should carry a non-overwritable ManagedBy=Terraform discovery tag."
   }
 
-  assert {
-    condition     = aws_instance.us_west_2["west-state"].tags["AnsibleTransport"] == "ssh" && aws_instance.us_west_2_refresh["west-refresh"].tags["AnsibleTransport"] == "ssh" && aws_instance.us_east_1["east-state"].tags["AnsibleTransport"] == "ssh"
-    error_message = "EC2 instances should carry a non-overwritable AnsibleTransport=ssh discovery tag."
-  }
-
-  assert {
-    condition     = aws_instance.us_west_2["west-state"].tags["AnsibleGroup"] == "jenkins" && aws_instance.us_west_2_refresh["west-refresh"].tags["AnsibleGroup"] == "jenkins" && aws_instance.us_east_1["east-state"].tags["AnsibleGroup"] == "jenkins"
-    error_message = "EC2 instances should carry a non-overwritable AnsibleGroup tag from all_systems[*].ansible_group."
-  }
 }
 
 run "aws_instances_output_exposes_non_secret_inventory" {
@@ -162,7 +149,6 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-west-inventory-linux"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "linux_app"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
 
@@ -183,7 +169,6 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-east-inventory-windows"
         key_name             = "east-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "windows_ops"
         aws_kms_alias        = "east"
         ami                  = "windows_server_2025_base"
 
@@ -204,7 +189,6 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         subnet_id            = "subnet-west-inventory-refresh"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "refresh_group"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
         refresh              = true
@@ -242,20 +226,15 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-linux-west"].hostname == "inv-linux-west",
       output.aws_instances["inv-linux-west"].region == "us_west_2",
       output.aws_instances["inv-linux-west"].function == "Inventory Linux",
-      output.aws_instances["inv-linux-west"].ansible_group == "linux_app",
-      output.aws_instances["inv-linux-west"].environment == "TEST",
-      output.aws_instances["inv-linux-west"].transport == "ssh",
       output.aws_instances["inv-linux-west"].os_family == "linux",
-      output.aws_instances["inv-linux-west"].ansible_connection == "ssh",
-      output.aws_instances["inv-linux-west"].ansible_user == "ec2-user",
-      output.aws_instances["inv-linux-west"].ansible_shell_type == null,
+      output.aws_instances["inv-linux-west"].environment == "TEST",
     ])
     error_message = "Linux inventory entries should expose plan-known target facts."
   }
 
   assert {
     condition = alltrue([
-      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      for field in ["instance_id", "private_ip", "private_dns"] :
       contains(keys(output.aws_instances["inv-linux-west"]), field)
     ])
     error_message = "Linux inventory entries should include apply-known target fact keys."
@@ -266,20 +245,15 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-win-east"].hostname == "inv-win-east",
       output.aws_instances["inv-win-east"].region == "us_east_1",
       output.aws_instances["inv-win-east"].function == "Inventory Windows",
-      output.aws_instances["inv-win-east"].ansible_group == "windows_ops",
-      output.aws_instances["inv-win-east"].environment == "TEST",
-      output.aws_instances["inv-win-east"].transport == "ssh",
       output.aws_instances["inv-win-east"].os_family == "windows",
-      output.aws_instances["inv-win-east"].ansible_connection == "ssh",
-      output.aws_instances["inv-win-east"].ansible_user == null,
-      output.aws_instances["inv-win-east"].ansible_shell_type == "powershell",
+      output.aws_instances["inv-win-east"].environment == "TEST",
     ])
     error_message = "Windows inventory entries should expose plan-known target facts."
   }
 
   assert {
     condition = alltrue([
-      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      for field in ["instance_id", "private_ip", "private_dns"] :
       contains(keys(output.aws_instances["inv-win-east"]), field)
     ])
     error_message = "Windows inventory entries should include apply-known target fact keys."
@@ -290,20 +264,24 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-refresh"].hostname == "inv-refresh",
       output.aws_instances["inv-refresh"].region == "us_west_2",
       output.aws_instances["inv-refresh"].function == "Inventory Refresh",
-      output.aws_instances["inv-refresh"].ansible_group == "refresh_group",
-      output.aws_instances["inv-refresh"].environment == "TEST",
-      output.aws_instances["inv-refresh"].transport == "ssh",
       output.aws_instances["inv-refresh"].os_family == "linux",
-      output.aws_instances["inv-refresh"].ansible_connection == "ssh",
-      output.aws_instances["inv-refresh"].ansible_user == "ec2-user",
-      output.aws_instances["inv-refresh"].ansible_shell_type == null,
+      output.aws_instances["inv-refresh"].environment == "TEST",
     ])
     error_message = "Refresh inventory entries should expose plan-known target facts."
   }
 
   assert {
     condition = alltrue([
-      for field in ["instance_id", "private_ip", "private_dns", "ansible_host"] :
+      for name in ["inv-linux-west", "inv-win-east", "inv-refresh"] :
+      length(setsubtract(toset(keys(output.aws_instances[name])), toset(["hostname", "instance_id", "region", "private_ip", "private_dns", "function", "os_family", "environment"]))) == 0 &&
+      length(setsubtract(toset(["hostname", "instance_id", "region", "private_ip", "private_dns", "function", "os_family", "environment"]), toset(keys(output.aws_instances[name])))) == 0
+    ])
+    error_message = "Inventory entries should expose exactly the neutral EC2 hand-off fields."
+  }
+
+  assert {
+    condition = alltrue([
+      for field in ["instance_id", "private_ip", "private_dns"] :
       contains(keys(output.aws_instances["inv-refresh"]), field)
     ])
     error_message = "Refresh inventory entries should include apply-known target fact keys."
@@ -327,7 +305,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
         subnet_id            = "subnet-west-ebs"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
         tags = {
@@ -357,7 +334,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
         subnet_id            = "subnet-west-ebs-refresh"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         refresh              = true
 
@@ -384,7 +360,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
         subnet_id            = "subnet-east-ebs"
         key_name             = "east-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "east"
 
         tags = {
@@ -534,7 +509,6 @@ run "systems_reject_duplicate_hostnames" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
         tags = {
@@ -554,7 +528,6 @@ run "systems_reject_duplicate_hostnames" {
         subnet_id            = "subnet-west-b"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
         tags = {
@@ -587,7 +560,6 @@ run "systems_reject_regions_outside_aws_config" {
         subnet_id            = "subnet-eu-a"
         key_name             = "eu-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "eu"
 
         tags = {
@@ -620,7 +592,6 @@ run "systems_reject_unknown_ami_keys" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "amazon_linux_2023"
 
@@ -654,7 +625,6 @@ run "systems_accept_windows_server_2025_base_ami" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2025_base"
 
@@ -689,7 +659,6 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
@@ -723,7 +692,6 @@ run "systems_accept_valid_windows_hostnames" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
@@ -758,7 +726,6 @@ run "systems_render_ssh_user_data_per_os" {
         subnet_id            = "subnet-west-linux"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "red_hat_enterprise_linux_8"
 
@@ -779,7 +746,6 @@ run "systems_render_ssh_user_data_per_os" {
         subnet_id            = "subnet-west-windows"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
@@ -834,7 +800,6 @@ run "systems_reject_kms_alias_prefix" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "alias/west"
 
         tags = {
@@ -867,7 +832,6 @@ run "systems_reject_empty_iam_instance_profile" {
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = ""
-        ansible_group        = "jenkins"
         aws_kms_alias        = "west"
 
         tags = {
@@ -877,39 +841,6 @@ run "systems_reject_empty_iam_instance_profile" {
         network_interfaces = [
           {
             private_ip = "10.0.6.10"
-          }
-        ]
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_systems,
-  ]
-}
-
-run "systems_reject_invalid_ansible_group" {
-  command = plan
-
-  variables {
-    all_systems = [
-      {
-        region               = "us-west-2"
-        hostname             = "invalid-ansible-group"
-        availability_zone    = "us-west-2a"
-        subnet_id            = "subnet-west-a"
-        key_name             = "west-key"
-        iam_instance_profile = "example-instance-profile"
-        ansible_group        = "bad-group"
-        aws_kms_alias        = "west"
-
-        tags = {
-          Function = "Invalid Ansible group"
-        }
-
-        network_interfaces = [
-          {
-            private_ip = "10.0.6.11"
           }
         ]
       }

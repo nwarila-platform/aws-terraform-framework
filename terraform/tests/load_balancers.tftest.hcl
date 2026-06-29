@@ -125,7 +125,6 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         subnet_id            = "subnet-web-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "ebs"
 
         network_interfaces = [
@@ -146,7 +145,6 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         subnet_id            = "subnet-web-b"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "ebs"
         refresh              = true
 
@@ -168,7 +166,6 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         subnet_id            = "subnet-api-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "ebs"
 
         network_interfaces = [
@@ -265,7 +262,6 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         subnet_id            = "subnet-web-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
-        ansible_group        = "jenkins"
         aws_kms_alias        = "ebs"
 
         network_interfaces = [
