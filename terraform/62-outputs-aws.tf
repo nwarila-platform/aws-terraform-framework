@@ -428,78 +428,54 @@
 #region ------ [ Resource(s): aws_instance ] -------------------------------------------------- #
 
 output "aws_instances" {
-  description = "Stable non-secret EC2 inventory keyed by hostname for the Ansible aws_ec2 SSH hand-off + readiness gate."
+  description = "Stable non-secret EC2 inventory keyed by hostname for inventory hand-off and readiness gating."
   value = merge(
     {
       for key, inst in aws_instance.us_west_2 : key => {
-        hostname           = key
-        instance_id        = inst.id
-        region             = "us_west_2"
-        private_ip         = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        private_dns        = inst.private_dns
-        function           = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        ansible_group      = local.elastic_compute_cloud.us_west_2[key].ansible_group
-        environment        = var.environment
-        transport          = "ssh"
-        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
-        ansible_host       = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        ansible_connection = "ssh"
-        ansible_user       = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? null : "ec2-user"
-        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "powershell" : null
+        hostname    = key
+        instance_id = inst.id
+        region      = "us_west_2"
+        private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
+        private_dns = inst.private_dns
+        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        environment = var.environment
       }
     },
     {
       for key, inst in aws_instance.us_west_2_refresh : key => {
-        hostname           = key
-        instance_id        = inst.id
-        region             = "us_west_2"
-        private_ip         = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        private_dns        = inst.private_dns
-        function           = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        ansible_group      = local.elastic_compute_cloud.us_west_2[key].ansible_group
-        environment        = var.environment
-        transport          = "ssh"
-        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
-        ansible_host       = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        ansible_connection = "ssh"
-        ansible_user       = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? null : "ec2-user"
-        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "powershell" : null
+        hostname    = key
+        instance_id = inst.id
+        region      = "us_west_2"
+        private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
+        private_dns = inst.private_dns
+        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
+        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        environment = var.environment
       }
     },
     {
       for key, inst in aws_instance.us_east_1 : key => {
-        hostname           = key
-        instance_id        = inst.id
-        region             = "us_east_1"
-        private_ip         = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        private_dns        = inst.private_dns
-        function           = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        ansible_group      = local.elastic_compute_cloud.us_east_1[key].ansible_group
-        environment        = var.environment
-        transport          = "ssh"
-        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
-        ansible_host       = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        ansible_connection = "ssh"
-        ansible_user       = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? null : "ec2-user"
-        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "powershell" : null
+        hostname    = key
+        instance_id = inst.id
+        region      = "us_east_1"
+        private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
+        private_dns = inst.private_dns
+        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        environment = var.environment
       }
     },
     {
       for key, inst in aws_instance.us_east_1_refresh : key => {
-        hostname           = key
-        instance_id        = inst.id
-        region             = "us_east_1"
-        private_ip         = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        private_dns        = inst.private_dns
-        function           = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        ansible_group      = local.elastic_compute_cloud.us_east_1[key].ansible_group
-        environment        = var.environment
-        transport          = "ssh"
-        os_family          = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
-        ansible_host       = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        ansible_connection = "ssh"
-        ansible_user       = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? null : "ec2-user"
-        ansible_shell_type = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "powershell" : null
+        hostname    = key
+        instance_id = inst.id
+        region      = "us_east_1"
+        private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
+        private_dns = inst.private_dns
+        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
+        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        environment = var.environment
       }
     }
   )

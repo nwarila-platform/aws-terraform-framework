@@ -25,7 +25,6 @@ variable "all_systems" {
     subnet_id            = string
     key_name             = string
     iam_instance_profile = string
-    ansible_group        = string
     aws_kms_alias        = string
     refresh              = optional(bool, false)
 
@@ -37,8 +36,6 @@ variable "all_systems" {
       #Terraform            = <Set Automatically to 'True'>
       #Environment          = <Set Automatically From 'var.environment'>
       #ManagedBy            = <Statically Set To 'Terraform'>
-      #AnsibleTransport     = <Statically Set To 'ssh'>
-      #AnsibleGroup         = <Set Automatically From 'ansible_group'>
     })
 
     /* Optional Parameters */
@@ -155,13 +152,6 @@ variable "all_systems" {
     error_message = "Each all_systems entry must set a non-empty iam_instance_profile."
   }
 
-  validation {
-    condition = alltrue([
-      for s in var.all_systems :
-      can(regex("^[a-zA-Z_][a-zA-Z0-9_]*$", s.ansible_group))
-    ])
-    error_message = "Each all_systems entry ansible_group must be a valid Ansible group name (letters, numbers, underscores; not starting with a number; no hyphens or dots)."
-  }
 
   # validation {
   #   condition     = length(distinct([for s in var.baseline_ami_systems : s.ip])) == length(var.baseline_ami_systems)

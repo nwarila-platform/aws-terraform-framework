@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "terraform-module",
+  "bump-minor-pre-major": true,
   "bootstrap-sha": "e9cb4825b8ea36efcb466ae8c1b162585ad12ca9",
   "include-component-in-tag": false,
   "include-v-in-tag": true,
