@@ -41,8 +41,16 @@ locals {
         iam_instance_profile = system.iam_instance_profile
         user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
           <powershell>
+          Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
           Set-Service -Name sshd -StartupType Automatic
           Start-Service -Name sshd
+          $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
+          $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }
+          $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
+          Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
+          icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
+          New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
+          Restart-Service -Name sshd
           </powershell>
         WINDOWS_USER_DATA
           : <<-LINUX_USER_DATA

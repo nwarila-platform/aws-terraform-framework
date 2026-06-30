@@ -778,8 +778,13 @@ run "systems_render_ssh_user_data_per_os" {
   }
 
   assert {
-    condition     = strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic") && strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Start-Service -Name sshd")
-    error_message = "Windows user_data should enable and start sshd."
+    condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "administrators_authorized_keys"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "public-keys/0/openssh-key"),
+    ])
+    error_message = "Windows user_data should install OpenSSH, enable sshd, and bootstrap the launch key."
   }
 
   assert {
