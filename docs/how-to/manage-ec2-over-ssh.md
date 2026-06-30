@@ -136,16 +136,18 @@ This module only prepares the EC2 systems and emits infrastructure facts.
 
 ## Gate readiness before Ansible
 
-This module gates SSH reachability before configuration management. On
-`terraform apply`, `terraform_data.ssh_ready` runs a connect-only SSH-banner
-probe for each managed instance with a 10-minute timeout and no login attempt,
-so the Terraform step does not complete, and its duration captures the wait,
-until every managed instance is answering SSH.
+This module gates SSH readiness before configuration management. On
+`terraform apply`, `terraform_data.ssh_ready` runs a per-instance
+`remote-exec` probe that first waits for SSH with Terraform's 10-minute
+connection timeout, then runs the OS-native launch-agent wait:
+`cloud-init status --wait` on Linux and `ec2launch status -b` on Windows.
+The Terraform step does not complete, and its duration captures the wait, until
+each instance is provisioned and reachable.
 
-This proves reachability, not `user_data` or cloud-init completion. On Linux,
-sshd can answer before cloud-init finishes. The probe also does not
-authenticate, so the downstream Ansible job still owns SSH credentials and any
-"fully configured" check.
+The gate authenticates with the instance key pair using
+`var.ssh_readiness_private_key_paths`, the same private key material the
+Ansible controller uses. Leave the map empty for plan and CI; a real apply must
+populate a filesystem path for every `key_name` in use.
 
 ## Treat the key pair as the management credential
 

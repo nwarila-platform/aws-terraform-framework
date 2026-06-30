@@ -1156,32 +1156,78 @@ resource "aws_instance" "us_east_1_refresh" {
 
 }
 
-#region ------ [ Wait For SSH Readiness ] ----------------------------------------------------- #
+#region ------ [ SSH Readiness Gate ] --------------------------------------------------------- #
 
-# Block `apply` until each instance is answering SSH (connect-only banner probe; no login/auth), so the
-# Terraform step owns and times the full boot + user_data setup wait. Re-runs only when an instance is
-# replaced. A 10-minute timeout means a box that never brings sshd up (e.g. a silent Windows OpenSSH
-# install failure with no egress) fails the apply instead of passing silently.
+# Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the readiness
+# gate can pick the right login user, wait command, and private key per instance.
+locals {
+  ssh_ready_targets = merge(
+    {
+      for hostname, instance in aws_instance.us_west_2 : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_west_2_refresh : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_east_1 : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_east_1_refresh : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+      }
+    },
+  )
+}
+
+# Block `apply` until each instance finishes provisioning and is reachable over SSH, so the Terraform
+# step owns and times the full boot + user_data window. The connection retry (10-minute timeout) waits
+# for SSH; the OS-native inline command then waits for the launch agent to finish (cloud-init on Linux,
+# EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Authenticates with the instance's key
+# pair (path supplied by var.ssh_readiness_private_key_paths). On a SEPARATE terraform_data so a gate
+# failure taints only this resource, never the EC2 instance.
 resource "terraform_data" "ssh_ready" {
 
-  for_each = merge(
-    aws_instance.us_west_2,
-    aws_instance.us_west_2_refresh,
-    aws_instance.us_east_1,
-    aws_instance.us_east_1_refresh,
-  )
+  for_each = local.ssh_ready_targets
 
-  # Re-run the probe only when the underlying instance is (re)created.
   triggers_replace = {
     instance_id = each.value.id
   }
 
-  provisioner "local-exec" {
-    command = "python3 \"${abspath("${path.module}/../tools/wait_for_ssh.py")}\" ${each.value.private_ip} 22 600 5"
+  provisioner "remote-exec" {
+    connection {
+      type            = "ssh"
+      host            = each.value.private_ip
+      user            = each.value.is_windows ? "administrator" : "ec2-user"
+      private_key     = try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
+      target_platform = each.value.is_windows ? "windows" : "unix"
+      timeout         = "10m"
+    }
+
+    inline = [
+      each.value.is_windows ? "ec2launch status -b" : "cloud-init status --wait",
+    ]
   }
 }
 
-#endregion --- [ Wait For SSH Readiness ] ----------------------------------------------------- #
+#endregion --- [ SSH Readiness Gate ] --------------------------------------------------------- #
 
 #endregion --- [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
 

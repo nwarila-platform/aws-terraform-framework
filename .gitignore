@@ -78,7 +78,6 @@
 !/tools/
 !/tools/check_docs_layout.py
 !/tools/build_plan_input.py
-!/tools/wait_for_ssh.py
 !/tools/install_ci_tools.sh
 
 # Policies

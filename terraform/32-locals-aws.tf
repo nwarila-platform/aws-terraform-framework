@@ -66,9 +66,6 @@ locals {
     # 4. Default the OpenSSH shell to PowerShell.
     New-Item -Path "HKLM:\SOFTWARE\OpenSSH" -Force | Out-Null
     New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
-
-    # 5. Restart sshd so all of the above takes effect.
-    Restart-Service -Name sshd
     </powershell>
   WINDOWS_USER_DATA
 
