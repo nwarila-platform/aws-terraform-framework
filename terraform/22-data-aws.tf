@@ -32,8 +32,8 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  # Red Hat's public AMI publisher account.
-  owners = ["279693163583"]
+  # Self-owned RHEL AMIs in the deploying account.
+  owners = ["self"]
 
   # [Optional(String)] Name Regex:
   name_regex = "^RHEL-8\\.[\\d.]+_[^-]+-\\d{6,8}-x86_64-([^-]+-){2}GP3(-[^-]+){2}$"
@@ -103,8 +103,8 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  # Red Hat's public AMI publisher account.
-  owners = ["279693163583"]
+  # Self-owned RHEL AMIs in the deploying account.
+  owners = ["self"]
 
   # [Optional(String)] Name Regex:
   name_regex = "^RHEL-8\\.[\\d.]+_[^-]+-\\d{6,8}-x86_64-([^-]+-){2}GP3(-[^-]+){2}$"
