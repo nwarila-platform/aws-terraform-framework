@@ -936,14 +936,6 @@ resource "aws_instance" "us_west_2" {
     }
   }
 
-  # Wait until system is both booted & finished running user-data.
-  # This no longer works since we included windows support. Will need Workaround.
-  # provisioner "remote-exec" {
-  #   inline = [
-  #     "cloud-init status --wait"
-  #   ]
-  # }
-
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
@@ -1084,14 +1076,6 @@ resource "aws_instance" "us_east_1" {
     }
   }
 
-  # Wait until system is both booted & finished running user-data.
-  # This no longer works since we included windows support. Will need Workaround.
-  # provisioner "remote-exec" {
-  #   inline = [
-  #     "cloud-init status --wait"
-  #   ]
-  # }
-
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
@@ -1171,6 +1155,33 @@ resource "aws_instance" "us_east_1_refresh" {
   }
 
 }
+
+#region ------ [ Wait For SSH Readiness ] ----------------------------------------------------- #
+
+# Block `apply` until each instance is answering SSH (connect-only banner probe; no login/auth), so the
+# Terraform step owns and times the full boot + user_data setup wait. Re-runs only when an instance is
+# replaced. A 10-minute timeout means a box that never brings sshd up (e.g. a silent Windows OpenSSH
+# install failure with no egress) fails the apply instead of passing silently.
+resource "terraform_data" "ssh_ready" {
+
+  for_each = merge(
+    aws_instance.us_west_2,
+    aws_instance.us_west_2_refresh,
+    aws_instance.us_east_1,
+    aws_instance.us_east_1_refresh,
+  )
+
+  # Re-run the probe only when the underlying instance is (re)created.
+  triggers_replace = {
+    instance_id = each.value.id
+  }
+
+  provisioner "local-exec" {
+    command = "python3 \"${abspath("${path.module}/../tools/wait_for_ssh.py")}\" ${each.value.private_ip} 22 600 5"
+  }
+}
+
+#endregion --- [ Wait For SSH Readiness ] ----------------------------------------------------- #
 
 #endregion --- [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
 

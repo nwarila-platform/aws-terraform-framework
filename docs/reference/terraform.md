@@ -39,6 +39,7 @@ This file is overwritten by `terraform-docs` on every PR via the
 | [aws_volume_attachment.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
 | [aws_volume_attachment.us_west_2_refresh](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
 | [terraform_data.refresh](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [terraform_data.ssh_ready](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 
 ## Inputs
 
