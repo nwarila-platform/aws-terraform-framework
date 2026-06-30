@@ -64,7 +64,7 @@ Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` installs the
 OpenSSH Server capability, sets `sshd` to start automatically, starts the
 service, bootstraps the launch key into
 `C:\ProgramData\ssh\administrators_authorized_keys`, locks down that file's
-ACLs, and sets PowerShell as the default OpenSSH shell.
+ACLs, and leaves the OpenSSH default shell as cmd.
 
 Runtime verification is also outside this repository. The pipeline should check
 that each emitted SSH target is reachable before it runs Ansible.
@@ -140,9 +140,14 @@ This module gates SSH readiness before configuration management. On
 `terraform apply`, `terraform_data.ssh_ready` runs a per-instance
 `remote-exec` probe that first waits for SSH with Terraform's 10-minute
 connection timeout, then runs the OS-native launch-agent wait:
-`cloud-init status --wait` on Linux and `ec2launch status -b` on Windows.
+`cloud-init status --wait` on Linux and
+`"C:\Program Files\Amazon\EC2Launch\EC2Launch.exe" status -b` on Windows.
 The Terraform step does not complete, and its duration captures the wait, until
 each instance is provisioned and reachable.
+
+Windows OpenSSH intentionally uses its built-in cmd default shell so
+Terraform's `remote-exec` SCP upload works. Ansible sets its own shell in the
+separate configuration-management pipeline.
 
 The gate authenticates with the instance key pair using
 `var.ssh_readiness_private_key_paths`, the same private key material the
