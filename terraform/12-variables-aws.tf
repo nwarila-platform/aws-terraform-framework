@@ -23,6 +23,13 @@ variable "windows_ami_owners" {
   nullable    = false
 }
 
+variable "windows_openssh_source" {
+  description = "Optional local Feature-on-Demand source path for installing the OpenSSH.Server capability on Windows Server 2019/2022 in air-gapped / no-egress environments (passed to 'Add-WindowsCapability -Source <path> -LimitAccess'). Leave empty (default) to install from Windows Update, which requires outbound egress. Ignored on Windows Server 2025 (OpenSSH ships preinstalled) and on any instance where OpenSSH is already Present."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
 variable "all_load_balancers" {
   description = "Define all Elastic Load Balancers managed by this framework."
 
