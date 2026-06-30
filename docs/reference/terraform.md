@@ -50,6 +50,7 @@ This file is overwritten by `terraform-docs` on every PR via the
 | aws\_config | Define all of the required environmental variables specific to the AWS provider. | <pre>object({<br/>    regions = list(string)<br/>  })</pre> | <pre>{<br/>  "regions": [<br/>    "us_east_1",<br/>    "us_west_2"<br/>  ]<br/>}</pre> | no |
 | environment | Deployment environment tag value applied to managed AWS resources. | `string` | n/a | yes |
 | windows\_ami\_owners | AWS account IDs or owner aliases that own the public AWS Windows Server Base AMI. Defaults to Amazon's public AMIs; override only when mirroring those images into another account. | `list(string)` | <pre>[<br/>  "amazon"<br/>]</pre> | no |
+| windows\_openssh\_source | Optional local Feature-on-Demand source path for installing the OpenSSH.Server capability on Windows Server 2019/2022 in air-gapped / no-egress environments (passed to 'Add-WindowsCapability -Source <path> -LimitAccess'). Leave empty (default) to install from Windows Update, which requires outbound egress. Ignored on Windows Server 2025 (OpenSSH ships preinstalled) and on any instance where OpenSSH is already Present. | `string` | `""` | no |
 
 ## Outputs
 

@@ -23,6 +23,60 @@ locals {
       us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
     }
   }
+
+  # SSH bootstrap user_data (selected per-OS in the elastic_compute_cloud map below).
+  # Windows: self-contained, idempotent, version-aware OpenSSH bootstrap. It (1) installs the
+  #   OpenSSH.Server capability only if not already Present (WS2025 ships it; WS2019/2022 install it
+  #   as a Feature-on-Demand), preferring a local -Source when var.windows_openssh_source is set and
+  #   otherwise pulling from Windows Update; (2) VERIFIES the capability is Installed and fails loudly
+  #   (exit 1) if not, because the FoD install fails silently with no egress; (3) installs the launch
+  #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs; (4) defaults the
+  #   OpenSSH shell to PowerShell. Linux: cloud-init enables sshd.
+  windows_ssh_user_data = <<-WINDOWS_USER_DATA
+    <powershell>
+    $ErrorActionPreference = "Stop"
+    $source = "${var.windows_openssh_source}"
+
+    # 1. Ensure the OpenSSH Server capability is present (idempotent + version-aware).
+    $capability = Get-WindowsCapability -Online -Name "OpenSSH.Server*"
+    if ($capability.State -ne "Installed") {
+      if ($source) {
+        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -Source $source -LimitAccess
+      } else {
+        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+      }
+      $capability = Get-WindowsCapability -Online -Name "OpenSSH.Server*"
+      if ($capability.State -ne "Installed") {
+        Write-Error "OpenSSH.Server is still NotPresent after install (no Windows Update egress and no -Source supplied?). Aborting SSH bootstrap."
+        exit 1
+      }
+    }
+
+    # 2. Enable and start the sshd service.
+    Set-Service -Name sshd -StartupType Automatic
+    Start-Service -Name sshd
+
+    # 3. Install the launch key-pair public key (from IMDSv2) for administrator SSH.
+    $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
+    $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }
+    $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
+    Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
+    icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
+
+    # 4. Default the OpenSSH shell to PowerShell.
+    New-Item -Path "HKLM:\SOFTWARE\OpenSSH" -Force | Out-Null
+    New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
+
+    # 5. Restart sshd so all of the above takes effect.
+    Restart-Service -Name sshd
+    </powershell>
+  WINDOWS_USER_DATA
+
+  linux_ssh_user_data = <<-LINUX_USER_DATA
+    #cloud-config
+    runcmd:
+      - systemctl enable --now sshd
+  LINUX_USER_DATA
 }
 
 
@@ -39,30 +93,11 @@ locals {
         get_password_data    = system.get_password_data
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data = trimspace(can(regex("windows", lower(system.ami))) ? <<-WINDOWS_USER_DATA
-          <powershell>
-          Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-          Set-Service -Name sshd -StartupType Automatic
-          Start-Service -Name sshd
-          $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
-          $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }
-          $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
-          Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
-          icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
-          New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
-          Restart-Service -Name sshd
-          </powershell>
-        WINDOWS_USER_DATA
-          : <<-LINUX_USER_DATA
-          #cloud-config
-          runcmd:
-            - systemctl enable --now sshd
-        LINUX_USER_DATA
-        )
-        hostname      = system.hostname
-        instance_type = system.instance_type
-        refresh       = system.refresh
-        set_state     = system.set_state
+        user_data            = trimspace(can(regex("windows", lower(system.ami))) ? local.windows_ssh_user_data : local.linux_ssh_user_data)
+        hostname             = system.hostname
+        instance_type        = system.instance_type
+        refresh              = system.refresh
+        set_state            = system.set_state
 
         root_block_device = {
           volume_size           = system.root_block_device.volume_size
