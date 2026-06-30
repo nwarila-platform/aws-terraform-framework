@@ -1221,9 +1221,8 @@ resource "terraform_data" "ssh_ready" {
       timeout         = "10m"
     }
 
-    # ec2launch is not on PATH in the SSH session, so the full EC2Launch.exe path is required.
     inline = [
-      each.value.is_windows ? "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b" : "cloud-init status --wait",
+      each.value.is_windows ? local.windows_ssh_ready_command : local.linux_ssh_ready_command,
     ]
   }
 }

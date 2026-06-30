@@ -72,6 +72,11 @@ locals {
     runcmd:
       - systemctl enable --now sshd
   LINUX_USER_DATA
+
+  # SSH readiness-gate wait commands (selected per-OS in terraform_data.ssh_ready). Each blocks until the
+  # OS launch/provisioning agent reports completion after Terraform has first established SSH connectivity.
+  windows_ssh_ready_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
+  linux_ssh_ready_command   = "cloud-init status --wait"
 }
 
 
