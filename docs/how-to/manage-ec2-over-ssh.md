@@ -50,29 +50,33 @@ all_systems = [
 
 ## Use SSH-ready images
 
-Bake the SSH server into the golden image before this framework launches
-instances. Windows images must include OpenSSH Server. That image build happens
-outside this repository. The framework's `user_data` only enables and starts the
-service at boot:
+Linux images must include an SSH server before this framework launches
+instances. The framework's Linux `user_data` only enables and starts the service
+at boot:
 
-- Linux: `systemctl enable --now sshd`
-- Windows: `Set-Service -Name sshd -StartupType Automatic` and
-  `Start-Service -Name sshd`
+```sh
+systemctl enable --now sshd
+```
+
+Windows systems may use `windows_server_2022_base` or
+`windows_server_2025_base`. The framework resolves those keys to the public
+Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` installs the
+OpenSSH Server capability, sets `sshd` to start automatically, starts the
+service, bootstraps the launch key into
+`C:\ProgramData\ssh\administrators_authorized_keys`, locks down that file's
+ACLs, and sets PowerShell as the default OpenSSH shell.
 
 Runtime verification is also outside this repository. The pipeline should check
 that each emitted SSH target is reachable before it runs Ansible.
 
-Windows systems may use `windows_server_2022_base` or
-`windows_server_2025_base`. Prefer `windows_server_2025_base` for new
-deployments; Windows Server 2022 mainstream support ends on 2026-10-13. Set the
-allowed Windows AMI owner accounts with `var.windows_ami_owners`.
+Prefer `windows_server_2025_base` for new deployments; Windows Server 2022
+mainstream support ends on 2026-10-13. Set `var.windows_ami_owners` only when
+mirroring the public Amazon Windows Server Base AMIs into another account.
 
-The owner must confirm the Windows Server 2025 golden-image `name_regex` matches
-the published image names:
-
-```hcl
-^TPM-Windows_Server-2025-English-Full-Base-[\d.]+$
-```
+Windows OpenSSH capability installation pulls from Windows Update at first boot.
+Windows instances therefore need egress, such as a public subnet or NAT path,
+for their initial boot. Air-gapped or NAT-less private subnets need a pre-baked
+Windows image with OpenSSH Server already installed.
 
 This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
@@ -146,8 +150,16 @@ polling, or runtime readiness gates.
 ## Treat the key pair as the management credential
 
 `key_name` is required for every `all_systems` entry. It names the EC2 key pair
-whose private key the controller uses for SSH authentication. The login user and
-Ansible inventory variables stay in the separate pipeline job.
+whose private key the controller uses for SSH authentication. On Windows, the
+same launch key is installed for administrator SSH access through the
+`user_data` IMDS bootstrap:
+
+```sh
+ssh -i <key_name>.pem administrator@<private_ip>
+```
+
+The login user and Ansible inventory variables stay in the separate pipeline
+job.
 
 The EC2 resources set `user_data_replace_on_change = true`. Adopting this SSH
 service bootstrap or changing it later forces instance replacement so the boot

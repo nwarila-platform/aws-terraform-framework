@@ -181,7 +181,7 @@ data "aws_ami" "us_west_2_windows_server_2022_base" {
   owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
-  name_regex = "^TPM-Windows_Server-2022-English-Full-Base-[\\d.]+$"
+  name_regex = "^Windows_Server-2022-English-Full-Base-[\\d.]+$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
@@ -251,7 +251,7 @@ data "aws_ami" "us_east_1_windows_server_2022_base" {
   owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
-  name_regex = "^TPM-Windows_Server-2022-English-Full-Base-[\\d.]+$"
+  name_regex = "^Windows_Server-2022-English-Full-Base-[\\d.]+$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
@@ -325,7 +325,7 @@ data "aws_ami" "us_west_2_windows_server_2025_base" {
   owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
-  name_regex = "^TPM-Windows_Server-2025-English-Full-Base-[\\d.]+$"
+  name_regex = "^Windows_Server-2025-English-Full-Base-[\\d.]+$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
@@ -395,7 +395,7 @@ data "aws_ami" "us_east_1_windows_server_2025_base" {
   owners = var.windows_ami_owners
 
   # [Optional(String)] Name Regex:
-  name_regex = "^TPM-Windows_Server-2025-English-Full-Base-[\\d.]+$"
+  name_regex = "^Windows_Server-2025-English-Full-Base-[\\d.]+$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
