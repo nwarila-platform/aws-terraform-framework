@@ -30,8 +30,10 @@ locals {
   #   as a Feature-on-Demand), preferring a local -Source when var.windows_openssh_source is set and
   #   otherwise pulling from Windows Update; (2) VERIFIES the capability is Installed and fails loudly
   #   (exit 1) if not, because the FoD install fails silently with no egress; (3) installs the launch
-  #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs; (4) defaults the
-  #   OpenSSH shell to PowerShell. Linux: cloud-init enables sshd.
+  #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs. The OpenSSH
+  #   default shell is intentionally left as cmd; setting it to PowerShell breaks the Terraform
+  #   remote-exec SCP upload used by the SSH readiness gate (terraform_data.ssh_ready).
+  # Linux: cloud-init enables sshd.
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
@@ -62,10 +64,6 @@ locals {
     $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
     Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
     icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
-
-    # 4. Default the OpenSSH shell to PowerShell.
-    New-Item -Path "HKLM:\SOFTWARE\OpenSSH" -Force | Out-Null
-    New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force
     </powershell>
   WINDOWS_USER_DATA
 
@@ -74,6 +72,11 @@ locals {
     runcmd:
       - systemctl enable --now sshd
   LINUX_USER_DATA
+
+  # SSH readiness-gate wait commands (selected per-OS in terraform_data.ssh_ready). Each blocks until the
+  # OS launch/provisioning agent reports completion after Terraform has first established SSH connectivity.
+  windows_ssh_ready_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
+  linux_ssh_ready_command   = "cloud-init status --wait"
 }
 
 

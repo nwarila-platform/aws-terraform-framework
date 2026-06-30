@@ -1222,7 +1222,7 @@ resource "terraform_data" "ssh_ready" {
     }
 
     inline = [
-      each.value.is_windows ? "ec2launch status -b" : "cloud-init status --wait",
+      each.value.is_windows ? local.windows_ssh_ready_command : local.linux_ssh_ready_command,
     ]
   }
 }
