@@ -136,16 +136,18 @@ This module only prepares the EC2 systems and emits infrastructure facts.
 
 ## Gate readiness before Ansible
 
-The pipeline should check TCP 22 reachability for each emitted `private_ip`
-before it runs configuration management:
+This module gates SSH readiness before configuration management. On
+`terraform apply`, `terraform_data.ssh_ready` runs a per-instance
+`remote-exec` probe that first waits for SSH with Terraform's 10-minute
+connection timeout, then runs the OS-native launch-agent wait:
+`cloud-init status --wait` on Linux and `ec2launch status -b` on Windows.
+The Terraform step does not complete, and its duration captures the wait, until
+each instance is provisioned and reachable.
 
-```sh
-nc -vz "$private_ip" 22
-```
-
-Continue only when every managed instance accepts SSH from the controller. This
-repository intentionally does not add Terraform provisioners, `null_resource`
-polling, or runtime readiness gates.
+The gate authenticates with the instance key pair using
+`var.ssh_readiness_private_key_paths`, the same private key material the
+Ansible controller uses. Leave the map empty for plan and CI; a real apply must
+populate a filesystem path for every `key_name` in use.
 
 ## Treat the key pair as the management credential
 
@@ -174,5 +176,4 @@ These responsibilities stay outside this repository:
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.
 - IAM role, policy, and instance-profile creation.
-- Runtime readiness polling.
 - OS hostname setting.

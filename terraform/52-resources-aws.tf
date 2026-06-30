@@ -936,14 +936,6 @@ resource "aws_instance" "us_west_2" {
     }
   }
 
-  # Wait until system is both booted & finished running user-data.
-  # This no longer works since we included windows support. Will need Workaround.
-  # provisioner "remote-exec" {
-  #   inline = [
-  #     "cloud-init status --wait"
-  #   ]
-  # }
-
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
@@ -1084,14 +1076,6 @@ resource "aws_instance" "us_east_1" {
     }
   }
 
-  # Wait until system is both booted & finished running user-data.
-  # This no longer works since we included windows support. Will need Workaround.
-  # provisioner "remote-exec" {
-  #   inline = [
-  #     "cloud-init status --wait"
-  #   ]
-  # }
-
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
@@ -1171,6 +1155,79 @@ resource "aws_instance" "us_east_1_refresh" {
   }
 
 }
+
+#region ------ [ SSH Readiness Gate ] --------------------------------------------------------- #
+
+# Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the readiness
+# gate can pick the right login user, wait command, and private key per instance.
+locals {
+  ssh_ready_targets = merge(
+    {
+      for hostname, instance in aws_instance.us_west_2 : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_west_2_refresh : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_east_1 : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+      }
+    },
+    {
+      for hostname, instance in aws_instance.us_east_1_refresh : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        key_name   = instance.key_name
+        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+      }
+    },
+  )
+}
+
+# Block `apply` until each instance finishes provisioning and is reachable over SSH, so the Terraform
+# step owns and times the full boot + user_data window. The connection retry (10-minute timeout) waits
+# for SSH; the OS-native inline command then waits for the launch agent to finish (cloud-init on Linux,
+# EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Authenticates with the instance's key
+# pair (path supplied by var.ssh_readiness_private_key_paths). On a SEPARATE terraform_data so a gate
+# failure taints only this resource, never the EC2 instance.
+resource "terraform_data" "ssh_ready" {
+
+  for_each = local.ssh_ready_targets
+
+  triggers_replace = {
+    instance_id = each.value.id
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      type            = "ssh"
+      host            = each.value.private_ip
+      user            = each.value.is_windows ? "administrator" : "ec2-user"
+      private_key     = try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
+      target_platform = each.value.is_windows ? "windows" : "unix"
+      timeout         = "10m"
+    }
+
+    inline = [
+      each.value.is_windows ? "ec2launch status -b" : "cloud-init status --wait",
+    ]
+  }
+}
+
+#endregion --- [ SSH Readiness Gate ] --------------------------------------------------------- #
 
 #endregion --- [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
 
