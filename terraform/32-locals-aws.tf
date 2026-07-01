@@ -24,7 +24,34 @@ locals {
     }
   }
 
-  # SSH bootstrap user_data (selected per-OS in the elastic_compute_cloud map below).
+  # Windows WinRM readiness shim selected for Windows in the elastic_compute_cloud map below. This
+  # uses only in-box WS-Management components so no Feature-on-Demand install, Windows Update, or
+  # egress is required.
+  windows_winrm_user_data = <<-WINDOWS_USER_DATA
+    <powershell>
+    $ErrorActionPreference = "Stop"
+
+    Enable-PSRemoting -Force -SkipNetworkProfileCheck
+
+    Set-Item -Path WSMan:\localhost\Service\Auth\Negotiate -Value $true
+    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $false
+    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $false
+
+    $ruleName = "Terraform WinRM HTTP 5985"
+    $rule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    if ($rule) {
+      Set-NetFirewallRule -DisplayName $ruleName -Enabled True -Direction Inbound -Action Allow -Profile Any
+      Get-NetFirewallRule -DisplayName $ruleName | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 5985
+    } else {
+      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985 -Profile Any
+    }
+
+    Set-Service -Name WinRM -StartupType Automatic
+    Start-Service -Name WinRM
+    </powershell>
+  WINDOWS_USER_DATA
+
+  # SSH bootstrap user_data.
   # Windows: self-contained, idempotent, version-aware OpenSSH bootstrap. It (1) installs the
   #   OpenSSH.Server capability only if not already Present (WS2025 ships it; WS2019/2022 install it
   #   as a Feature-on-Demand), preferring a local -Source when var.windows_openssh_source is set and
@@ -34,6 +61,9 @@ locals {
   #   default shell is intentionally left as cmd; setting it to PowerShell breaks the Terraform
   #   remote-exec SCP upload used by the SSH readiness gate (terraform_data.ssh_ready).
   # Linux: cloud-init enables sshd.
+  # Windows OpenSSH user_data is retained unused and will be re-activated when owner-managed AMIs
+  # include SSH in the image.
+  # tflint-ignore: terraform_unused_declarations
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
@@ -90,10 +120,10 @@ locals {
         #region           = < This is set statically >
         ami                  = system.ami
         availability_zone    = system.availability_zone
-        get_password_data    = system.get_password_data
+        get_password_data    = can(regex("windows", lower(system.ami)))
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(can(regex("windows", lower(system.ami))) ? local.windows_ssh_user_data : local.linux_ssh_user_data)
+        user_data            = trimspace(can(regex("windows", lower(system.ami))) ? local.windows_winrm_user_data : local.linux_ssh_user_data)
         hostname             = system.hostname
         instance_type        = system.instance_type
         refresh              = system.refresh

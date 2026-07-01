@@ -39,10 +39,9 @@ variable "all_systems" {
     })
 
     /* Optional Parameters */
-    ami               = optional(string, "red_hat_enterprise_linux_8")
-    instance_type     = optional(string, "m6i.large")
-    get_password_data = optional(bool, false)
-    set_state         = optional(string)
+    ami           = optional(string, "red_hat_enterprise_linux_8")
+    instance_type = optional(string, "m6i.large")
+    set_state     = optional(string)
 
     root_block_device = optional(
       object({
@@ -78,8 +77,8 @@ variable "all_systems" {
 
     network_interfaces = list(
       object({
-        #subnet_ip            = # Calculated automatically from parent object
-        #region               = # Calculated automatically from parent object
+        #subnet_ip      = # Calculated automatically from parent object
+        #region         = # Calculated automatically from parent object
         description     = optional(string)
         interface_type  = optional(string, null)
         private_ip      = string
@@ -151,7 +150,6 @@ variable "all_systems" {
     ])
     error_message = "Each all_systems entry must set a non-empty iam_instance_profile."
   }
-
 
   # validation {
   #   condition     = length(distinct([for s in var.baseline_ami_systems : s.ip])) == length(var.baseline_ami_systems)

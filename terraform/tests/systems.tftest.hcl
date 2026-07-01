@@ -714,7 +714,7 @@ run "systems_accept_valid_windows_hostnames" {
   }
 }
 
-run "systems_render_ssh_user_data_per_os" {
+run "systems_render_readiness_user_data_per_os" {
   command = plan
 
   variables {
@@ -750,7 +750,7 @@ run "systems_render_ssh_user_data_per_os" {
         ami                  = "windows_server_2022_base"
 
         tags = {
-          Function = "Windows SSH user data"
+          Function = "Windows WinRM user data"
         }
 
         network_interfaces = [
@@ -774,17 +774,31 @@ run "systems_render_ssh_user_data_per_os" {
 
   assert {
     condition     = aws_instance.us_west_2["win-ssh-01"].user_data != null
-    error_message = "Windows instances should receive rendered SSH user_data."
+    error_message = "Windows instances should receive rendered WinRM user_data."
   }
 
   assert {
     condition = alltrue([
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "administrators_authorized_keys"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "public-keys/0/openssh-key"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Negotiate"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\AllowUnencrypted"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5985"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name WinRM -StartupType Automatic"),
     ])
-    error_message = "Windows user_data should install OpenSSH, enable sshd, and bootstrap the launch key."
+    error_message = "Windows user_data should enable WinRM, require encrypted Negotiate auth, and allow TCP 5985."
+  }
+
+  assert {
+    condition = alltrue([
+      strcontains(local.windows_ssh_user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.windows_ssh_user_data, "administrators_authorized_keys"),
+    ])
+    error_message = "Dormant Windows OpenSSH user_data should remain available for owner-managed AMIs."
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["win-ssh-01"].get_password_data == true
+    error_message = "Windows instances should compute get_password_data = true for WinRM readiness."
   }
 
   assert {
@@ -1143,6 +1157,6 @@ run "instances_enforce_imdsv2_and_password_data_default" {
 
   assert {
     condition     = aws_instance.us_west_2["west-no-state"].get_password_data == false
-    error_message = "get_password_data should default to false when omitted."
+    error_message = "Linux instances should compute get_password_data = false."
   }
 }
