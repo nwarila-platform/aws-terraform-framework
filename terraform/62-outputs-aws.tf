@@ -438,7 +438,7 @@ output "aws_instances" {
         private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
         private_dns = inst.private_dns
         function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        os_family   = local.elastic_compute_cloud.us_west_2[key].is_windows ? "windows" : "linux"
         environment = var.environment
       }
     },
@@ -450,7 +450,7 @@ output "aws_instances" {
         private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
         private_dns = inst.private_dns
         function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[key].ami))) ? "windows" : "linux"
+        os_family   = local.elastic_compute_cloud.us_west_2[key].is_windows ? "windows" : "linux"
         environment = var.environment
       }
     },
@@ -462,7 +462,7 @@ output "aws_instances" {
         private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
         private_dns = inst.private_dns
         function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        os_family   = local.elastic_compute_cloud.us_east_1[key].is_windows ? "windows" : "linux"
         environment = var.environment
       }
     },
@@ -474,7 +474,7 @@ output "aws_instances" {
         private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
         private_dns = inst.private_dns
         function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        os_family   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[key].ami))) ? "windows" : "linux"
+        os_family   = local.elastic_compute_cloud.us_east_1[key].is_windows ? "windows" : "linux"
         environment = var.environment
       }
     }

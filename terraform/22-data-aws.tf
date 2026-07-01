@@ -448,6 +448,44 @@ data "aws_ami" "us_east_1_windows_server_2025_base" {
 
 #endregion --- [ Amazon Machine Image(s): Windows Server 2025 Base ] ------------------------ #
 
+#region ------ [ Amazon Machine Image(s): Direct AMI IDs ] ---------------------------------- #
+
+data "aws_ami" "us_west_2_direct" {
+
+  for_each = toset([
+    for s in var.all_systems : s.ami
+    if can(regex("^ami-[0-9a-f]{8,17}$", s.ami)) && contains(["us_west_2", "us-west-2"], s.region)
+  ])
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_west_2
+
+  filter {
+    name   = "image-id"
+    values = [each.value]
+  }
+
+}
+
+data "aws_ami" "us_east_1_direct" {
+
+  for_each = toset([
+    for s in var.all_systems : s.ami
+    if can(regex("^ami-[0-9a-f]{8,17}$", s.ami)) && contains(["us_east_1", "us-east-1"], s.region)
+  ])
+
+  # Set the provider in which to deploy the instance.
+  provider = aws.us_east_1
+
+  filter {
+    name   = "image-id"
+    values = [each.value]
+  }
+
+}
+
+#endregion --- [ Amazon Machine Image(s): Direct AMI IDs ] ---------------------------------- #
+
 #endregion --- [ Amazon Machine Image(s) ] ---------------------------------------------------- #
 
 
