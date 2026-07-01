@@ -25,6 +25,7 @@ variable "ssh_readiness_linux_script_dir" {
     error_message = "ssh_readiness_linux_script_dir must be an absolute path with no trailing slash."
   }
 }
+
 variable "all_systems" {
   description = "Define all EC2 systems managed by this framework."
 
@@ -175,26 +176,22 @@ variable "all_databases" {
 
   type = list(object({
     /* Required Parameters */
-    region            = string
-    availability_zone = string
-
+    availability_zone    = string
+    aws_kms_alias        = string
     db_name              = string
-    instance_class       = string
     db_subnet_group_name = string
-
-    engine         = string
-    engine_version = string
-
-    username = string
-    password = optional(string)
-
-    aws_kms_alias = string
+    engine               = string
+    engine_version       = string
+    instance_class       = string
+    password             = optional(string)
+    region               = string
+    username             = string
 
     tags = object({
-      #Name                 = <Set Automatically From 'db_name'>
+      #Name        = <Set Automatically From 'db_name'>
       Function = string
-      #Terraform            = <Set Automatically to 'True'>
-      #Environment          = <Set Automatically From 'var.environment'>
+      #Terraform   = <Set Automatically to 'True'>
+      #Environment = <Set Automatically From 'var.environment'>
     })
 
     /* Optional Parameters */
