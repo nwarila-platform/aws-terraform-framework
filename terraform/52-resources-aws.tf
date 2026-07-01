@@ -1156,12 +1156,13 @@ resource "aws_instance" "us_east_1_refresh" {
 
 }
 
-#region ------ [ SSH Readiness Gate ] --------------------------------------------------------- #
+#region ------ [ Readiness Gate ] ------------------------------------------------------------- #
 
-# Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the readiness
-# gate can pick the right login user, wait command, and private key per instance.
+# Combine each instance's runtime facts (id, private IP, key pair name, decrypted Windows password)
+# with its OS so the readiness gate can pick the right transport, login user, wait command, and
+# credential per instance.
 locals {
-  ssh_ready_targets = merge(
+  readiness_targets = merge(
     {
       for hostname, instance in aws_instance.us_west_2 : hostname => {
         id         = instance.id
@@ -1201,15 +1202,22 @@ locals {
   )
 }
 
-# Block `apply` until each instance finishes provisioning and is reachable over SSH, so the Terraform
-# step owns and times the full boot + user_data window. The connection retry (10-minute timeout) waits
-# for SSH; the OS-native inline command then waits for the launch agent to finish (cloud-init on Linux,
-# EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Authenticates with the instance's key
-# pair (path supplied by var.ssh_readiness_private_key_paths). On a SEPARATE terraform_data so a gate
-# failure taints only this resource, never the EC2 instance.
-resource "terraform_data" "ssh_ready" {
+# Preserve existing readiness-gate state when renaming the internal resource address.
+moved {
+  from = terraform_data.ssh_ready
+  to   = terraform_data.readiness_gate
+}
 
-  for_each = local.ssh_ready_targets
+# Block `apply` until each instance finishes provisioning and is reachable over its readiness
+# transport: SSH on Linux, WinRM on Windows. The connection retry (10-minute timeout) waits for the
+# transport; the OS-native inline command then waits for the launch agent to finish (cloud-init on
+# Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Linux authenticates with
+# the launch key pair (path supplied by var.ssh_readiness_private_key_paths); Windows authenticates
+# with the decrypted launch Administrator password. On a SEPARATE terraform_data so a gate failure
+# taints only this resource, never the EC2 instance.
+resource "terraform_data" "readiness_gate" {
+
+  for_each = local.readiness_targets
 
   triggers_replace = {
     instance_id = each.value.id
@@ -1231,12 +1239,12 @@ resource "terraform_data" "ssh_ready" {
     }
 
     inline = [
-      each.value.is_windows ? local.windows_ssh_ready_command : local.linux_ssh_ready_command,
+      each.value.is_windows ? local.windows_readiness_command : local.linux_readiness_command,
     ]
   }
 }
 
-#endregion --- [ SSH Readiness Gate ] --------------------------------------------------------- #
+#endregion --- [ Readiness Gate ] ------------------------------------------------------------- #
 
 #endregion --- [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
 

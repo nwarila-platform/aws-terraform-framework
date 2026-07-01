@@ -764,7 +764,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
       local.elastic_compute_cloud.us_west_2["direct-win01"].is_windows == true,
       local.elastic_compute_cloud.us_west_2["direct-win01"].get_password_data == true,
       aws_instance.us_west_2["direct-win01"].get_password_data == true,
-      local.ssh_ready_targets["direct-win01"].is_windows == true,
+      local.readiness_targets["direct-win01"].is_windows == true,
       output.aws_instances["direct-win01"].os_family == "windows",
       strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
     ])
@@ -776,7 +776,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
       local.elastic_compute_cloud.us_east_1["direct-linux"].is_windows == false,
       local.elastic_compute_cloud.us_east_1["direct-linux"].get_password_data == false,
       aws_instance.us_east_1["direct-linux"].get_password_data == false,
-      local.ssh_ready_targets["direct-linux"].is_windows == false,
+      local.readiness_targets["direct-linux"].is_windows == false,
       output.aws_instances["direct-linux"].os_family == "linux",
       strcontains(local.elastic_compute_cloud.us_east_1["direct-linux"].user_data, "systemctl enable --now sshd"),
     ])

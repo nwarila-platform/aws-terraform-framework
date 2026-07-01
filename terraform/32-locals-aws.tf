@@ -69,8 +69,8 @@ locals {
   #   otherwise pulling from Windows Update; (2) VERIFIES the capability is Installed and fails loudly
   #   (exit 1) if not, because the FoD install fails silently with no egress; (3) installs the launch
   #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs. The OpenSSH
-  #   default shell is intentionally left as cmd; setting it to PowerShell breaks the Terraform
-  #   remote-exec SCP upload used by the SSH readiness gate (terraform_data.ssh_ready).
+  #   default shell is intentionally left as cmd; setting it to PowerShell breaks Terraform
+  #   remote-exec SCP upload when this dormant SSH bootstrap is re-activated.
   # Linux: cloud-init enables sshd.
   # Windows OpenSSH user_data is retained unused and will be re-activated when owner-managed AMIs
   # include SSH in the image.
@@ -114,10 +114,10 @@ locals {
       - systemctl enable --now sshd
   LINUX_USER_DATA
 
-  # SSH readiness-gate wait commands (selected per-OS in terraform_data.ssh_ready). Each blocks until the
-  # OS launch/provisioning agent reports completion after Terraform has first established SSH connectivity.
-  windows_ssh_ready_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
-  linux_ssh_ready_command   = "cloud-init status --wait"
+  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate). Each blocks until
+  # the OS launch/provisioning agent reports completion after Terraform has first connected.
+  windows_readiness_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
+  linux_readiness_command   = "cloud-init status --wait"
 }
 
 
