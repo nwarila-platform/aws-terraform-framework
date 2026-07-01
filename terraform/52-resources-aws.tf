@@ -1222,7 +1222,7 @@ resource "terraform_data" "ssh_ready" {
       user            = each.value.is_windows ? "Administrator" : "ec2-user"
       password        = each.value.is_windows ? each.value.password : null
       private_key     = each.value.is_windows ? null : try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
-      script_path     = each.value.is_windows ? null : "/tmp/terraform_%RAND%.sh"
+      script_path     = each.value.is_windows ? null : "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh"
       target_platform = each.value.is_windows ? "windows" : "unix"
       port            = each.value.is_windows ? 5985 : null
       https           = each.value.is_windows ? false : null

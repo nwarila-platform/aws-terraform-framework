@@ -14,6 +14,17 @@ variable "environment" {
   }
 }
 
+variable "ssh_readiness_linux_script_dir" {
+  description = "Absolute directory on each Linux instance where the SSH readiness gate uploads its remote-exec script. Must be writable by ec2-user AND mounted exec (NOT noexec). Hardened AMIs commonly mount /tmp (sometimes /var/tmp, /dev/shm) noexec, which breaks the default remote-exec upload; the login user's home is the usual escape hatch. Override if /home is also noexec in your image."
+  type        = string
+  default     = "/home/ec2-user"
+  nullable    = false
+
+  validation {
+    condition     = startswith(var.ssh_readiness_linux_script_dir, "/") && !endswith(var.ssh_readiness_linux_script_dir, "/")
+    error_message = "ssh_readiness_linux_script_dir must be an absolute path with no trailing slash."
+  }
+}
 variable "all_systems" {
   description = "Define all EC2 systems managed by this framework."
 
