@@ -9,20 +9,31 @@
 
 # Statically Configured LOCALS
 locals {
-  amazon_machine_images = {
-    "red_hat_enterprise_linux_8" = {
-      us_west_2 = try(data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0], null)
-      us_east_1 = try(data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0], null)
+  amazon_machine_images = merge(
+    {
+      "red_hat_enterprise_linux_8" = {
+        us_west_2 = try(data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0], null)
+        us_east_1 = try(data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0], null)
+      }
+      "windows_server_2022_base" = {
+        us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
+        us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
+      }
+      "windows_server_2025_base" = {
+        us_west_2 = try(data.aws_ami.us_west_2_windows_server_2025_base[0], null)
+        us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
+      }
+    },
+    {
+      for id in toset([
+        for s in var.all_systems : s.ami
+        if can(regex("^ami-[0-9a-f]{8,17}$", s.ami))
+        ]) : id => {
+        us_west_2 = try(data.aws_ami.us_west_2_direct[id], null)
+        us_east_1 = try(data.aws_ami.us_east_1_direct[id], null)
+      }
     }
-    "windows_server_2022_base" = {
-      us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
-      us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
-    }
-    "windows_server_2025_base" = {
-      us_west_2 = try(data.aws_ami.us_west_2_windows_server_2025_base[0], null)
-      us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
-    }
-  }
+  )
 
   # Windows WinRM readiness shim selected for Windows in the elastic_compute_cloud map below. This
   # uses only in-box WS-Management components so no Feature-on-Demand install, Windows Update, or
@@ -120,10 +131,11 @@ locals {
         #region           = < This is set statically >
         ami                  = system.ami
         availability_zone    = system.availability_zone
-        get_password_data    = can(regex("windows", lower(system.ami)))
+        is_windows           = can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details))
+        get_password_data    = can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details))
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(can(regex("windows", lower(system.ami))) ? local.windows_winrm_user_data : local.linux_ssh_user_data)
+        user_data            = trimspace(can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details)) ? local.windows_winrm_user_data : local.linux_ssh_user_data)
         hostname             = system.hostname
         instance_type        = system.instance_type
         refresh              = system.refresh
@@ -211,10 +223,7 @@ locals {
           # AWS Network Interface Properties
           availability_zone     = system.availability_zone
           delete_on_termination = system.ebs_block_devices[index].delete_on_termination
-          device_name = can(regex(
-            "[Ww]indows",
-            local.amazon_machine_images[system.ami][region].platform
-            )) ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
+          device_name = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
             "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
           )
           encrypted   = true
@@ -244,10 +253,7 @@ locals {
               # ?      a [char] lookup. Unicode character set is used in the conversation, so
               # ?      [INT]100 converted to Unicode [CHAR] is'd', then each index increment after
               # ?      that will itterate through next characters (I.E. e, f, g, h, etc.)
-              DeviceName = can(regex(
-                "[Ww]indows",
-                local.amazon_machine_images[system.ami][region].platform
-                )) ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
+              DeviceName = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
                 "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
               )
             }

@@ -206,6 +206,24 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     ]
   }
 
+  override_data {
+    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000001"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_windows_server_2025_base[0]
+    values = {
+      id               = "ami-00000000000000002"
+      platform         = "windows"
+      platform_details = "Windows"
+    }
+  }
+
   assert {
     condition     = contains(keys(output.aws_instances), "inv-linux-west")
     error_message = "aws_instances output should include the normal Linux hostname key."
@@ -379,6 +397,24 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
       }
     ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000003"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000004"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
   }
 
   override_resource {
@@ -647,6 +683,107 @@ run "systems_accept_windows_server_2025_base_ami" {
   }
 }
 
+run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "direct-win01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-direct-windows"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "ami-0123456789abcdef0"
+
+        tags = {
+          Function = "Direct Windows AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.10.10"
+          }
+        ]
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "direct-linux"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-east-direct-linux"
+        key_name             = "east-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "east"
+        ami                  = "ami-0fedcba9876543210"
+
+        tags = {
+          Function = "Direct Linux AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.1.10.10"
+          }
+        ]
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_direct["ami-0123456789abcdef0"]
+    values = {
+      id               = "ami-0123456789abcdef0"
+      platform         = "windows"
+      platform_details = "Windows"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_direct["ami-0fedcba9876543210"]
+    values = {
+      id               = "ami-0fedcba9876543210"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  assert {
+    condition     = contains(keys(data.aws_ami.us_west_2_direct), "ami-0123456789abcdef0") && contains(keys(data.aws_ami.us_east_1_direct), "ami-0fedcba9876543210")
+    error_message = "Raw AMI IDs should instantiate exact image-id data lookups in their target regions."
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["direct-win01"].ami == "ami-0123456789abcdef0" && aws_instance.us_east_1["direct-linux"].ami == "ami-0fedcba9876543210"
+    error_message = "Instances launched from raw AMI IDs should use the resolved direct AMI IDs."
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_compute_cloud.us_west_2["direct-win01"].is_windows == true,
+      local.elastic_compute_cloud.us_west_2["direct-win01"].get_password_data == true,
+      aws_instance.us_west_2["direct-win01"].get_password_data == true,
+      local.ssh_ready_targets["direct-win01"].is_windows == true,
+      output.aws_instances["direct-win01"].os_family == "windows",
+      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+    ])
+    error_message = "A raw Windows AMI should classify as Windows exclusively from platform_details metadata."
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_compute_cloud.us_east_1["direct-linux"].is_windows == false,
+      local.elastic_compute_cloud.us_east_1["direct-linux"].get_password_data == false,
+      aws_instance.us_east_1["direct-linux"].get_password_data == false,
+      local.ssh_ready_targets["direct-linux"].is_windows == false,
+      output.aws_instances["direct-linux"].os_family == "linux",
+      strcontains(local.elastic_compute_cloud.us_east_1["direct-linux"].user_data, "systemctl enable --now sshd"),
+    ])
+    error_message = "A raw non-Windows AMI should classify as Linux from platform_details metadata."
+  }
+}
+
 run "systems_reject_windows_hostnames_over_15_characters" {
   command = plan
 
@@ -760,6 +897,24 @@ run "systems_render_readiness_user_data_per_os" {
         ]
       }
     ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000005"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_windows_server_2022_base[0]
+    values = {
+      id               = "ami-00000000000000006"
+      platform         = "windows"
+      platform_details = "Windows"
+    }
   }
 
   assert {
@@ -1124,6 +1279,24 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
 
 run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
+
+  override_data {
+    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000007"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0]
+    values = {
+      id               = "ami-00000000000000008"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
 
   assert {
     condition     = aws_instance.us_west_2["west-state"].metadata_options[0].http_tokens == "required"

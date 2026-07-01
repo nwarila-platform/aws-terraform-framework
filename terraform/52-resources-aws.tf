@@ -1167,8 +1167,8 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
-        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+        password   = local.elastic_compute_cloud.us_west_2[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
+        is_windows = local.elastic_compute_cloud.us_west_2[hostname].is_windows
       }
     },
     {
@@ -1176,8 +1176,8 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
-        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
+        password   = local.elastic_compute_cloud.us_west_2[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
+        is_windows = local.elastic_compute_cloud.us_west_2[hostname].is_windows
       }
     },
     {
@@ -1185,8 +1185,8 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
-        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+        password   = local.elastic_compute_cloud.us_east_1[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
+        is_windows = local.elastic_compute_cloud.us_east_1[hostname].is_windows
       }
     },
     {
@@ -1194,8 +1194,8 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
-        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
+        password   = local.elastic_compute_cloud.us_east_1[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
+        is_windows = local.elastic_compute_cloud.us_east_1[hostname].is_windows
       }
     },
   )
