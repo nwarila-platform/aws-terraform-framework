@@ -14,15 +14,16 @@
 #?    to update this data source to automatically pull release specific custom AMI.            ?#
 #?endregion --- [ Notes ] -------------------------------------------------------------------- ?#
 
-#region ------ [ Amazon Machine Image(s): Red Hat Enterprise Linux 8 ] ---------------------- #
+#region ------ [ Amazon Machine Image(s): Self-Built AMIs ] -------------------------------- #
 
-data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
+data "aws_ami" "us_west_2_selfbuilt" {
 
-  count = length([
-    for s in var.all_systems : s
-    if s.ami == "red_hat_enterprise_linux_8" &&
+  for_each = toset([
+    for s in var.all_systems : s.ami
+    if !local.ami_specs[s.ami].is_direct_id &&
+    !local.ami_specs[s.ami].is_public_alias &&
     contains(["us_west_2", "us-west-2"], s.region)
-  ]) > 0 ? 1 : 0
+  ])
 
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
@@ -32,11 +33,8 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  # Self-owned RHEL AMIs in the deploying account.
+  # Self-owned AMIs in the deploying account.
   owners = ["self"]
-
-  # [Optional(String)] Name Regex:
-  name_regex = "^RHEL-8\\.[\\d.]+_[^-]+-\\d{6,8}-x86_64-([^-]+-){2}GP3(-[^-]+){2}$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
@@ -44,6 +42,13 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
   // All filters are optional, most filters are lists, and all of them are combined to     //
   // allow robust targeting.                                                               //
   // ===================================================================================== //
+
+  # [String[]] Name: Self-built AMI name glob. The glob template is assembled in
+  # local.ami_specs so future naming-delimiter changes are localized.
+  filter {
+    name   = "name"
+    values = [local.ami_specs[each.value].glob]
+  }
 
   # [String[]] image-type: Type of image.
   # Valid values: "machine", "kernel", "ramdisk"
@@ -66,12 +71,6 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
     values = ["x86_64"]
   }
 
-  # [String[]] Root Device Name: Device name of the root device.
-  filter {
-    name   = "root-device-name"
-    values = ["/dev/sda1"]
-  }
-
   # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
   #     successfully registered and can be used to launch an instance.
   # Valid values: "available", "pending", "failed"
@@ -79,21 +78,16 @@ data "aws_ami" "us_west_2_red_hat_enterprise_linux_8" {
     name   = "state"
     values = ["available"]
   }
-
-  # [String[]] Description: Description of the AMI that was provided during image creation.
-  filter {
-    name   = "description"
-    values = ["Provided by Red Hat, Inc."]
-  }
 }
 
-data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
+data "aws_ami" "us_east_1_selfbuilt" {
 
-  count = length([
-    for s in var.all_systems : s
-    if s.ami == "red_hat_enterprise_linux_8" &&
+  for_each = toset([
+    for s in var.all_systems : s.ami
+    if !local.ami_specs[s.ami].is_direct_id &&
+    !local.ami_specs[s.ami].is_public_alias &&
     contains(["us_east_1", "us-east-1"], s.region)
-  ]) > 0 ? 1 : 0
+  ])
 
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
@@ -103,11 +97,8 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
 
   # [Optional(String[])] List of AMI owners to limit search.
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
-  # Self-owned RHEL AMIs in the deploying account.
+  # Self-owned AMIs in the deploying account.
   owners = ["self"]
-
-  # [Optional(String)] Name Regex:
-  name_regex = "^RHEL-8\\.[\\d.]+_[^-]+-\\d{6,8}-x86_64-([^-]+-){2}GP3(-[^-]+){2}$"
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
@@ -115,6 +106,13 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
   // All filters are optional, most filters are lists, and all of them are combined to     //
   // allow robust targeting.                                                               //
   // ===================================================================================== //
+
+  # [String[]] Name: Self-built AMI name glob. The glob template is assembled in
+  # local.ami_specs so future naming-delimiter changes are localized.
+  filter {
+    name   = "name"
+    values = [local.ami_specs[each.value].glob]
+  }
 
   # [String[]] image-type: Type of image.
   # Valid values: "machine", "kernel", "ramdisk"
@@ -137,12 +135,6 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
     values = ["x86_64"]
   }
 
-  # [String[]] Root Device Name: Device name of the root device.
-  filter {
-    name   = "root-device-name"
-    values = ["/dev/sda1"]
-  }
-
   # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
   #     successfully registered and can be used to launch an instance.
   # Valid values: "available", "pending", "failed"
@@ -150,15 +142,9 @@ data "aws_ami" "us_east_1_red_hat_enterprise_linux_8" {
     name   = "state"
     values = ["available"]
   }
-
-  # [String[]] Description: Description of the AMI that was provided during image creation.
-  filter {
-    name   = "description"
-    values = ["Provided by Red Hat, Inc."]
-  }
 }
 
-#endregion --- [ Amazon Machine Image(s): Red Hat Enterprise Linux 8 ] ---------------------- #
+#endregion --- [ Amazon Machine Image(s): Self-Built AMIs ] -------------------------------- #
 
 #region ------ [ Amazon Machine Image(s): Windows Server 2022 Base ] ------------------------ #
 

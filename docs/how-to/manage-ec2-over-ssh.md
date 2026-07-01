@@ -60,6 +60,12 @@ at boot:
 systemctl enable --now sshd
 ```
 
+Self-built AMIs can be selected by family name, such as `ttc-rhel8`, or by a
+version pin, such as `ttc-rhel8:8.10`. The framework resolves those against
+self-owned AMI names matching `<family>_v*` or `<family>_v<version>_*` with
+`most_recent = true`; latest means most recently built, not highest semantic
+version. A direct `ami-...` ID remains an exact pin.
+
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. The framework resolves those keys to the public
 Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` installs the
@@ -111,7 +117,7 @@ contains only neutral, non-secret values:
   `<hostname>-eni-0` network interface.
 - `private_dns`: the EC2 private DNS name.
 - `function`: supplied by `all_systems[*].tags.Function`.
-- `os_family`: `linux` or `windows`, derived from the selected AMI key.
+- `os_family`: `linux` or `windows`, derived from the resolved AMI `platform`.
 - `environment`: supplied by `var.environment`.
 
 The `private_ip`, `private_dns`, and `instance_id` values are apply-known. They
