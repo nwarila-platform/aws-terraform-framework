@@ -5,13 +5,15 @@ by a separate Ansible pipeline over SSH.
 
 ## Operating model
 
-SSH on TCP 22 is the only supported management path for EC2 instances created
-by this framework. Do not use WinRM for normal management. Ansible runs outside
-this repository, in a separate pipeline job, using its own SSH configuration.
+SSH on TCP 22 is the supported management path for EC2 instances created by this
+framework. Windows readiness uses an in-box WinRM HTTPS shim on TCP 5986 before
+configuration management, but normal management still belongs to SSH. Ansible
+runs outside this repository, in a separate pipeline job, using its own SSH
+configuration.
 
-This repository stops at creating SSH-reachable instances and emitting a
-non-secret inventory hand-off. It does not run Ansible, poll instance readiness,
-create IAM roles, create networking, or create security group rules.
+This repository stops at creating reachable instances, gating initial readiness,
+and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
+roles, create networking, or create security group rules.
 
 ## Configure the instance profile
 
@@ -91,9 +93,10 @@ rules.
 Use this network posture:
 
 - Allow inbound TCP 22 from the management or controller source.
+- Allow inbound TCP 5986 from the Terraform apply host for Windows readiness.
 - Ensure private subnet instances are reachable from the Ansible controller
   through routing, VPN, a bastion path, or another consumer-managed path.
-- RDP on 3389 and WinRM on 5985 or 5986 remain consumer opt-in and are not the
+- RDP on 3389 and WinRM on 5985 remain consumer opt-in and are not the
   management path for this framework.
 
 ## Hand off inventory
@@ -179,7 +182,7 @@ payload actually runs.
 
 These responsibilities stay outside this repository:
 
-- Non-SSH management methods, including WinRM.
+- Non-SSH management methods, including WinRM beyond the Windows readiness shim.
 - Ansible execution.
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.

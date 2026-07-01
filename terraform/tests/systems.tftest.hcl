@@ -767,6 +767,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
       local.readiness_targets["direct-win01"].is_windows == true,
       output.aws_instances["direct-win01"].os_family == "windows",
       strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Transport HTTPS"),
+      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "LocalPort 5986"),
     ])
     error_message = "A raw Windows AMI should classify as Windows exclusively from platform_details metadata."
   }
@@ -967,11 +969,16 @@ run "systems_render_readiness_user_data_per_os" {
     condition = alltrue([
       strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
       strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Negotiate"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Basic"),
       strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\AllowUnencrypted"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5985"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "New-SelfSignedCertificate"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Transport HTTPS"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "CertificateThumbprint"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5986"),
+      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5985"),
       strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name WinRM -StartupType Automatic"),
     ])
-    error_message = "Windows user_data should enable WinRM, require encrypted Negotiate auth, and allow TCP 5985."
+    error_message = "Windows user_data should enable WinRM over HTTPS 5986, require encrypted Negotiate auth, and avoid exposing TCP 5985."
   }
 
   assert {

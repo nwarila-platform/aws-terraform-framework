@@ -37,7 +37,8 @@ locals {
 
   # Windows WinRM readiness shim selected for Windows in the elastic_compute_cloud map below. This
   # uses only in-box WS-Management components so no Feature-on-Demand install, Windows Update, or
-  # egress is required.
+  # egress is required. Terraform connects with NTLM over HTTPS; TLS supplies the message encryption
+  # WinRM requires while keeping Basic auth and unencrypted SOAP disabled.
   windows_winrm_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
@@ -48,13 +49,48 @@ locals {
     Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $false
     Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $false
 
-    $ruleName = "Terraform WinRM HTTP 5985"
+    $certFriendlyName = "Terraform WinRM HTTPS"
+    $cert = Get-ChildItem -Path Cert:\LocalMachine\My |
+      Where-Object { $_.FriendlyName -eq $certFriendlyName -and $_.HasPrivateKey } |
+      Sort-Object -Property NotAfter -Descending |
+      Select-Object -First 1
+
+    if (-not $cert) {
+      $cert = New-SelfSignedCertificate `
+        -DnsName $env:COMPUTERNAME `
+        -CertStoreLocation Cert:\LocalMachine\My `
+        -FriendlyName $certFriendlyName `
+        -KeyAlgorithm RSA `
+        -KeyLength 2048 `
+        -HashAlgorithm SHA256 `
+        -NotAfter (Get-Date).AddYears(5)
+    }
+
+    Get-ChildItem -Path WSMan:\localhost\Listener |
+      Where-Object { $_.Keys -contains "Transport=HTTP" } |
+      ForEach-Object { Remove-Item -Path $_.PSPath -Recurse -Force }
+
+    Get-ChildItem -Path WSMan:\localhost\Listener |
+      Where-Object { $_.Keys -contains "Transport=HTTPS" } |
+      ForEach-Object { Remove-Item -Path $_.PSPath -Recurse -Force }
+
+    New-Item `
+      -Path WSMan:\localhost\Listener `
+      -Transport HTTPS `
+      -Address "*" `
+      -CertificateThumbprint $cert.Thumbprint `
+      -Force
+
+    Get-NetFirewallRule -DisplayGroup "Windows Remote Management" -ErrorAction SilentlyContinue |
+      Disable-NetFirewallRule
+
+    $ruleName = "Terraform WinRM HTTPS 5986"
     $rule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
     if ($rule) {
       Set-NetFirewallRule -DisplayName $ruleName -Enabled True -Direction Inbound -Action Allow -Profile Any
-      Get-NetFirewallRule -DisplayName $ruleName | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 5985
+      Get-NetFirewallRule -DisplayName $ruleName | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 5986
     } else {
-      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985 -Profile Any
+      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986 -Profile Any
     }
 
     Set-Service -Name WinRM -StartupType Automatic
