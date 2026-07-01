@@ -1167,6 +1167,7 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
+        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
         is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
       }
     },
@@ -1175,6 +1176,7 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
+        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
         is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_west_2[hostname].ami)))
       }
     },
@@ -1183,6 +1185,7 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
+        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
         is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
       }
     },
@@ -1191,6 +1194,7 @@ locals {
         id         = instance.id
         private_ip = instance.private_ip
         key_name   = instance.key_name
+        password   = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami))) ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
         is_windows = can(regex("windows", lower(local.elastic_compute_cloud.us_east_1[hostname].ami)))
       }
     },
@@ -1213,11 +1217,16 @@ resource "terraform_data" "ssh_ready" {
 
   provisioner "remote-exec" {
     connection {
-      type            = "ssh"
+      type            = each.value.is_windows ? "winrm" : "ssh"
       host            = each.value.private_ip
-      user            = each.value.is_windows ? "administrator" : "ec2-user"
-      private_key     = try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
+      user            = each.value.is_windows ? "Administrator" : "ec2-user"
+      password        = each.value.is_windows ? each.value.password : null
+      private_key     = each.value.is_windows ? null : try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
+      script_path     = each.value.is_windows ? null : "/tmp/terraform_%RAND%.sh"
       target_platform = each.value.is_windows ? "windows" : "unix"
+      port            = each.value.is_windows ? 5985 : null
+      https           = each.value.is_windows ? false : null
+      use_ntlm        = each.value.is_windows ? true : null
       timeout         = "10m"
     }
 
