@@ -136,23 +136,26 @@ This module only prepares the EC2 systems and emits infrastructure facts.
 
 ## Gate readiness before Ansible
 
-This module gates SSH readiness before configuration management. On
-`terraform apply`, `terraform_data.ssh_ready` runs a per-instance
-`remote-exec` probe that first waits for SSH with Terraform's 10-minute
-connection timeout, then runs the OS-native launch-agent wait:
+This module gates instance readiness before configuration management. On
+`terraform apply`, `terraform_data.readiness_gate` runs a per-instance
+`remote-exec` probe that first waits for the readiness transport (SSH on Linux,
+WinRM on Windows) with Terraform's 10-minute connection timeout, then runs the
+OS-native launch-agent wait:
 `cloud-init status --wait` on Linux and
 `"C:\Program Files\Amazon\EC2Launch\EC2Launch.exe" status -b` on Windows.
 The Terraform step does not complete, and its duration captures the wait, until
 each instance is provisioned and reachable.
 
-Windows OpenSSH intentionally uses its built-in cmd default shell so
-Terraform's `remote-exec` SCP upload works. Ansible sets its own shell in the
-separate configuration-management pipeline.
+The dormant Windows OpenSSH bootstrap intentionally uses its built-in cmd
+default shell so Terraform's `remote-exec` SCP upload will work if that SSH path
+is reactivated. Ansible sets its own shell in the separate
+configuration-management pipeline.
 
-The gate authenticates with the instance key pair using
-`var.ssh_readiness_private_key_paths`, the same private key material the
-Ansible controller uses. Leave the map empty for plan and CI; a real apply must
-populate a filesystem path for every `key_name` in use.
+Linux readiness authenticates with the instance key pair using
+`var.ssh_readiness_private_key_paths`. Windows readiness uses the same map to
+decrypt the launch Administrator password for WinRM. Leave the map empty for
+plan and CI; a real apply must populate a filesystem path for every `key_name`
+in use.
 
 ## Treat the key pair as the management credential
 

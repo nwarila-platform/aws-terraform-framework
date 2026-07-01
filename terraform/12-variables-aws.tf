@@ -31,7 +31,7 @@ variable "windows_openssh_source" {
 }
 
 variable "ssh_readiness_private_key_paths" {
-  description = "Map of EC2 key_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the SSH readiness gate (terraform_data.ssh_ready) to authenticate its connect-and-wait probe. Leave empty (default) for plan/CI; a real apply must supply a path for each key_name in use, or the gate cannot connect. The gate authenticates exactly like the downstream Ansible job will."
+  description = "Map of EC2 key_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the readiness gate (terraform_data.readiness_gate): Linux authenticates directly with this key over SSH, and Windows uses it to decrypt the launch Administrator password for WinRM. Leave empty (default) for plan/CI; a real apply must supply a path for each key_name in use, or the gate cannot connect."
   type        = map(string)
   default     = {}
   nullable    = false

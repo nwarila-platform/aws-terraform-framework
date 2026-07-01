@@ -38,8 +38,8 @@ This file is overwritten by `terraform-docs` on every PR via the
 | [aws_volume_attachment.us_east_1_refresh](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
 | [aws_volume_attachment.us_west_2](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
 | [aws_volume_attachment.us_west_2_refresh](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
+| [terraform_data.readiness_gate](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [terraform_data.refresh](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
-| [terraform_data.ssh_ready](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 
 ## Inputs
 
@@ -51,7 +51,7 @@ This file is overwritten by `terraform-docs` on every PR via the
 | aws\_config | Define all of the required environmental variables specific to the AWS provider. | <pre>object({<br/>    regions = list(string)<br/>  })</pre> | <pre>{<br/>  "regions": [<br/>    "us_east_1",<br/>    "us_west_2"<br/>  ]<br/>}</pre> | no |
 | environment | Deployment environment tag value applied to managed AWS resources. | `string` | n/a | yes |
 | ssh\_readiness\_linux\_script\_dir | Absolute directory on each Linux instance where the SSH readiness gate uploads its remote-exec script. Must be writable by ec2-user AND mounted exec (NOT noexec). Hardened AMIs commonly mount /tmp (sometimes /var/tmp, /dev/shm) noexec, which breaks the default remote-exec upload; the login user's home is the usual escape hatch. Override if /home is also noexec in your image. | `string` | `"/home/ec2-user"` | no |
-| ssh\_readiness\_private\_key\_paths | Map of EC2 key\_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the SSH readiness gate (terraform\_data.ssh\_ready) to authenticate its connect-and-wait probe. Leave empty (default) for plan/CI; a real apply must supply a path for each key\_name in use, or the gate cannot connect. The gate authenticates exactly like the downstream Ansible job will. | `map(string)` | `{}` | no |
+| ssh\_readiness\_private\_key\_paths | Map of EC2 key\_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the readiness gate (terraform\_data.readiness\_gate): Linux authenticates directly with this key over SSH, and Windows uses it to decrypt the launch Administrator password for WinRM. Leave empty (default) for plan/CI; a real apply must supply a path for each key\_name in use, or the gate cannot connect. | `map(string)` | `{}` | no |
 | windows\_ami\_owners | AWS account IDs or owner aliases that own the public AWS Windows Server Base AMI. Defaults to Amazon's public AMIs; override only when mirroring those images into another account. | `list(string)` | <pre>[<br/>  "amazon"<br/>]</pre> | no |
 | windows\_openssh\_source | Optional local Feature-on-Demand source path for installing the OpenSSH.Server capability on Windows Server 2019/2022 in air-gapped / no-egress environments (passed to 'Add-WindowsCapability -Source <path> -LimitAccess'). Leave empty (default) to install from Windows Update, which requires outbound egress. Ignored on Windows Server 2025 (OpenSSH ships preinstalled) and on any instance where OpenSSH is already Present. | `string` | `""` | no |
 
