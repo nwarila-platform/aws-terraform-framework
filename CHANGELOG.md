@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.2.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v0.1.0...v0.2.0) (2026-07-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* the red_hat_enterprise_linux_8 alias is removed (default ami is now ttc-rhel8); self-built resolution expects AMI Names shaped <family>_v<version>_<build>, so previously-resolved RHEL instances may re-resolve and replace.
+* Windows user_data change forces Windows instance replacement; the readiness gate now needs inbound TCP 5986 (not 5985) from the Terraform apply host.
+* get_password_data removed from all_systems input; Windows user_data change forces Windows instance replacement.
+* deployments must own matching RHEL AMIs in-account; the resolved RHEL AMI may change, which can replace existing RHEL EC2 instances on apply.
+* the Windows user_data changes (DefaultShell step removed), forcing replacement of existing Windows EC2 instances on apply.
+* `terraform apply` now runs an SSH readiness gate that requires ssh_readiness_private_key_paths to be populated (key_name => private key path) and SSH reachability from the apply host; pipelines must set it. The Windows user_data also changes (restart removed), forcing replacement of existing Windows EC2 instances on apply.
+* the Windows user_data bytes change, forcing replacement of existing Windows EC2 instances on apply (user_data_replace_on_change = true).
+* changes which Windows AMI resolves (public base vs custom golden image) and expands the Windows user_data, forcing replacement of existing Windows instances. OpenSSH capability install pulls from Windows Update at first boot, so Windows instances need egress on first boot (air-gapped subnets need a pre-baked image).
+* removes the required all_systems.ansible_group input and the transport/ansible_* fields and Ansible* tags from the aws_instances output; Ansible now derives connection/grouping itself from the neutral facts and generic tags.
+* EC2 user_data changes from SSM-agent-ensure to SSH-readiness, which forces replacement of existing instances; the aws_instances output facts (transport, ansible_connection, ansible_host, plus the new ansible_user) change shape.
+
+### Features
+
+* direct-AMI lookup + platform-based OS classification ([#68](https://github.com/nwarila-platform/aws-terraform-framework/issues/68)) ([07520ce](https://github.com/nwarila-platform/aws-terraform-framework/commit/07520ce30a97b72df347fb74340a5a8b1d8c96a9))
+* flip EC2 management transport from SSM to SSH ([1a80b79](https://github.com/nwarila-platform/aws-terraform-framework/commit/1a80b79a93b63398186f234e1ba19aad7044d77d))
+* gate terraform apply on SSH readiness via native remote-exec ([525889d](https://github.com/nwarila-platform/aws-terraform-framework/commit/525889df9027610f2077ef62fec2619f3c13bb9f))
+* harden Windows OpenSSH user_data and extract user_data into named locals ([8491fd7](https://github.com/nwarila-platform/aws-terraform-framework/commit/8491fd7ade9e44c4bbdf7337467974405b5ef4d2))
+* make EC2 inventory orchestrator-neutral ([7694680](https://github.com/nwarila-platform/aws-terraform-framework/commit/7694680994825cf2d6499653394032a68ede1464))
+* name-based AMI version resolution (family / family:version / ami-id) + OS via platform ([#73](https://github.com/nwarila-platform/aws-terraform-framework/issues/73)) ([5eccbbf](https://github.com/nwarila-platform/aws-terraform-framework/commit/5eccbbfcca4ef6ccb5c5f82452b76c804dc300a7))
+* source RHEL AMIs from self-owned account ([cd1c5cf](https://github.com/nwarila-platform/aws-terraform-framework/commit/cd1c5cff4323af20177bb823e5d1bb4d05783b1d))
+* use public Windows base AMI and install OpenSSH via user_data ([53e4c9e](https://github.com/nwarila-platform/aws-terraform-framework/commit/53e4c9e2294d8bbddf9c578f1eb5661b78b30ed8))
+* WinRM readiness shim for Windows (offline-safe) ([#67](https://github.com/nwarila-platform/aws-terraform-framework/issues/67)) ([f3f1890](https://github.com/nwarila-platform/aws-terraform-framework/commit/f3f1890b6cda542207fc2f2008c11eb59dbe5930))
+
+
+### Bug Fixes
+
+* repair the Windows SSH readiness gate (cmd default shell + full EC2Launch path) ([0692548](https://github.com/nwarila-platform/aws-terraform-framework/commit/069254841e833977c521257ebfdaffdb3def74d7))
+* upload the Linux readiness script to a configurable exec dir ([#69](https://github.com/nwarila-platform/aws-terraform-framework/issues/69)) ([052afc8](https://github.com/nwarila-platform/aws-terraform-framework/commit/052afc8e5b303a0d66de77af33ff497473b2d26d))
+* WinRM readiness over HTTPS/5986 (NTLM/HTTP-5985 could not authenticate) ([#71](https://github.com/nwarila-platform/aws-terraform-framework/issues/71)) ([998e1ba](https://github.com/nwarila-platform/aws-terraform-framework/commit/998e1ba8b937ea06bafe8b5ec2d13912144422e2))
+
 ## 0.1.0 (2026-06-17)
 
 
