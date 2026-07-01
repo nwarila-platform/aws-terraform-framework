@@ -9,12 +9,24 @@
 
 # Statically Configured LOCALS
 locals {
+  public_ami_aliases = toset([
+    "windows_server_2022_base",
+    "windows_server_2025_base",
+  ])
+
+  ami_specs = {
+    for ami in toset([for system in var.all_systems : system.ami]) : ami => {
+      is_direct_id    = can(regex("^ami-[0-9a-f]{8,17}$", ami))
+      is_public_alias = contains(local.public_ami_aliases, ami)
+      is_versioned    = can(regex(":", ami))
+      family          = split(":", ami)[0]
+      version         = can(regex(":", ami)) ? split(":", ami)[1] : null
+      glob            = can(regex(":", ami)) ? "${split(":", ami)[0]}_v${split(":", ami)[1]}_*" : "${ami}_v*"
+    }
+  }
+
   amazon_machine_images = merge(
     {
-      "red_hat_enterprise_linux_8" = {
-        us_west_2 = try(data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0], null)
-        us_east_1 = try(data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0], null)
-      }
       "windows_server_2022_base" = {
         us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
         us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
@@ -25,13 +37,18 @@ locals {
       }
     },
     {
-      for id in toset([
-        for s in var.all_systems : s.ami
-        if can(regex("^ami-[0-9a-f]{8,17}$", s.ami))
-        ]) : id => {
-        us_west_2 = try(data.aws_ami.us_west_2_direct[id], null)
-        us_east_1 = try(data.aws_ami.us_east_1_direct[id], null)
+      for ami, spec in local.ami_specs : ami => {
+        us_west_2 = try(data.aws_ami.us_west_2_direct[ami], null)
+        us_east_1 = try(data.aws_ami.us_east_1_direct[ami], null)
       }
+      if spec.is_direct_id
+    },
+    {
+      for ami, spec in local.ami_specs : ami => {
+        us_west_2 = try(data.aws_ami.us_west_2_selfbuilt[ami], null)
+        us_east_1 = try(data.aws_ami.us_east_1_selfbuilt[ami], null)
+      }
+      if !spec.is_direct_id && !spec.is_public_alias
     }
   )
 
@@ -167,11 +184,11 @@ locals {
         #region           = < This is set statically >
         ami                  = system.ami
         availability_zone    = system.availability_zone
-        is_windows           = can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details))
-        get_password_data    = can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details))
+        is_windows           = local.amazon_machine_images[system.ami][region].platform == "windows"
+        get_password_data    = local.amazon_machine_images[system.ami][region].platform == "windows"
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(can(regex("[Ww]indows", local.amazon_machine_images[system.ami][region].platform_details)) ? local.windows_winrm_user_data : local.linux_ssh_user_data)
+        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_winrm_user_data : local.linux_ssh_user_data)
         hostname             = system.hostname
         instance_type        = system.instance_type
         refresh              = system.refresh

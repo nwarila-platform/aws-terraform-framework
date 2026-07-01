@@ -150,7 +150,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "red_hat_enterprise_linux_8"
+        ami                  = "ttc-rhel8"
 
         tags = {
           Function = "Inventory Linux"
@@ -190,7 +190,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "red_hat_enterprise_linux_8"
+        ami                  = "ttc-rhel8"
         refresh              = true
 
         tags = {
@@ -207,7 +207,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000001"
       platform         = ""
@@ -400,7 +400,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000003"
       platform         = ""
@@ -409,7 +409,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_east_1_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000004"
       platform         = ""
@@ -616,23 +616,23 @@ run "systems_reject_regions_outside_aws_config" {
   ]
 }
 
-run "systems_reject_unknown_ami_keys" {
+run "systems_reject_invalid_ami_identifiers" {
   command = plan
 
   variables {
     all_systems = [
       {
         region               = "us-west-2"
-        hostname             = "unknown-ami"
+        hostname             = "invalid-ami"
         availability_zone    = "us-west-2a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "amazon_linux_2023"
+        ami                  = "amazon_linux_2023:latest"
 
         tags = {
-          Function = "Unsupported AMI"
+          Function = "Invalid AMI"
         }
 
         network_interfaces = [
@@ -683,7 +683,160 @@ run "systems_accept_windows_server_2025_base_ami" {
   }
 }
 
-run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
+run "systems_accept_selfbuilt_ami_names_and_versions" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "default-rhel"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-selfbuilt-default"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Default self-built Linux AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.11.10"
+          }
+        ]
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "prod-rhel"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-east-selfbuilt-name"
+        key_name             = "east-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "east"
+        ami                  = "prod-rhel8"
+
+        tags = {
+          Function = "Named self-built Linux AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.1.11.10"
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "selfwin01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-selfbuilt-version"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "ttc-win22-sql19:1.2"
+
+        tags = {
+          Function = "Versioned self-built Windows AMI"
+        }
+
+        network_interfaces = [
+          {
+            private_ip = "10.0.11.11"
+          }
+        ]
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    values = {
+      id               = "ami-00000000000000009"
+      platform         = ""
+      platform_details = "Windows"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_selfbuilt["prod-rhel8"]
+    values = {
+      id               = "ami-00000000000000010"
+      platform         = ""
+      platform_details = "Windows"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-win22-sql19:1.2"]
+    values = {
+      id               = "ami-00000000000000011"
+      platform         = "windows"
+      platform_details = "Linux/UNIX"
+    }
+  }
+
+  assert {
+    condition     = contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-rhel8") && contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
+    error_message = "Self-built name and name:version inputs should instantiate regional self-owned AMI data lookups."
+  }
+
+  assert {
+    condition = alltrue([
+      local.ami_specs["ttc-rhel8"].family == "ttc-rhel8",
+      local.ami_specs["ttc-rhel8"].version == null,
+      local.ami_specs["ttc-rhel8"].glob == "ttc-rhel8_v*",
+      local.ami_specs["prod-rhel8"].family == "prod-rhel8",
+      local.ami_specs["prod-rhel8"].glob == "prod-rhel8_v*",
+      local.ami_specs["ttc-win22-sql19:1.2"].family == "ttc-win22-sql19",
+      local.ami_specs["ttc-win22-sql19:1.2"].version == "1.2",
+      local.ami_specs["ttc-win22-sql19:1.2"].glob == "ttc-win22-sql19_v1.2_*",
+    ])
+    error_message = "AMI specs should preserve caller-provided families and build the name glob in one local."
+  }
+
+  assert {
+    condition = alltrue([
+      contains(keys(local.amazon_machine_images), "windows_server_2025_base"),
+      contains(keys(local.amazon_machine_images), "ttc-rhel8"),
+      contains(keys(local.amazon_machine_images), "prod-rhel8"),
+      contains(keys(local.amazon_machine_images), "ttc-win22-sql19:1.2"),
+    ])
+    error_message = "The unified AMI map should be keyed by public aliases and full self-built input strings."
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["default-rhel"].ami == "ami-00000000000000009" && aws_instance.us_east_1["prod-rhel"].ami == "ami-00000000000000010" && aws_instance.us_west_2["selfwin01"].ami == "ami-00000000000000011"
+    error_message = "Instances should launch from the resolved self-built AMI IDs."
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_compute_cloud.us_west_2["default-rhel"].is_windows == false,
+      local.elastic_compute_cloud.us_east_1["prod-rhel"].is_windows == false,
+      output.aws_instances["default-rhel"].os_family == "linux",
+      output.aws_instances["prod-rhel"].os_family == "linux",
+      strcontains(local.elastic_compute_cloud.us_west_2["default-rhel"].user_data, "systemctl enable --now sshd"),
+      strcontains(local.elastic_compute_cloud.us_east_1["prod-rhel"].user_data, "systemctl enable --now sshd"),
+    ])
+    error_message = "Self-built AMIs with empty platform should classify as Linux even if platform_details is misleading."
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_compute_cloud.us_west_2["selfwin01"].is_windows == true,
+      local.elastic_compute_cloud.us_west_2["selfwin01"].get_password_data == true,
+      aws_instance.us_west_2["selfwin01"].get_password_data == true,
+      local.readiness_targets["selfwin01"].is_windows == true,
+      output.aws_instances["selfwin01"].os_family == "windows",
+      strcontains(local.elastic_compute_cloud.us_west_2["selfwin01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+    ])
+    error_message = "Self-built AMIs with platform=windows should classify as Windows even if platform_details is misleading."
+  }
+}
+
+run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   command = plan
 
   variables {
@@ -736,7 +889,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
     values = {
       id               = "ami-0123456789abcdef0"
       platform         = "windows"
-      platform_details = "Windows"
+      platform_details = "Linux/UNIX"
     }
   }
 
@@ -745,7 +898,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
     values = {
       id               = "ami-0fedcba9876543210"
       platform         = ""
-      platform_details = "Red Hat Enterprise Linux"
+      platform_details = "Windows"
     }
   }
 
@@ -770,7 +923,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
       strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Transport HTTPS"),
       strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "LocalPort 5986"),
     ])
-    error_message = "A raw Windows AMI should classify as Windows exclusively from platform_details metadata."
+    error_message = "A raw Windows AMI should classify as Windows exclusively from platform metadata."
   }
 
   assert {
@@ -782,7 +935,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform_details" {
       output.aws_instances["direct-linux"].os_family == "linux",
       strcontains(local.elastic_compute_cloud.us_east_1["direct-linux"].user_data, "systemctl enable --now sshd"),
     ])
-    error_message = "A raw non-Windows AMI should classify as Linux from platform_details metadata."
+    error_message = "A raw non-Windows AMI should classify as Linux from platform metadata."
   }
 }
 
@@ -897,7 +1050,7 @@ run "systems_render_readiness_user_data_per_os" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "red_hat_enterprise_linux_8"
+        ami                  = "ttc-rhel8"
 
         tags = {
           Function = "Linux SSH user data"
@@ -933,7 +1086,7 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000005"
       platform         = ""
@@ -996,7 +1149,7 @@ run "systems_render_readiness_user_data_per_os" {
 
   assert {
     condition     = local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data != local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data
-    error_message = "Linux and Windows user_data should differ so the AMI regex split is covered."
+    error_message = "Linux and Windows user_data should differ so platform-based OS selection is covered."
   }
 }
 
@@ -1319,7 +1472,7 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 
   override_data {
-    target = data.aws_ami.us_west_2_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000007"
       platform         = ""
@@ -1328,7 +1481,7 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_red_hat_enterprise_linux_8[0]
+    target = data.aws_ami.us_east_1_selfbuilt["ttc-rhel8"]
     values = {
       id               = "ami-00000000000000008"
       platform         = ""

@@ -51,7 +51,7 @@ variable "all_systems" {
     })
 
     /* Optional Parameters */
-    ami           = optional(string, "red_hat_enterprise_linux_8")
+    ami           = optional(string, "ttc-rhel8")
     instance_type = optional(string, "m6i.large")
     set_state     = optional(string)
 
@@ -130,9 +130,9 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      contains(["red_hat_enterprise_linux_8", "windows_server_2022_base", "windows_server_2025_base"], system.ami) || can(regex("^ami-[0-9a-f]{8,17}$", system.ami))
+      contains(["windows_server_2022_base", "windows_server_2025_base"], system.ami) || can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) || can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*(:[0-9]+(\\.[0-9]+)*)?$", system.ami))
     ])
-    error_message = "Each all_systems entry ami must be red_hat_enterprise_linux_8, windows_server_2022_base, windows_server_2025_base, or a raw AMI ID matching ami-[0-9a-f]{8,17}."
+    error_message = "Each all_systems entry ami must be windows_server_2022_base, windows_server_2025_base, a raw AMI ID matching ami-[0-9a-f]{8,17}, or a self-built AMI family optionally pinned as family:version."
   }
 
   validation {
