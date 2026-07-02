@@ -151,6 +151,52 @@ run "instance_state_created_only_when_set_state_is_not_null" {
 
 }
 
+run "instance_state_includes_refresh_instances_after_readiness" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "west-refresh-state"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-refresh-state"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        refresh              = true
+        set_state            = "stopped"
+
+        tags = {
+          Function = "West refresh instance with state control"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.12"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = contains(keys(aws_instance.us_west_2_refresh), "west-refresh-state")
+    error_message = "west-refresh-state should plan as a refresh instance."
+  }
+
+  assert {
+    condition     = contains(keys(aws_ec2_instance_state.us_west_2), "west-refresh-state")
+    error_message = "west-refresh-state should have an aws_ec2_instance_state resource even though it is refresh=true."
+  }
+
+  assert {
+    condition     = aws_ec2_instance_state.us_west_2["west-refresh-state"].state == "stopped"
+    error_message = "west-refresh-state should preserve the requested stopped state."
+  }
+}
+
 run "aws_instances_output_exposes_non_secret_inventory" {
   command = plan
 
@@ -351,8 +397,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size = "125"
           },
           {
-            delete_on_termination = false
-            volume_size           = "250"
+            volume_size = "250"
+          },
+          {
+            skip_destroy = true
+            volume_size  = "500"
           }
         ]
 
@@ -492,6 +541,14 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
+    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-2"]
+    override_during = plan
+    values = {
+      id = "vol-west-ebs-2"
+    }
+  }
+
+  override_resource {
     target          = aws_ebs_volume.us_west_2_refresh["west-ebs-refresh-ebs-0"]
     override_during = plan
     values = {
@@ -523,6 +580,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-2"].skip_destroy == true
+    error_message = "The third west normal EBS local should preserve explicit skip_destroy."
+  }
+
+  assert {
     condition     = local.ebs_block_devices.us_west_2["west-ebs-refresh-ebs-0"].hostname == "west-ebs-refresh"
     error_message = "The west refresh EBS local should carry its owning hostname explicitly."
   }
@@ -533,13 +595,18 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd"
-    error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring."
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].skip_destroy == false && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].stop_instance_before_detaching == true
+    error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring, default skip_destroy, and safe detach."
   }
 
   assert {
     condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-1"].volume_id == "vol-west-ebs-1" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].skip_destroy == false
-    error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and skip_destroy."
+    error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and default skip_destroy."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-2"].volume_id == "vol-west-ebs-2" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].device_name == "/dev/sdf" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].skip_destroy == true && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].stop_instance_before_detaching == true
+    error_message = "The third west normal EBS attachment should preserve address -> volume -> instance -> device wiring, explicit skip_destroy, and safe detach."
   }
 
   assert {
@@ -661,6 +728,40 @@ run "systems_reject_invalid_ami_identifiers" {
         network_interfaces = [
           {
             private_ip      = "10.0.3.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_invalid_set_state" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "bad-state"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        set_state            = "terminated"
+
+        tags = {
+          Function = "Invalid instance state"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.3.11"
             security_groups = ["sg-west"]
           }
         ]
