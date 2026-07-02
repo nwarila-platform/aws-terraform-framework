@@ -163,7 +163,7 @@ is reactivated. Ansible sets its own shell in the separate
 configuration-management pipeline.
 
 Linux readiness authenticates with the instance key pair using
-`var.ssh_readiness_private_key_paths`. Windows readiness uses the same map to
+`var.readiness_private_key_paths`. Windows readiness uses the same map to
 decrypt the launch Administrator password for WinRM. Leave the map empty for
 plan and CI; a real apply must populate a filesystem path for every `key_name`
 in use.

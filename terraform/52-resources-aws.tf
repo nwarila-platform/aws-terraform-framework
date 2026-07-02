@@ -1162,7 +1162,7 @@ resource "aws_instance" "us_east_1_refresh" {
 # transport: SSH on Linux, WinRM on Windows. The connection retry (10-minute timeout) waits for the
 # transport; the OS-native inline command then waits for the launch agent to finish (cloud-init on
 # Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Linux authenticates with
-# the launch key pair (path supplied by var.ssh_readiness_private_key_paths); Windows authenticates
+# the launch key pair (path supplied by var.readiness_private_key_paths); Windows authenticates
 # with the decrypted launch Administrator password. On a SEPARATE terraform_data so a gate failure
 # taints only this resource, never the EC2 instance.
 resource "terraform_data" "readiness_gate" {
@@ -1179,8 +1179,8 @@ resource "terraform_data" "readiness_gate" {
       host        = each.value.private_ip
       user        = each.value.is_windows ? "Administrator" : "ec2-user"
       password    = each.value.is_windows ? each.value.password : null
-      private_key = each.value.is_windows ? null : try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
-      script_path = each.value.is_windows ? null : "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh"
+      private_key = each.value.is_windows ? null : try(file(var.readiness_private_key_paths[each.value.key_name]), null)
+      script_path = each.value.is_windows ? null : "${var.readiness_linux_script_dir}/terraform_%RAND%.sh"
       port        = each.value.is_windows ? 5986 : null
       https       = each.value.is_windows ? true : null
       insecure    = each.value.is_windows ? true : null
