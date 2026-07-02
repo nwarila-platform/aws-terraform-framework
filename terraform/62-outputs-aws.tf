@@ -429,56 +429,18 @@
 
 output "aws_instances" {
   description = "Stable non-secret EC2 inventory keyed by hostname for inventory hand-off and readiness gating."
-  value = merge(
-    {
-      for key, inst in aws_instance.us_west_2 : key => {
-        hostname    = key
-        instance_id = inst.id
-        region      = "us_west_2"
-        private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        private_dns = inst.private_dns
-        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        os_family   = local.elastic_compute_cloud.us_west_2[key].is_windows ? "windows" : "linux"
-        environment = var.environment
-      }
-    },
-    {
-      for key, inst in aws_instance.us_west_2_refresh : key => {
-        hostname    = key
-        instance_id = inst.id
-        region      = "us_west_2"
-        private_ip  = aws_network_interface.us_west_2["${key}-eni-0"].private_ip
-        private_dns = inst.private_dns
-        function    = local.elastic_compute_cloud.us_west_2[key].tags["Function"]
-        os_family   = local.elastic_compute_cloud.us_west_2[key].is_windows ? "windows" : "linux"
-        environment = var.environment
-      }
-    },
-    {
-      for key, inst in aws_instance.us_east_1 : key => {
-        hostname    = key
-        instance_id = inst.id
-        region      = "us_east_1"
-        private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        private_dns = inst.private_dns
-        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        os_family   = local.elastic_compute_cloud.us_east_1[key].is_windows ? "windows" : "linux"
-        environment = var.environment
-      }
-    },
-    {
-      for key, inst in aws_instance.us_east_1_refresh : key => {
-        hostname    = key
-        instance_id = inst.id
-        region      = "us_east_1"
-        private_ip  = aws_network_interface.us_east_1["${key}-eni-0"].private_ip
-        private_dns = inst.private_dns
-        function    = local.elastic_compute_cloud.us_east_1[key].tags["Function"]
-        os_family   = local.elastic_compute_cloud.us_east_1[key].is_windows ? "windows" : "linux"
-        environment = var.environment
-      }
+  value = {
+    for hostname, inst in local.all_ec2_instances : hostname => {
+      hostname    = hostname
+      instance_id = inst.id
+      region      = local.systems_by_hostname[hostname].region
+      private_ip  = merge(aws_network_interface.us_west_2, aws_network_interface.us_east_1)["${hostname}-eni-0"].private_ip
+      private_dns = inst.private_dns
+      function    = local.systems_by_hostname[hostname].tags["Function"]
+      os_family   = local.systems_by_hostname[hostname].is_windows ? "windows" : "linux"
+      environment = var.environment
     }
-  )
+  }
 }
 
 #endregion --- [ Resource(s): aws_instance ] -------------------------------------------------- #

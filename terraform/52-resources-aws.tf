@@ -890,7 +890,7 @@ resource "aws_instance" "us_west_2" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.get_password_data
+  get_password_data           = each.value.is_windows
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
@@ -957,7 +957,7 @@ resource "aws_instance" "us_west_2_refresh" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.get_password_data
+  get_password_data           = each.value.is_windows
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
@@ -1030,7 +1030,7 @@ resource "aws_instance" "us_east_1" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.get_password_data
+  get_password_data           = each.value.is_windows
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
@@ -1097,7 +1097,7 @@ resource "aws_instance" "us_east_1_refresh" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.get_password_data
+  get_password_data           = each.value.is_windows
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
@@ -1158,56 +1158,6 @@ resource "aws_instance" "us_east_1_refresh" {
 
 #region ------ [ Readiness Gate ] ------------------------------------------------------------- #
 
-# Combine each instance's runtime facts (id, private IP, key pair name, decrypted Windows password)
-# with its OS so the readiness gate can pick the right transport, login user, wait command, and
-# credential per instance.
-locals {
-  readiness_targets = merge(
-    {
-      for hostname, instance in aws_instance.us_west_2 : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
-        key_name   = instance.key_name
-        password   = local.elastic_compute_cloud.us_west_2[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = local.elastic_compute_cloud.us_west_2[hostname].is_windows
-      }
-    },
-    {
-      for hostname, instance in aws_instance.us_west_2_refresh : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
-        key_name   = instance.key_name
-        password   = local.elastic_compute_cloud.us_west_2[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = local.elastic_compute_cloud.us_west_2[hostname].is_windows
-      }
-    },
-    {
-      for hostname, instance in aws_instance.us_east_1 : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
-        key_name   = instance.key_name
-        password   = local.elastic_compute_cloud.us_east_1[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = local.elastic_compute_cloud.us_east_1[hostname].is_windows
-      }
-    },
-    {
-      for hostname, instance in aws_instance.us_east_1_refresh : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
-        key_name   = instance.key_name
-        password   = local.elastic_compute_cloud.us_east_1[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
-        is_windows = local.elastic_compute_cloud.us_east_1[hostname].is_windows
-      }
-    },
-  )
-}
-
-# Preserve existing readiness-gate state when renaming the internal resource address.
-moved {
-  from = terraform_data.ssh_ready
-  to   = terraform_data.readiness_gate
-}
-
 # Block `apply` until each instance finishes provisioning and is reachable over its readiness
 # transport: SSH on Linux, WinRM on Windows. The connection retry (10-minute timeout) waits for the
 # transport; the OS-native inline command then waits for the launch agent to finish (cloud-init on
@@ -1225,18 +1175,17 @@ resource "terraform_data" "readiness_gate" {
 
   provisioner "remote-exec" {
     connection {
-      type            = each.value.is_windows ? "winrm" : "ssh"
-      host            = each.value.private_ip
-      user            = each.value.is_windows ? "Administrator" : "ec2-user"
-      password        = each.value.is_windows ? each.value.password : null
-      private_key     = each.value.is_windows ? null : try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
-      script_path     = each.value.is_windows ? null : "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh"
-      target_platform = each.value.is_windows ? "windows" : "unix"
-      port            = each.value.is_windows ? 5986 : null
-      https           = each.value.is_windows ? true : null
-      insecure        = each.value.is_windows ? true : null
-      use_ntlm        = each.value.is_windows ? true : null
-      timeout         = "10m"
+      type        = each.value.is_windows ? "winrm" : "ssh"
+      host        = each.value.private_ip
+      user        = each.value.is_windows ? "Administrator" : "ec2-user"
+      password    = each.value.is_windows ? each.value.password : null
+      private_key = each.value.is_windows ? null : try(file(var.ssh_readiness_private_key_paths[each.value.key_name]), null)
+      script_path = each.value.is_windows ? null : "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh"
+      port        = each.value.is_windows ? 5986 : null
+      https       = each.value.is_windows ? true : null
+      insecure    = each.value.is_windows ? true : null
+      use_ntlm    = each.value.is_windows ? true : null
+      timeout     = "10m"
     }
 
     inline = [
