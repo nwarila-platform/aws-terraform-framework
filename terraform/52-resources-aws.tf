@@ -13,10 +13,10 @@
 
 resource "aws_network_interface" "us_west_2" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all network interfaces in the target region.
   for_each = local.elastic_network_interfaces.us_west_2
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the network interface.
   provider = aws.us_west_2
 
   # Define the Network Interface Properties
@@ -35,10 +35,10 @@ resource "aws_network_interface" "us_west_2" {
 
 resource "aws_network_interface" "us_east_1" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all network interfaces in the target region.
   for_each = local.elastic_network_interfaces.us_east_1
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the network interface.
   provider = aws.us_east_1
 
   # Define the Network Interface Properties
@@ -62,7 +62,7 @@ resource "aws_network_interface" "us_east_1" {
 
 resource "aws_lb" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancers in the target region.
+  # Iterate through all Elastic Load Balancers in the target region.
   for_each = local.elastic_load_balancers.us_west_2
 
   # Set the provider in which to deploy the load balancer.
@@ -170,7 +170,7 @@ resource "aws_lb" "us_west_2" {
 
 resource "aws_lb" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancers in the target region.
+  # Iterate through all Elastic Load Balancers in the target region.
   for_each = local.elastic_load_balancers.us_east_1
 
   # Set the provider in which to deploy the load balancer.
@@ -283,7 +283,7 @@ resource "aws_lb" "us_east_1" {
 
 resource "aws_lb_target_group" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancer target groups in the target region.
+  # Iterate through all Elastic Load Balancer target groups in the target region.
   for_each = local.lb_target_groups.us_west_2
 
   # Set the provider in which to deploy the target group.
@@ -337,7 +337,7 @@ resource "aws_lb_target_group" "us_west_2" {
 
 resource "aws_lb_target_group_attachment" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancer target group attachments in the target region.
+  # Iterate through all Elastic Load Balancer target group attachments in the target region.
   for_each = local.lb_target_group_attachments.us_west_2
 
   # Set the provider in which to deploy the target group attachment.
@@ -356,7 +356,7 @@ resource "aws_lb_target_group_attachment" "us_west_2" {
 
 resource "aws_lb_target_group" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancer target groups in the target region.
+  # Iterate through all Elastic Load Balancer target groups in the target region.
   for_each = local.lb_target_groups.us_east_1
 
   # Set the provider in which to deploy the target group.
@@ -410,7 +410,7 @@ resource "aws_lb_target_group" "us_east_1" {
 
 resource "aws_lb_target_group_attachment" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancer target group attachments in the target region.
+  # Iterate through all Elastic Load Balancer target group attachments in the target region.
   for_each = local.lb_target_group_attachments.us_east_1
 
   # Set the provider in which to deploy the target group attachment.
@@ -434,7 +434,7 @@ resource "aws_lb_target_group_attachment" "us_east_1" {
 
 resource "aws_lb_listener" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancer listeners in the target region.
+  # Iterate through all Elastic Load Balancer listeners in the target region.
   for_each = local.lb_listeners.us_west_2
 
   # Set the provider in which to deploy the listener.
@@ -480,7 +480,7 @@ resource "aws_lb_listener" "us_west_2" {
 
 resource "aws_lb_listener_rule" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancer listener rules in the target region.
+  # Iterate through all Elastic Load Balancer listener rules in the target region.
   for_each = local.lb_listener_rules.us_west_2
 
   # Set the provider in which to deploy the listener rule.
@@ -578,7 +578,7 @@ resource "aws_lb_listener_rule" "us_west_2" {
 
 resource "aws_lb_listener_certificate" "us_west_2" {
 
-  # Itterate through all Elastic Load Balancer listener certificates in the target region.
+  # Iterate through all Elastic Load Balancer listener certificates in the target region.
   for_each = local.lb_listener_certificates.us_west_2
 
   # Set the provider in which to deploy the listener certificate.
@@ -596,7 +596,7 @@ resource "aws_lb_listener_certificate" "us_west_2" {
 
 resource "aws_lb_listener" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancer listeners in the target region.
+  # Iterate through all Elastic Load Balancer listeners in the target region.
   for_each = local.lb_listeners.us_east_1
 
   # Set the provider in which to deploy the listener.
@@ -642,7 +642,7 @@ resource "aws_lb_listener" "us_east_1" {
 
 resource "aws_lb_listener_rule" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancer listener rules in the target region.
+  # Iterate through all Elastic Load Balancer listener rules in the target region.
   for_each = local.lb_listener_rules.us_east_1
 
   # Set the provider in which to deploy the listener rule.
@@ -740,7 +740,7 @@ resource "aws_lb_listener_rule" "us_east_1" {
 
 resource "aws_lb_listener_certificate" "us_east_1" {
 
-  # Itterate through all Elastic Load Balancer listener certificates in the target region.
+  # Iterate through all Elastic Load Balancer listener certificates in the target region.
   for_each = local.lb_listener_certificates.us_east_1
 
   # Set the provider in which to deploy the listener certificate.
@@ -763,13 +763,13 @@ resource "aws_lb_listener_certificate" "us_east_1" {
 
 resource "aws_ebs_volume" "us_west_2" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all Elastic Block Store volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_west_2 : k => v
     if v.refresh == false
   }
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the Elastic Block Store volume.
   provider = aws.us_west_2
 
   # Define the Elastic Block Store Properties
@@ -787,13 +787,13 @@ resource "aws_ebs_volume" "us_west_2" {
 
 resource "aws_ebs_volume" "us_west_2_refresh" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all Elastic Block Store volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_west_2 : k => v
     if v.refresh == true
   }
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the Elastic Block Store volume.
   provider = aws.us_west_2
 
   # Define the Elastic Block Store Properties
@@ -815,13 +815,13 @@ resource "aws_ebs_volume" "us_west_2_refresh" {
 
 resource "aws_ebs_volume" "us_east_1" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all Elastic Block Store volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_east_1 : k => v
     if v.refresh == false
   }
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the Elastic Block Store volume.
   provider = aws.us_east_1
 
   # Define the Elastic Block Store Properties
@@ -843,13 +843,13 @@ resource "aws_ebs_volume" "us_east_1" {
 
 resource "aws_ebs_volume" "us_east_1_refresh" {
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all Elastic Block Store volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_east_1 : k => v
     if v.refresh == true
   }
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the Elastic Block Store volume.
   provider = aws.us_east_1
 
   # Define the Elastic Block Store Properties
@@ -869,19 +869,19 @@ resource "aws_ebs_volume" "us_east_1_refresh" {
 
 }
 
-#endregion --- [ Create All Elastic Block Store (EBS) Objects - us-west-2 ] ------------- #
+#endregion --- [ Create All Elastic Block Store (EBS) Objects - us-east-1 ] ------------- #
 
 #endregion --- [ Create All Elastic Block Store (EBS) Objects ] ------------------------------- #
 
 
-#region ------ [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
+#region ------ [ Create All Elastic Compute Cloud (EC2s) ] ------------------------------------ #
 
 resource "aws_instance" "us_west_2" {
 
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all EC2 instances in the target region.
   for_each = {
     for k, v in local.elastic_compute_cloud.us_west_2 : k => v
     if v.refresh == false
@@ -917,7 +917,7 @@ resource "aws_instance" "us_west_2" {
   }
 
   # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created reguardless of what else has been configured, and network interfaces
+  # ?  will be created regardless of what else has been configured, and network interfaces
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
@@ -948,7 +948,7 @@ resource "aws_instance" "us_west_2_refresh" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all EC2 instances in the target region.
   for_each = {
     for k, v in local.elastic_compute_cloud.us_west_2 : k => v
     if v.refresh == true
@@ -984,7 +984,7 @@ resource "aws_instance" "us_west_2_refresh" {
   }
 
   # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created reguardless of what else has been configured, and network interfaces
+  # ?  will be created regardless of what else has been configured, and network interfaces
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
@@ -1021,7 +1021,7 @@ resource "aws_instance" "us_east_1" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all EC2 instances in the target region.
   for_each = {
     for k, v in local.elastic_compute_cloud.us_east_1 : k => v
     if v.refresh == false
@@ -1057,7 +1057,7 @@ resource "aws_instance" "us_east_1" {
   }
 
   # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created reguardless of what else has been configured, and network interfaces
+  # ?  will be created regardless of what else has been configured, and network interfaces
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
@@ -1088,7 +1088,7 @@ resource "aws_instance" "us_east_1_refresh" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all EC2 instances in the target region.
   for_each = {
     for k, v in local.elastic_compute_cloud.us_east_1 : k => v
     if v.refresh == true
@@ -1124,7 +1124,7 @@ resource "aws_instance" "us_east_1_refresh" {
   }
 
   # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created reguardless of what else has been configured, and network interfaces
+  # ?  will be created regardless of what else has been configured, and network interfaces
   # ?  can only be attached while the system is powered off causing serious workflow issues.
   dynamic "network_interface" {
     for_each = {
@@ -1203,7 +1203,7 @@ resource "terraform_data" "readiness_gate" {
 
 #endregion --- [ Readiness Gate ] ------------------------------------------------------------- #
 
-#endregion --- [ Create All Elastic Computer Cloud (EC2s) ] ----------------------------------- #
+#endregion --- [ Create All Elastic Compute Cloud (EC2s) ] ------------------------------------ #
 
 
 #region ------ [ Attach All Elastic Block Store (EBS) Volumes ] ------------------------------- #
@@ -1212,10 +1212,10 @@ resource "terraform_data" "readiness_gate" {
 
 resource "aws_volume_attachment" "us_west_2" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the volume attachment.
   provider = aws.us_west_2
 
-  # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
+  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_west_2 : k => v
     if v.refresh == false
@@ -1232,10 +1232,10 @@ resource "aws_volume_attachment" "us_west_2" {
 
 resource "aws_volume_attachment" "us_west_2_refresh" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the volume attachment.
   provider = aws.us_west_2
 
-  # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
+  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_west_2 : k => v
     if v.refresh == true
@@ -1256,10 +1256,10 @@ resource "aws_volume_attachment" "us_west_2_refresh" {
 
 resource "aws_volume_attachment" "us_east_1" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the volume attachment.
   provider = aws.us_east_1
 
-  # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
+  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_east_1 : k => v
     if v.refresh == false
@@ -1276,10 +1276,10 @@ resource "aws_volume_attachment" "us_east_1" {
 
 resource "aws_volume_attachment" "us_east_1_refresh" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the volume attachment.
   provider = aws.us_east_1
 
-  # Itterate through all Elastic Block Storeage (EBS) volumes in the target region.
+  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
   for_each = {
     for k, v in local.ebs_block_devices.us_east_1 : k => v
     if v.refresh == true
@@ -1294,7 +1294,7 @@ resource "aws_volume_attachment" "us_east_1_refresh" {
 
 }
 
-#endregion --- [ Attach All Elastic Block Store (EBS) Volumes - us-west-2 ] ------------- #
+#endregion --- [ Attach All Elastic Block Store (EBS) Volumes - us-east-1 ] ------------- #
 
 #endregion --- [ Attach All Elastic Block Store (EBS) Volumes ] ------------------------------- #
 
@@ -1303,10 +1303,10 @@ resource "aws_volume_attachment" "us_east_1_refresh" {
 
 resource "aws_db_instance" "us_west_2" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the RDS database instance.
   provider = aws.us_west_2
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all RDS database instances in the target region.
   for_each = local.relational_database_service.us_west_2
 
   allocated_storage           = each.value.allocated_storage
@@ -1349,10 +1349,10 @@ resource "aws_db_instance" "us_west_2" {
 
 resource "aws_db_instance" "us_east_1" {
 
-  # Set the provider in which to deploy the instance.
+  # Set the provider in which to deploy the RDS database instance.
   provider = aws.us_east_1
 
-  # Itterate through all network interfaces in the target region.
+  # Iterate through all RDS database instances in the target region.
   for_each = local.relational_database_service.us_east_1
 
   allocated_storage           = each.value.allocated_storage
@@ -1402,7 +1402,7 @@ resource "aws_ec2_instance_state" "us_west_2" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_west_2
 
-  # Itterate through all EC2 instances in 'us-west-2' where 'set_state' is defined.
+  # Iterate through all EC2 instances in 'us-west-2' where 'set_state' is defined.
   for_each = {
     for hostname, system in merge(aws_instance.us_west_2, aws_instance.us_west_2_refresh) : hostname => system
     if local.elastic_compute_cloud["us_west_2"][hostname].set_state != null
@@ -1420,7 +1420,7 @@ resource "aws_ec2_instance_state" "us_east_1" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  # Itterate through all EC2 instances in 'us-east-1' where 'set_state' is defined.
+  # Iterate through all EC2 instances in 'us-east-1' where 'set_state' is defined.
   for_each = {
     for hostname, system in merge(aws_instance.us_east_1, aws_instance.us_east_1_refresh) : hostname => system
     if local.elastic_compute_cloud["us_east_1"][hostname].set_state != null

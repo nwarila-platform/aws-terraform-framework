@@ -607,6 +607,33 @@ run "ebs_volume_attachments_use_structured_wiring" {
             security_groups = ["sg-east"]
           }
         ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "west-ebs-max"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-ebs-max"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "West EBS max"
+        }
+
+        ebs_block_devices = [
+          for index in range(23) : {
+            volume_size = "10"
+          }
+        ]
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.5.12"
+            security_groups = ["sg-west"]
+          }
+        ]
       }
     ]
   }
@@ -738,6 +765,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
+    condition     = local.ebs_block_devices.us_west_2["west-ebs-max-ebs-22"].device_name == "/dev/sdz"
+    error_message = "The twenty-third west EBS local should stay inside the d..z device-name range."
+  }
+
+  assert {
     condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd"
     error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring."
   }
@@ -766,6 +798,46 @@ run "ebs_volume_attachments_use_structured_wiring" {
     condition     = aws_volume_attachment.us_east_1["east-ebs-ebs-0"].volume_id == "vol-east-ebs-0" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].instance_id == "i-east-ebs" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].device_name == "/dev/sdd"
     error_message = "The east EBS attachment should preserve address -> volume -> instance -> device wiring."
   }
+}
+
+run "systems_reject_more_than_23_ebs_block_devices" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "too-many-ebs"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-ebs-too-many"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Too many EBS devices"
+        }
+
+        ebs_block_devices = [
+          for index in range(24) : {
+            volume_size = "10"
+          }
+        ]
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.5.13"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
 }
 
 run "systems_reject_duplicate_hostnames" {
