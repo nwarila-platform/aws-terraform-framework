@@ -14,6 +14,12 @@ variable "environment" {
   }
 }
 
+variable "refresh_serial" {
+  description = "Monotonic counter that forces replacement of all refresh=true instances when incremented. Bump it (0 -> 1 -> 2 ...) to intentionally rebuild the refresh fleet; leaving it unchanged keeps plans clean. Replaces the previous timestamp() trigger that rebuilt the fleet on every apply."
+  type        = number
+  default     = 0
+}
+
 variable "ssh_readiness_linux_script_dir" {
   description = "Absolute directory on each Linux instance where the SSH readiness gate uploads its remote-exec script. Must be writable by ec2-user AND mounted exec (NOT noexec). Hardened AMIs commonly mount /tmp (sometimes /var/tmp, /dev/shm) noexec, which breaks the default remote-exec upload; the login user's home is the usual escape hatch. Override if /home is also noexec in your image."
   type        = string
@@ -72,16 +78,16 @@ variable "all_systems" {
     ebs_block_devices = optional(
       list(
         object({
-          delete_on_termination = optional(bool, true)
           #device_name          = # Calculated automatically from index of volume.
           #encrypted            = # Statically set to 'true'
           iops = optional(string, null)
           #kms_key_id           = # Calculated automatically from system.aws_kms_alias
-          snapshot_id = optional(string, null)
-          tags        = optional(map(string), {})
-          throughput  = optional(string, null)
-          volume_type = optional(string, "gp3")
-          volume_size = optional(string, "100")
+          snapshot_id  = optional(string, null)
+          skip_destroy = optional(bool, false)
+          tags         = optional(map(string), {})
+          throughput   = optional(string, null)
+          volume_type  = optional(string, "gp3")
+          volume_size  = optional(string, "100")
         })
       ),
       []
@@ -125,6 +131,14 @@ variable "all_systems" {
       contains(var.aws_config.regions, replace(system.region, "-", "_"))
     ])
     error_message = "Each all_systems entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.set_state == null || contains(["running", "stopped"], system.set_state)
+    ])
+    error_message = "all_systems set_state, when set, must be exactly \"running\" or \"stopped\"."
   }
 
   validation {

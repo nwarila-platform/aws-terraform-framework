@@ -1214,10 +1214,12 @@ resource "aws_volume_attachment" "us_west_2" {
     if v.refresh == false
   }
 
-  skip_destroy = each.value.delete_on_termination
-  instance_id  = aws_instance.us_west_2[each.value.hostname].id
-  volume_id    = aws_ebs_volume.us_west_2[each.key].id
-  device_name  = each.value.device_name
+  skip_destroy = each.value.skip_destroy
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
+  stop_instance_before_detaching = true
+  instance_id                    = aws_instance.us_west_2[each.value.hostname].id
+  volume_id                      = aws_ebs_volume.us_west_2[each.key].id
+  device_name                    = each.value.device_name
 
 }
 
@@ -1232,10 +1234,12 @@ resource "aws_volume_attachment" "us_west_2_refresh" {
     if v.refresh == true
   }
 
-  skip_destroy = each.value.delete_on_termination
-  instance_id  = aws_instance.us_west_2_refresh[each.value.hostname].id
-  volume_id    = aws_ebs_volume.us_west_2_refresh[each.key].id
-  device_name  = each.value.device_name
+  skip_destroy = each.value.skip_destroy
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
+  stop_instance_before_detaching = true
+  instance_id                    = aws_instance.us_west_2_refresh[each.value.hostname].id
+  volume_id                      = aws_ebs_volume.us_west_2_refresh[each.key].id
+  device_name                    = each.value.device_name
 
 }
 
@@ -1254,10 +1258,12 @@ resource "aws_volume_attachment" "us_east_1" {
     if v.refresh == false
   }
 
-  skip_destroy = each.value.delete_on_termination
-  instance_id  = aws_instance.us_east_1[each.value.hostname].id
-  volume_id    = aws_ebs_volume.us_east_1[each.key].id
-  device_name  = each.value.device_name
+  skip_destroy = each.value.skip_destroy
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
+  stop_instance_before_detaching = true
+  instance_id                    = aws_instance.us_east_1[each.value.hostname].id
+  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
+  device_name                    = each.value.device_name
 
 }
 
@@ -1272,10 +1278,12 @@ resource "aws_volume_attachment" "us_east_1_refresh" {
     if v.refresh == true
   }
 
-  skip_destroy = each.value.delete_on_termination
-  instance_id  = aws_instance.us_east_1_refresh[each.value.hostname].id
-  volume_id    = aws_ebs_volume.us_east_1_refresh[each.key].id
-  device_name  = each.value.device_name
+  skip_destroy = each.value.skip_destroy
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
+  stop_instance_before_detaching = true
+  instance_id                    = aws_instance.us_east_1_refresh[each.value.hostname].id
+  volume_id                      = aws_ebs_volume.us_east_1_refresh[each.key].id
+  device_name                    = each.value.device_name
 
 }
 
@@ -1389,12 +1397,14 @@ resource "aws_ec2_instance_state" "us_west_2" {
 
   # Itterate through all EC2 instances in 'us-west-2' where 'set_state' is defined.
   for_each = {
-    for hostname, system in aws_instance.us_west_2 : hostname => system
+    for hostname, system in merge(aws_instance.us_west_2, aws_instance.us_west_2_refresh) : hostname => system
     if local.elastic_compute_cloud["us_west_2"][hostname].set_state != null
   }
 
   instance_id = each.value.id
   state       = local.elastic_compute_cloud["us_west_2"][each.key].set_state
+
+  depends_on = [terraform_data.readiness_gate]
 
 }
 
@@ -1405,12 +1415,14 @@ resource "aws_ec2_instance_state" "us_east_1" {
 
   # Itterate through all EC2 instances in 'us-east-1' where 'set_state' is defined.
   for_each = {
-    for hostname, system in aws_instance.us_east_1 : hostname => system
+    for hostname, system in merge(aws_instance.us_east_1, aws_instance.us_east_1_refresh) : hostname => system
     if local.elastic_compute_cloud["us_east_1"][hostname].set_state != null
   }
 
   instance_id = each.value.id
   state       = local.elastic_compute_cloud["us_east_1"][each.key].set_state
+
+  depends_on = [terraform_data.readiness_gate]
 
 }
 

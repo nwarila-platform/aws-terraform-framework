@@ -7,5 +7,5 @@
 #% =========================================================================================== %#
 
 resource "terraform_data" "refresh" {
-  input = timestamp()
+  input = var.refresh_serial
 }
