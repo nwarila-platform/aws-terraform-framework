@@ -595,13 +595,18 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].skip_destroy == false && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].stop_instance_before_detaching == true
-    error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring, default skip_destroy, and safe detach."
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd"
+    error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+
+  assert {
+    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].skip_destroy == false && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].stop_instance_before_detaching == true
+    error_message = "The first west normal EBS attachment should default skip_destroy to false and stop the instance before detaching."
   }
 
   assert {
     condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-1"].volume_id == "vol-west-ebs-1" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].skip_destroy == false
-    error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and default skip_destroy."
+    error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and skip_destroy."
   }
 
   assert {
