@@ -181,11 +181,10 @@ locals {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => {
 
-        #region           = < This is set statically >
+        region               = region
         ami                  = system.ami
         availability_zone    = system.availability_zone
         is_windows           = local.amazon_machine_images[system.ami][region].platform == "windows"
-        get_password_data    = local.amazon_machine_images[system.ami][region].platform == "windows"
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
         user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_winrm_user_data : local.linux_ssh_user_data)
@@ -231,6 +230,33 @@ locals {
       }
       # Normalize 'region' variable input to align with Terraform best practices.
       if replace(system.region, "-", "_") == region
+    }
+  }
+
+  # The ONLY place the physical instance resources are enumerated. Four resources exist because
+  # `provider` and `lifecycle` are static meta-arguments (2 regions x base/refresh); HCL cannot
+  # iterate resource addresses, so they are merged here once. Hostnames are validated-unique and
+  # each system lives in exactly one region, so this merge is a disjoint union.
+  all_ec2_instances = merge(
+    aws_instance.us_west_2,
+    aws_instance.us_west_2_refresh,
+    aws_instance.us_east_1,
+    aws_instance.us_east_1_refresh,
+  )
+
+  # Config entries keyed by hostname across all regions (disjoint union; see above).
+  systems_by_hostname = merge(values(local.elastic_compute_cloud)...)
+
+  # Combine each instance's runtime facts (id, private IP, key pair name, decrypted Windows password)
+  # with its OS so the readiness gate can pick the right transport, login user, wait command, and
+  # credential per instance.
+  readiness_targets = {
+    for hostname, instance in local.all_ec2_instances : hostname => {
+      id         = instance.id
+      private_ip = instance.private_ip
+      key_name   = instance.key_name
+      is_windows = local.systems_by_hostname[hostname].is_windows
+      password   = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
     }
   }
 

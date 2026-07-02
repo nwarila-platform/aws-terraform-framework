@@ -826,7 +826,6 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   assert {
     condition = alltrue([
       local.elastic_compute_cloud.us_west_2["selfwin01"].is_windows == true,
-      local.elastic_compute_cloud.us_west_2["selfwin01"].get_password_data == true,
       aws_instance.us_west_2["selfwin01"].get_password_data == true,
       local.readiness_targets["selfwin01"].is_windows == true,
       output.aws_instances["selfwin01"].os_family == "windows",
@@ -915,7 +914,6 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   assert {
     condition = alltrue([
       local.elastic_compute_cloud.us_west_2["direct-win01"].is_windows == true,
-      local.elastic_compute_cloud.us_west_2["direct-win01"].get_password_data == true,
       aws_instance.us_west_2["direct-win01"].get_password_data == true,
       local.readiness_targets["direct-win01"].is_windows == true,
       output.aws_instances["direct-win01"].os_family == "windows",
@@ -929,7 +927,6 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   assert {
     condition = alltrue([
       local.elastic_compute_cloud.us_east_1["direct-linux"].is_windows == false,
-      local.elastic_compute_cloud.us_east_1["direct-linux"].get_password_data == false,
       aws_instance.us_east_1["direct-linux"].get_password_data == false,
       local.readiness_targets["direct-linux"].is_windows == false,
       output.aws_instances["direct-linux"].os_family == "linux",
