@@ -1190,12 +1190,12 @@ run "systems_use_default_linux_readiness_script_path" {
   command = plan
 
   assert {
-    condition     = "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh" == "/home/ec2-user/terraform_%RAND%.sh"
+    condition     = "${var.readiness_linux_script_dir}/terraform_%RAND%.sh" == "/home/ec2-user/terraform_%RAND%.sh"
     error_message = "Linux readiness should upload the remote-exec script under the default /home/ec2-user directory."
   }
 
   assert {
-    condition     = strcontains("${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh", "%RAND%")
+    condition     = strcontains("${var.readiness_linux_script_dir}/terraform_%RAND%.sh", "%RAND%")
     error_message = "Linux readiness script_path must preserve the literal Terraform communicator %RAND% token."
   }
 }
@@ -1204,16 +1204,16 @@ run "systems_allow_overridden_linux_readiness_script_path" {
   command = plan
 
   variables {
-    ssh_readiness_linux_script_dir = "/opt/terraform"
+    readiness_linux_script_dir = "/opt/terraform"
   }
 
   assert {
-    condition     = "${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh" == "/opt/terraform/terraform_%RAND%.sh"
+    condition     = "${var.readiness_linux_script_dir}/terraform_%RAND%.sh" == "/opt/terraform/terraform_%RAND%.sh"
     error_message = "Linux readiness should upload the remote-exec script under the overridden directory."
   }
 
   assert {
-    condition     = !strcontains("${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh", "/tmp/") && strcontains("${var.ssh_readiness_linux_script_dir}/terraform_%RAND%.sh", "%RAND%")
+    condition     = !strcontains("${var.readiness_linux_script_dir}/terraform_%RAND%.sh", "/tmp/") && strcontains("${var.readiness_linux_script_dir}/terraform_%RAND%.sh", "%RAND%")
     error_message = "Linux readiness script_path must avoid /tmp and preserve the literal %RAND% token when overridden."
   }
 }

@@ -20,16 +20,24 @@ variable "refresh_serial" {
   default     = 0
 }
 
-variable "ssh_readiness_linux_script_dir" {
+# Readiness gate configuration.
+variable "readiness_linux_script_dir" {
   description = "Absolute directory on each Linux instance where the SSH readiness gate uploads its remote-exec script. Must be writable by ec2-user AND mounted exec (NOT noexec). Hardened AMIs commonly mount /tmp (sometimes /var/tmp, /dev/shm) noexec, which breaks the default remote-exec upload; the login user's home is the usual escape hatch. Override if /home is also noexec in your image."
   type        = string
   default     = "/home/ec2-user"
   nullable    = false
 
   validation {
-    condition     = startswith(var.ssh_readiness_linux_script_dir, "/") && !endswith(var.ssh_readiness_linux_script_dir, "/")
-    error_message = "ssh_readiness_linux_script_dir must be an absolute path with no trailing slash."
+    condition     = startswith(var.readiness_linux_script_dir, "/") && !endswith(var.readiness_linux_script_dir, "/")
+    error_message = "readiness_linux_script_dir must be an absolute path with no trailing slash."
   }
+}
+
+variable "readiness_private_key_paths" {
+  description = "Map of EC2 key_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the readiness gate (terraform_data.readiness_gate): Linux authenticates directly with this key over SSH, and Windows uses it to decrypt the launch Administrator password for WinRM. Leave empty (default) for plan/CI; a real apply must supply a path for each key_name in use, or the gate cannot connect."
+  type        = map(string)
+  default     = {}
+  nullable    = false
 }
 
 variable "all_systems" {
@@ -186,13 +194,7 @@ variable "all_systems" {
     error_message = "Each all_systems network_interfaces entry must specify at least one security group; an empty or omitted list makes AWS attach the VPC default (allow-all) security group."
   }
 
-  # validation {
-  #   condition     = length(distinct([for s in var.baseline_ami_systems : s.ip])) == length(var.baseline_ami_systems)
-  #   error_message = "Duplicate 'private_ip' values detected. Each server will need a unique IPv4 address."
-  # }
-
 }
-
 
 variable "all_databases" {
   description = "Define all RDS database instances managed by this framework."

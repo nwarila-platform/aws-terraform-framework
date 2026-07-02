@@ -257,7 +257,7 @@ locals {
       private_ip = instance.private_ip
       key_name   = instance.key_name
       is_windows = local.systems_by_hostname[hostname].is_windows
-      password   = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.ssh_readiness_private_key_paths[instance.key_name]))), null) : null
+      password   = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.readiness_private_key_paths[instance.key_name]))), null) : null
     }
   }
 
