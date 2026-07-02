@@ -1173,6 +1173,13 @@ resource "terraform_data" "readiness_gate" {
     instance_id = each.value.id
   }
 
+  lifecycle {
+    precondition {
+      condition     = length(var.readiness_private_key_paths) == 0 || contains(keys(var.readiness_private_key_paths), each.value.key_name)
+      error_message = "readiness_private_key_paths is set but has no entry for key_name '${each.value.key_name}' (host ${each.key}); add its private-key path or the readiness gate will time out."
+    }
+  }
+
   provisioner "remote-exec" {
     connection {
       type        = each.value.is_windows ? "winrm" : "ssh"

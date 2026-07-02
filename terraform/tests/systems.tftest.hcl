@@ -155,6 +155,141 @@ run "instance_state_created_only_when_set_state_is_not_null" {
 
 }
 
+run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "backup-default"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-backup-default"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Backup default EC2"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.12.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "backup-disabled"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-backup-disabled"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Backup   = false
+          Function = "Backup disabled EC2"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.12.11"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+
+    all_databases = [
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "backupdefaultdb"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Backup default database"
+        }
+      },
+      {
+        region               = "us-west-2"
+        availability_zone    = "us-west-2a"
+        db_name              = "backupdisableddb"
+        instance_class       = "db.t3.micro"
+        db_subnet_group_name = "db-subnets"
+        engine               = "postgres"
+        engine_version       = "16.3"
+        username             = "dbadmin"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Backup   = false
+          Function = "Backup disabled database"
+        }
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    values = {
+      id               = "ami-00000000000000012"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_west_2["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  assert {
+    condition     = local.elastic_compute_cloud.us_west_2["backup-default"].tags["Backup"] == "True" && aws_instance.us_west_2["backup-default"].tags["Backup"] == "True"
+    error_message = "EC2 Backup should default to the normalized string True."
+  }
+
+  assert {
+    condition     = local.elastic_compute_cloud.us_west_2["backup-disabled"].tags["Backup"] == "False" && aws_instance.us_west_2["backup-disabled"].tags["Backup"] == "False"
+    error_message = "EC2 Backup=false should normalize to the string False."
+  }
+
+  assert {
+    condition     = local.relational_database_service.us_west_2["backupdefaultdb"].tags["Backup"] == "True" && aws_db_instance.us_west_2["backupdefaultdb"].tags["Backup"] == "True"
+    error_message = "RDS Backup should default to the normalized string True."
+  }
+
+  assert {
+    condition     = local.relational_database_service.us_west_2["backupdisableddb"].tags["Backup"] == "False" && aws_db_instance.us_west_2["backupdisableddb"].tags["Backup"] == "False"
+    error_message = "RDS Backup=false should normalize to the string False."
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_compute_cloud.us_west_2["backup-default"].tags["Backup"] == local.relational_database_service.us_west_2["backupdefaultdb"].tags["Backup"],
+      local.elastic_compute_cloud.us_west_2["backup-disabled"].tags["Backup"] == local.relational_database_service.us_west_2["backupdisableddb"].tags["Backup"],
+    ])
+    error_message = "EC2 and RDS Backup tags should emit identical True/False casing."
+  }
+
+  assert {
+    condition     = local.relational_database_service.us_west_2["backupdefaultdb"].storage_type == "gp3" && aws_db_instance.us_west_2["backupdefaultdb"].storage_type == "gp3"
+    error_message = "RDS storage_type should default to gp3 when omitted."
+  }
+}
+
 run "instance_state_includes_refresh_instances_after_readiness" {
   command = plan
 
@@ -1217,6 +1352,100 @@ run "systems_allow_overridden_linux_readiness_script_path" {
     error_message = "Linux readiness script_path must avoid /tmp and preserve the literal %RAND% token when overridden."
   }
 }
+
+run "readiness_gate_allows_empty_private_key_paths" {
+  command = plan
+
+  variables {
+    readiness_private_key_paths = {}
+
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "readiness-empty-map"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-readiness-empty-map"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Readiness empty key map"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.13.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    values = {
+      id               = "ami-00000000000000013"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  assert {
+    condition     = contains(keys(terraform_data.readiness_gate), "readiness-empty-map")
+    error_message = "An empty readiness_private_key_paths map should keep the plan/CI readiness gate path valid."
+  }
+}
+
+run "readiness_gate_rejects_populated_map_missing_key_name" {
+  command = plan
+
+  variables {
+    readiness_private_key_paths = {
+      unrelated = "/tmp/unrelated.pem"
+    }
+
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "readiness-missing-key"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-readiness-missing-key"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Readiness missing key"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.13.11"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    values = {
+      id               = "ami-00000000000000014"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  expect_failures = [
+    terraform_data.readiness_gate,
+  ]
+}
+
 run "systems_render_readiness_user_data_per_os" {
   command = plan
 
@@ -1428,6 +1657,35 @@ run "systems_reject_empty_network_interface_security_groups" {
             security_groups = []
           }
         ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_empty_network_interfaces" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "empty-eni"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Empty network interfaces"
+        }
+
+        network_interfaces = []
       }
     ]
   }
