@@ -488,6 +488,121 @@ run "load_balancer_rejects_empty_security_groups" {
   ]
 }
 
+run "load_balancer_rejects_connection_logs_on_network_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region             = "us-west-2"
+        resource_key       = "network_connection_logs"
+        name               = "network-connection-logs"
+        load_balancer_type = "network"
+        security_groups    = ["sg-network"]
+        subnets            = ["subnet-network-a", "subnet-network-b"]
+
+        connection_logs = {
+          bucket = "lb-connection-logs"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_health_check_logs_on_network_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region             = "us-west-2"
+        resource_key       = "network_health_logs"
+        name               = "network-health-logs"
+        load_balancer_type = "network"
+        security_groups    = ["sg-network"]
+        subnets            = ["subnet-network-a", "subnet-network-b"]
+
+        health_check_logs = {
+          bucket = "lb-health-check-logs"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_xff_header_processing_mode_on_network_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region                     = "us-west-2"
+        resource_key               = "network_xff_mode"
+        name                       = "network-xff-mode"
+        load_balancer_type         = "network"
+        security_groups            = ["sg-network"]
+        subnets                    = ["subnet-network-a", "subnet-network-b"]
+        xff_header_processing_mode = "append"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_secondary_ips_on_application_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region                                 = "us-west-2"
+        resource_key                           = "application_secondary_ips"
+        name                                   = "application-secondary-ips"
+        load_balancer_type                     = "application"
+        security_groups                        = ["sg-application"]
+        subnets                                = ["subnet-application-a", "subnet-application-b"]
+        secondary_ips_auto_assigned_per_subnet = 1
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_security_groups_on_gateway_type" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region             = "us-west-2"
+        resource_key       = "gateway_security_groups"
+        name               = "gateway-security-groups"
+        load_balancer_type = "gateway"
+        security_groups    = ["sg-gateway"]
+        subnets            = ["subnet-gateway-a", "subnet-gateway-b"]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
 run "load_balancer_rejects_duplicate_target_group_resource_keys" {
   command = plan
 

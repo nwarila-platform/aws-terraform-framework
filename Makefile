@@ -44,7 +44,8 @@ opa-test:
 opa-plan:
 	mkdir -p .tmp/opa-plan
 	terraform -chdir=terraform test -json -verbose > .tmp/opa-plan/terraform-test.jsonl
-	$(PYTHON) tools/build_plan_input.py < .tmp/opa-plan/terraform-test.jsonl | opa eval --fail-defined --format pretty --stdin-input --data policies/opa 'data.terraform_plan.deny[_]'
+	$(PYTHON) tools/build_plan_input.py < .tmp/opa-plan/terraform-test.jsonl > .tmp/opa-plan/input.json
+	opa eval --fail-defined --format pretty --input .tmp/opa-plan/input.json --data policies/opa 'data.terraform_plan.deny[_]'
 
 ci:
 	$(MAKE) fmt-check
