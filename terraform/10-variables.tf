@@ -67,7 +67,9 @@ variable "all_systems" {
 
     /* Optional Parameters */
     instance_type = optional(string, "m6i.large")
-    set_state     = optional(string)
+    # SSH/WinRM login user for the readiness gate. Defaults to ec2-user on Linux and Administrator on Windows; override for images with a different default user (for example, ubuntu, rocky, or admin).
+    readiness_user = optional(string)
+    set_state      = optional(string)
 
     root_block_device = optional(
       object({
