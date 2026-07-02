@@ -1,15 +1,16 @@
-# Manage EC2 over SSH
+# Manage EC2 with SSH and WinRM readiness
 
-Use this guide when adding Linux or Windows EC2 instances that will be managed
-by a separate Ansible pipeline over SSH.
+Use this guide when adding Linux EC2 instances that are reached over SSH, or
+Windows EC2 instances whose Terraform readiness gate uses WinRM HTTPS before
+hand-off to a separate configuration-management pipeline.
 
 ## Operating model
 
-SSH on TCP 22 is the supported management path for EC2 instances created by this
-framework. Windows readiness uses an in-box WinRM HTTPS shim on TCP 5986 before
-configuration management, but normal management still belongs to SSH. Ansible
-runs outside this repository, in a separate pipeline job, using its own SSH
-configuration.
+Linux readiness and management use SSH on TCP 22. Windows readiness uses an
+in-box WinRM HTTPS listener on TCP 5986, configured at first boot by this
+framework's Windows `user_data`. The repository does not configure a long-term
+Windows management transport. Ansible runs outside this repository, in a
+separate pipeline job, using its own connection settings.
 
 This repository stops at creating reachable instances, gating initial readiness,
 and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
@@ -51,7 +52,7 @@ all_systems = [
 ]
 ```
 
-## Use SSH-ready images
+## Use readiness-ready images
 
 Linux images must include an SSH server before this framework launches
 instances. The framework's Linux `user_data` only enables and starts the service
@@ -70,29 +71,25 @@ latest means most recently built, not highest semantic version. A direct
 
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. The framework resolves those keys to the public
-Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` installs the
-OpenSSH Server capability, sets `sshd` to start automatically, starts the
-service, bootstraps the launch key into
-`C:\ProgramData\ssh\administrators_authorized_keys`, locks down that file's
-ACLs, and leaves the OpenSSH default shell as cmd.
+Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` enables the
+in-box WS-Management service, creates a self-signed HTTPS listener on TCP 5986,
+enables NTLM authentication, disables Basic authentication, and disables
+unencrypted WinRM traffic. It installs no SSH server, uses no
+Feature-on-Demand payload, and requires no outbound egress for readiness.
 
-Runtime verification is also outside this repository. The pipeline should check
-that each emitted SSH target is reachable before it runs Ansible.
+Runtime verification beyond the Terraform readiness gate is outside this
+repository. The pipeline should check that each emitted target is reachable
+before it runs configuration management.
 
 Prefer `windows_server_2025_base` for new deployments; Windows Server 2022
 mainstream support ends on 2026-10-13. Set `var.windows_ami_owners` only when
 mirroring the public Amazon Windows Server Base AMIs into another account.
 
-Windows OpenSSH capability installation pulls from Windows Update at first boot.
-Windows instances therefore need egress, such as a public subnet or NAT path,
-for their initial boot. Air-gapped or NAT-less private subnets need a pre-baked
-Windows image with OpenSSH Server already installed.
-
 This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
 belongs in the Ansible job.
 
-## Open SSH from the controller
+## Open readiness access from the controller
 
 Attach consumer-supplied security groups through each network interface. The
 framework references those security groups and does not create security group
@@ -100,7 +97,8 @@ rules.
 
 Use this network posture:
 
-- Allow inbound TCP 22 from the management or controller source.
+- Allow inbound TCP 22 from the Terraform apply host and management or
+  controller source for Linux readiness and SSH management.
 - Allow inbound TCP 5986 from the Terraform apply host for Windows readiness.
 - Ensure private subnet instances are reachable from the Ansible controller
   through routing, VPN, a bastion path, or another consumer-managed path.
@@ -157,40 +155,55 @@ OS-native launch-agent wait:
 The Terraform step does not complete, and its duration captures the wait, until
 each instance is provisioned and reachable.
 
-The dormant Windows OpenSSH bootstrap intentionally uses its built-in cmd
-default shell so Terraform's `remote-exec` SCP upload will work if that SSH path
-is reactivated. Ansible sets its own shell in the separate
-configuration-management pipeline.
-
 Linux readiness authenticates with the instance key pair using
 `var.readiness_private_key_paths`. Windows readiness uses the same map to
-decrypt the launch Administrator password for WinRM. Leave the map empty for
-plan and CI; a real apply must populate a filesystem path for every `key_name`
-in use.
+decrypt the launch Administrator password with
+`rsadecrypt(password_data, readiness_private_key_paths[key_name])`, then
+connects to WinRM over HTTPS with NTLM. Leave the map empty for plan and CI; a
+real apply must populate a filesystem path for every `key_name` in use.
 
-## Treat the key pair as the management credential
+## Treat the key pair as the readiness credential
 
-`key_name` is required for every `all_systems` entry. It names the EC2 key pair
-whose private key the controller uses for SSH authentication. On Windows, the
-same launch key is installed for administrator SSH access through the
-`user_data` IMDS bootstrap:
-
-```sh
-ssh -i <key_name>.pem administrator@<private_ip>
-```
+`key_name` is required for every `all_systems` entry. On Linux, it names the EC2
+key pair whose private key the controller uses for SSH readiness and later SSH
+management. On Windows, the launch key decrypts the generated Administrator
+password that EC2 returns as `password_data`; the active Windows `user_data`
+does not install an SSH login key.
 
 The login user and Ansible inventory variables stay in the separate pipeline
 job.
 
-The EC2 resources set `user_data_replace_on_change = true`. Adopting this SSH
-service bootstrap or changing it later forces instance replacement so the boot
-payload actually runs.
+The EC2 resources set `user_data_replace_on_change = true`. Changing the Linux
+SSH bootstrap or the Windows WinRM bootstrap later forces instance replacement
+so the boot payload actually runs.
+
+## Manage EBS data volumes
+
+`ebs_block_devices` entries become standalone `aws_ebs_volume` resources and
+`aws_volume_attachment` attachments. Their lifecycle is independent from the
+EC2 instance, so data volumes do not delete automatically when an instance is
+terminated. That is why data-volume entries do not have
+`delete_on_termination`; use `skip_destroy` instead.
+
+`skip_destroy` defaults to `false`. With the default, Terraform detaches the
+volume when destroying the attachment. When `skip_destroy = true`, Terraform
+leaves the attachment in place while removing it from state.
+
+All data-volume attachments use `stop_instance_before_detaching = true`.
+Removing or replacing a data volume on a running instance stops the instance
+before detach to avoid `VolumeInUse` failures and force-detach corruption. This
+stop is not obvious in the plan, and the instance stays stopped unless the
+system sets `set_state = "running"`.
+
+If you are upgrading from an older configuration that set
+`ebs_block_devices[*].delete_on_termination`, switch that setting to
+`skip_destroy`; the old data-volume field is no longer part of the schema.
 
 ## Non-goals
 
 These responsibilities stay outside this repository:
 
-- Non-SSH management methods, including WinRM beyond the Windows readiness shim.
+- Windows management methods beyond the WinRM readiness shim.
 - Ansible execution.
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.

@@ -34,6 +34,7 @@
 !/terraform/.terraform.lock.hcl
 !/terraform/*.tf
 !/terraform/*.tfvars.example
+!/terraform/backend.hcl.example
 !/terraform/tests/
 !/terraform/tests/*.tftest.hcl
 !/terraform/tests/*.tftest.json
