@@ -216,7 +216,7 @@ locals {
 
         tags = merge(
           system.tags,
-          # Normalized Overwriteable Tags
+          # Normalized Overwritable Tags
           {
             Backup = system.tags["Backup"] ? "True" : "False"
           },
@@ -302,8 +302,9 @@ locals {
         for index in range(length(system.ebs_block_devices)) :
         "${system.hostname}-ebs-${index}" => {
 
-          # AWS Network Interface Properties
+          # AWS Elastic Block Store Properties
           availability_zone = system.availability_zone
+          # Device suffixes deliberately start at d and run d..z for up to 23 EBS volumes.
           device_name = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
             "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
           )
@@ -332,9 +333,9 @@ locals {
               Index       = index
               Environment = var.environment
               # ?Note: Dynamically assign a predictable device name by using the index to increment
-              # ?      a [char] lookup. Unicode character set is used in the conversation, so
-              # ?      [INT]100 converted to Unicode [CHAR] is'd', then each index increment after
-              # ?      that will itterate through next characters (I.E. e, f, g, h, etc.)
+              # ?      a [char] lookup. Unicode character set is used in the conversion, so
+              # ?      [INT]100 converted to Unicode [CHAR] is 'd', then each index increment after
+              # ?      that will iterate through next characters (I.E. e, f, g, h, etc.) up to z.
               DeviceName = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
                 "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
               )
@@ -558,7 +559,7 @@ locals {
 
         tags = merge(
           nonsensitive(database.tags),
-          # Normalized Overwriteable Tags
+          # Normalized Overwritable Tags
           {
             Backup = nonsensitive(database.tags["Backup"]) ? "True" : "False"
           },

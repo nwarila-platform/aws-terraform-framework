@@ -5,7 +5,7 @@
 
 provider "aws" {
 
-  // Define the provider, using an alias, targetting a specific region.
+  // Define the provider, using an alias, targeting a specific region.
   alias = "us_west_2"
 
   // Specify the region to connect to.
@@ -15,7 +15,7 @@ provider "aws" {
 
 provider "aws" {
 
-  // Define the provider, using an alias, targetting a specific region
+  // Define the provider, using an alias, targeting a specific region
   alias = "us_east_1"
 
   // Specify the region to connect to.

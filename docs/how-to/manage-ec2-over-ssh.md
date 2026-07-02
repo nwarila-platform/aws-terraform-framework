@@ -107,6 +107,12 @@ Use this network posture:
 - RDP on 3389 and WinRM on 5985 remain consumer opt-in and are not the
   management path for this framework.
 
+The Windows WinRM readiness listener on TCP 5986 is a standing in-box listener
+configured with firewall profile `Any`; it remains listening after readiness
+completes. Treat the consumer-supplied security group as the control point:
+scope inbound 5986 to the Terraform apply host or management CIDR. Consumers
+that want the listener closed post-provision should do that out of band.
+
 ## Hand off inventory
 
 After apply, read the `aws_instances` output. It is keyed by hostname and

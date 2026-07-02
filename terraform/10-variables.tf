@@ -152,6 +152,11 @@ variable "all_systems" {
   }
 
   validation {
+    condition     = alltrue([for system in var.all_systems : length(system.ebs_block_devices) <= 23])
+    error_message = "Each all_systems entry supports at most 23 ebs_block_devices (device names run /dev/sdd..sdz); split larger volume sets across instances."
+  }
+
+  validation {
     condition = alltrue([
       for system in var.all_systems :
       contains(["windows_server_2022_base", "windows_server_2025_base"], system.ami) || can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) || can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*(:[0-9]+(\\.[0-9]+)*)?$", system.ami))
