@@ -956,6 +956,19 @@ run "systems_reject_invalid_set_state" {
   ]
 }
 
+run "environment_rejects_blank_value" {
+  command = plan
+
+  variables {
+    environment = "   "
+    all_systems = []
+  }
+
+  expect_failures = [
+    var.environment,
+  ]
+}
+
 run "systems_accept_windows_server_2025_base_ami" {
   command = plan
 
@@ -1286,6 +1299,74 @@ run "systems_reject_windows_hostnames_over_15_characters" {
   ]
 }
 
+run "systems_reject_windows_hostnames_with_invalid_characters" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "win_app_01"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Windows hostname invalid characters"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.7.12"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_all_numeric_windows_hostnames" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "123456789012345"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Windows hostname all numeric"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.7.13"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
 run "systems_accept_valid_windows_hostnames" {
   command = plan
 
@@ -1351,6 +1432,30 @@ run "systems_allow_overridden_linux_readiness_script_path" {
     condition     = !strcontains("${var.readiness_linux_script_dir}/terraform_%RAND%.sh", "/tmp/") && strcontains("${var.readiness_linux_script_dir}/terraform_%RAND%.sh", "%RAND%")
     error_message = "Linux readiness script_path must avoid /tmp and preserve the literal %RAND% token when overridden."
   }
+}
+
+run "systems_reject_relative_linux_readiness_script_dir" {
+  command = plan
+
+  variables {
+    readiness_linux_script_dir = "opt/terraform"
+  }
+
+  expect_failures = [
+    var.readiness_linux_script_dir,
+  ]
+}
+
+run "systems_reject_trailing_slash_linux_readiness_script_dir" {
+  command = plan
+
+  variables {
+    readiness_linux_script_dir = "/opt/terraform/"
+  }
+
+  expect_failures = [
+    var.readiness_linux_script_dir,
+  ]
 }
 
 run "readiness_gate_allows_empty_private_key_paths" {

@@ -102,6 +102,10 @@ def main() -> int:
                 raw_changes.append(change)
                 resources.append(normalize_resource(change))
 
+    if not resources:
+        print("build_plan_input: no managed resources in plan input", file=sys.stderr)
+        return 1
+
     json.dump({"resources": resources, "resource_changes": raw_changes}, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0
