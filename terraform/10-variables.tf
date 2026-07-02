@@ -44,6 +44,7 @@ variable "all_systems" {
     key_name             = string
     iam_instance_profile = string
     aws_kms_alias        = string
+    ami                  = string
     refresh              = optional(bool, false)
 
     tags = object({
@@ -57,7 +58,6 @@ variable "all_systems" {
     })
 
     /* Optional Parameters */
-    ami           = optional(string, "ttc-rhel8")
     instance_type = optional(string, "m6i.large")
     set_state     = optional(string)
 

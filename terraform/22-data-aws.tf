@@ -36,6 +36,9 @@ data "aws_ami" "us_west_2_selfbuilt" {
   # Self-owned AMIs in the deploying account.
   owners = ["self"]
 
+  # [Optional(String)] Name Regex: Anchors the self-built family/version after the server-side glob.
+  name_regex = local.ami_specs[each.value].name_regex
+
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
   // ------------------------------------------------------------------------------------- //
@@ -99,6 +102,9 @@ data "aws_ami" "us_east_1_selfbuilt" {
   # Valid values: <AWS account ID>, 'self', <AWS owner alias>
   # Self-owned AMIs in the deploying account.
   owners = ["self"]
+
+  # [Optional(String)] Name Regex: Anchors the self-built family/version after the server-side glob.
+  name_regex = local.ami_specs[each.value].name_regex
 
   // ===================================================================================== //
   // === Filter(s): One or more name/value pairs to filter off of.                     === //
