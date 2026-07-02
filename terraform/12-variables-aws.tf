@@ -431,6 +431,15 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
+      !contains(["application", "network"], load_balancer.load_balancer_type) ||
+      (load_balancer.security_groups != null && length(load_balancer.security_groups) > 0)
+    ])
+    error_message = "Application and network load balancers must specify at least one security group; omitting it attaches the VPC default (allow-all) security group."
+  }
+
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers :
       load_balancer.connection_logs == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "connection_logs is only valid for application load balancers."

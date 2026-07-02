@@ -27,6 +27,7 @@ variables {
       name                             = "east-nlb"
       dns_record_client_routing_policy = "any_availability_zone"
       load_balancer_type               = "network"
+      security_groups                  = ["sg-east"]
 
       subnet_mapping = [
         {
@@ -453,6 +454,27 @@ run "load_balancer_rejects_public_internal_false" {
         internal        = false
         security_groups = ["sg-public"]
         subnets         = ["subnet-public-a", "subnet-public-b"]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_load_balancers,
+  ]
+}
+
+run "load_balancer_rejects_empty_security_groups" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region             = "us-west-2"
+        resource_key       = "empty_sg_alb"
+        name               = "empty-sg-alb"
+        load_balancer_type = "application"
+        security_groups    = []
+        subnets            = ["subnet-empty-a", "subnet-empty-b"]
       }
     ]
   }
