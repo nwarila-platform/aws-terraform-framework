@@ -35,6 +35,7 @@ all_systems = [
     key_name             = "app-ssh-key"
     iam_instance_profile = "ec2-base-profile"
     aws_kms_alias        = "ebs-default"
+    ami                  = "app-linux"
 
     tags = {
       Function = "app"
@@ -61,10 +62,11 @@ systemctl enable --now sshd
 ```
 
 Self-built AMIs can be selected by family name, such as `app-linux`, or by a
-version pin, such as `app-linux:8.10`. The framework resolves those against
-self-owned AMI names matching `<family>_v*` or `<family>_v<version>_*` with
-`most_recent = true`; latest means most recently built, not highest semantic
-version. A direct `ami-...` ID remains an exact pin.
+version pin, such as `app-linux:8.10`. The framework resolves non-versioned
+families against self-owned AMI names shaped `<family>_v<number>...`; version
+pins resolve `<family>_v<version>_...`. In both cases `most_recent = true`;
+latest means most recently built, not highest semantic version. A direct
+`ami-...` ID remains an exact pin.
 
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. The framework resolves those keys to the public

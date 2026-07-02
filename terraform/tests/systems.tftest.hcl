@@ -737,6 +737,21 @@ run "aws_config_rejects_unsupported_region_sets" {
   ]
 }
 
+run "aws_config_rejects_duplicate_region_entries" {
+  command = plan
+
+  variables {
+    aws_config = {
+      regions = ["us_east_1", "us_west_2", "us_east_1"]
+    }
+    all_systems = []
+  }
+
+  expect_failures = [
+    var.aws_config,
+  ]
+}
+
 run "systems_reject_invalid_ami_identifiers" {
   command = plan
 
