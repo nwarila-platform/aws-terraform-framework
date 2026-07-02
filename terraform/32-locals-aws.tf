@@ -22,6 +22,7 @@ locals {
       family          = split(":", ami)[0]
       version         = can(regex(":", ami)) ? split(":", ami)[1] : null
       glob            = can(regex(":", ami)) ? "${split(":", ami)[0]}_v${split(":", ami)[1]}_*" : "${ami}_v*"
+      name_regex      = can(regex(":", ami)) ? "^${replace(split(":", ami)[0], ".", "\\.")}_v${replace(split(":", ami)[1], ".", "\\.")}_" : "^${replace(ami, ".", "\\.")}_v[0-9]"
     }
   }
 

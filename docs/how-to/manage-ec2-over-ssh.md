@@ -60,8 +60,8 @@ at boot:
 systemctl enable --now sshd
 ```
 
-Self-built AMIs can be selected by family name, such as `ttc-rhel8`, or by a
-version pin, such as `ttc-rhel8:8.10`. The framework resolves those against
+Self-built AMIs can be selected by family name, such as `app-linux`, or by a
+version pin, such as `app-linux:8.10`. The framework resolves those against
 self-owned AMI names matching `<family>_v*` or `<family>_v<version>_*` with
 `most_recent = true`; latest means most recently built, not highest semantic
 version. A direct `ami-...` ID remains an exact pin.

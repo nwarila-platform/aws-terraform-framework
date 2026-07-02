@@ -18,6 +18,7 @@ variables {
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
       aws_kms_alias        = "west"
+      ami                  = "test-linux"
       set_state            = "stopped"
 
       tags = {
@@ -39,6 +40,7 @@ variables {
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
       aws_kms_alias        = "west"
+      ami                  = "test-linux"
 
       tags = {
         Function = "West instance without state control"
@@ -59,6 +61,7 @@ variables {
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
       aws_kms_alias        = "west"
+      ami                  = "test-linux"
       refresh              = true
 
       tags = {
@@ -80,6 +83,7 @@ variables {
       key_name             = "east-key"
       iam_instance_profile = "example-instance-profile"
       aws_kms_alias        = "east"
+      ami                  = "test-linux"
       set_state            = "running"
 
       tags = {
@@ -164,6 +168,7 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
         refresh              = true
         set_state            = "stopped"
 
@@ -210,7 +215,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "ttc-rhel8"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Inventory Linux"
@@ -252,7 +257,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "ttc-rhel8"
+        ami                  = "test-linux"
         refresh              = true
 
         tags = {
@@ -270,7 +275,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000001"
       platform         = ""
@@ -387,6 +392,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "West EBS"
@@ -420,6 +426,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
         refresh              = true
 
         tags = {
@@ -447,6 +454,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         key_name             = "east-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "east"
+        ami                  = "test-linux"
 
         tags = {
           Function = "East EBS"
@@ -469,7 +477,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000003"
       platform         = ""
@@ -478,7 +486,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000004"
       platform         = ""
@@ -638,6 +646,7 @@ run "systems_reject_duplicate_hostnames" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Duplicate host A"
@@ -658,6 +667,7 @@ run "systems_reject_duplicate_hostnames" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Duplicate host B"
@@ -691,6 +701,7 @@ run "systems_reject_regions_outside_aws_config" {
         key_name             = "eu-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "eu"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Unsupported region"
@@ -708,6 +719,21 @@ run "systems_reject_regions_outside_aws_config" {
 
   expect_failures = [
     var.all_systems,
+  ]
+}
+
+run "aws_config_rejects_unsupported_region_sets" {
+  command = plan
+
+  variables {
+    aws_config = {
+      regions = ["us_east_1", "eu_west_1"]
+    }
+    all_systems = []
+  }
+
+  expect_failures = [
+    var.aws_config,
   ]
 }
 
@@ -758,6 +784,7 @@ run "systems_reject_invalid_set_state" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
         set_state            = "terminated"
 
         tags = {
@@ -827,9 +854,10 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
-          Function = "Default self-built Linux AMI"
+          Function = "Family self-built Linux AMI"
         }
 
         network_interfaces = [
@@ -885,7 +913,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000009"
       platform         = ""
@@ -912,28 +940,30 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   assert {
-    condition     = contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-rhel8") && contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
+    condition     = contains(keys(data.aws_ami.us_west_2_selfbuilt), "test-linux") && contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
     error_message = "Self-built name and name:version inputs should instantiate regional self-owned AMI data lookups."
   }
 
   assert {
     condition = alltrue([
-      local.ami_specs["ttc-rhel8"].family == "ttc-rhel8",
-      local.ami_specs["ttc-rhel8"].version == null,
-      local.ami_specs["ttc-rhel8"].glob == "ttc-rhel8_v*",
+      local.ami_specs["test-linux"].family == "test-linux",
+      local.ami_specs["test-linux"].version == null,
+      local.ami_specs["test-linux"].glob == "test-linux_v*",
+      local.ami_specs["test-linux"].name_regex == "^test-linux_v[0-9]",
       local.ami_specs["prod-rhel8"].family == "prod-rhel8",
       local.ami_specs["prod-rhel8"].glob == "prod-rhel8_v*",
       local.ami_specs["ttc-win22-sql19:1.2"].family == "ttc-win22-sql19",
       local.ami_specs["ttc-win22-sql19:1.2"].version == "1.2",
       local.ami_specs["ttc-win22-sql19:1.2"].glob == "ttc-win22-sql19_v1.2_*",
+      local.ami_specs["ttc-win22-sql19:1.2"].name_regex == "^ttc-win22-sql19_v1\\.2_",
     ])
-    error_message = "AMI specs should preserve caller-provided families and build the name glob in one local."
+    error_message = "AMI specs should preserve caller-provided families and build anchored glob/regex selectors in one local."
   }
 
   assert {
     condition = alltrue([
       contains(keys(local.amazon_machine_images), "windows_server_2025_base"),
-      contains(keys(local.amazon_machine_images), "ttc-rhel8"),
+      contains(keys(local.amazon_machine_images), "test-linux"),
       contains(keys(local.amazon_machine_images), "prod-rhel8"),
       contains(keys(local.amazon_machine_images), "ttc-win22-sql19:1.2"),
     ])
@@ -1185,7 +1215,7 @@ run "systems_render_readiness_user_data_per_os" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "ttc-rhel8"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Linux SSH user data"
@@ -1223,7 +1253,7 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000005"
       platform         = ""
@@ -1303,6 +1333,7 @@ run "systems_reject_kms_alias_prefix" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "alias/west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Prefixed KMS alias"
@@ -1336,6 +1367,7 @@ run "systems_reject_empty_iam_instance_profile" {
         key_name             = "west-key"
         iam_instance_profile = ""
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Empty IAM instance profile"
@@ -1369,6 +1401,7 @@ run "systems_reject_empty_network_interface_security_groups" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
+        ami                  = "test-linux"
 
         tags = {
           Function = "Empty ENI security groups"
@@ -1645,7 +1678,7 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000007"
       platform         = ""
@@ -1654,7 +1687,7 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["ttc-rhel8"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000008"
       platform         = ""

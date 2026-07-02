@@ -5,7 +5,7 @@
 
 ### ⚠ BREAKING CHANGES
 
-* the red_hat_enterprise_linux_8 alias is removed (default ami is now ttc-rhel8); self-built resolution expects AMI Names shaped <family>_v<version>_<build>, so previously-resolved RHEL instances may re-resolve and replace.
+* the red_hat_enterprise_linux_8 alias is removed and all_systems.ami is required; self-built resolution expects AMI Names shaped <family>_v<version>_<build>, so previously-resolved RHEL instances may re-resolve and replace.
 * Windows user_data change forces Windows instance replacement; the readiness gate now needs inbound TCP 5986 (not 5985) from the Terraform apply host.
 * get_password_data removed from all_systems input; Windows user_data change forces Windows instance replacement.
 * deployments must own matching RHEL AMIs in-account; the resolved RHEL AMI may change, which can replace existing RHEL EC2 instances on apply.

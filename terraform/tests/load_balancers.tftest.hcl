@@ -127,6 +127,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "ebs"
+        ami                  = "test-linux"
 
         network_interfaces = [
           {
@@ -147,6 +148,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "ebs"
+        ami                  = "test-linux"
         refresh              = true
 
         network_interfaces = [
@@ -168,6 +170,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "ebs"
+        ami                  = "test-linux"
 
         network_interfaces = [
           {
@@ -264,6 +267,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "ebs"
+        ami                  = "test-linux"
 
         network_interfaces = [
           {

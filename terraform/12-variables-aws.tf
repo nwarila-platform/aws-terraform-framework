@@ -14,6 +14,11 @@ variable "aws_config" {
     regions = ["us_east_1", "us_west_2"]
   }
   nullable = false
+
+  validation {
+    condition     = toset(var.aws_config.regions) == toset(["us_east_1", "us_west_2"])
+    error_message = "aws_config.regions must be exactly [\"us_east_1\", \"us_west_2\"]. Supporting other/additional regions requires new provider aliases and per-region resource blocks (a code change), not just a variable edit."
+  }
 }
 
 variable "windows_ami_owners" {
