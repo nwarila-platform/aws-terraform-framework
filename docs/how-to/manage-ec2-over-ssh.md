@@ -55,11 +55,13 @@ all_systems = [
 ## Use readiness-ready images
 
 Linux images must include an SSH server before this framework launches
-instances. The framework's Linux `user_data` only enables and starts the service
-at boot:
+instances. The readiness gate logs in as `ec2-user` by default; set
+`readiness_user` per system for images with a different default login such as
+`ubuntu`, `rocky`, or `admin`. The framework's Linux `user_data` only enables
+and starts whichever SSH unit the distro provides at boot:
 
 ```sh
-systemctl enable --now sshd
+systemctl enable --now sshd || systemctl enable --now ssh
 ```
 
 Self-built AMIs can be selected by family name, such as `app-linux`, or by a

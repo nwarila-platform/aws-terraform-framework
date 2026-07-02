@@ -165,7 +165,7 @@ locals {
   linux_ssh_user_data = <<-LINUX_USER_DATA
     #cloud-config
     runcmd:
-      - systemctl enable --now sshd
+      - systemctl enable --now sshd || systemctl enable --now ssh
   LINUX_USER_DATA
 
   # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate). Each blocks until
@@ -191,6 +191,7 @@ locals {
         user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_winrm_user_data : local.linux_ssh_user_data)
         hostname             = system.hostname
         instance_type        = system.instance_type
+        readiness_user       = system.readiness_user
         refresh              = system.refresh
         set_state            = system.set_state
 
@@ -253,11 +254,12 @@ locals {
   # credential per instance.
   readiness_targets = {
     for hostname, instance in local.all_ec2_instances : hostname => {
-      id         = instance.id
-      private_ip = instance.private_ip
-      key_name   = instance.key_name
-      is_windows = local.systems_by_hostname[hostname].is_windows
-      password   = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.readiness_private_key_paths[instance.key_name]))), null) : null
+      id             = instance.id
+      private_ip     = instance.private_ip
+      key_name       = instance.key_name
+      is_windows     = local.systems_by_hostname[hostname].is_windows
+      readiness_user = local.systems_by_hostname[hostname].readiness_user
+      password       = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.readiness_private_key_paths[instance.key_name]))), null) : null
     }
   }
 

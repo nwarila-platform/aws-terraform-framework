@@ -1446,6 +1446,135 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
   ]
 }
 
+run "readiness_targets_thread_per_system_readiness_user" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "linux-override"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-linux-override"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+        readiness_user       = "ubuntu"
+
+        tags = {
+          Function = "Linux readiness override"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.14.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "linux-default"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-linux-default"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Linux readiness default"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.14.11"
+            security_groups = ["sg-west"]
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "win-override"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-win-override"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+        readiness_user       = "ReadinessAdmin"
+
+        tags = {
+          Function = "Windows readiness override"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.14.12"
+            security_groups = ["sg-west"]
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "win-default"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-win-default"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows_server_2022_base"
+
+        tags = {
+          Function = "Windows readiness default"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.14.13"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    values = {
+      id               = "ami-00000000000000015"
+      platform         = ""
+      platform_details = "Red Hat Enterprise Linux"
+    }
+  }
+
+  override_data {
+    target = data.aws_ami.us_west_2_windows_server_2022_base[0]
+    values = {
+      id               = "ami-00000000000000016"
+      platform         = "windows"
+      platform_details = "Windows"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      local.readiness_targets["linux-override"].readiness_user == "ubuntu",
+      local.readiness_targets["win-override"].readiness_user == "ReadinessAdmin",
+    ])
+    error_message = "Readiness targets should preserve per-system readiness_user overrides for Linux and Windows."
+  }
+
+  assert {
+    condition = alltrue([
+      local.readiness_targets["linux-default"].readiness_user == null,
+      local.readiness_targets["win-default"].readiness_user == null,
+    ])
+    error_message = "Readiness targets should keep readiness_user null when unset so OS defaults are used."
+  }
+}
+
 run "systems_render_readiness_user_data_per_os" {
   command = plan
 
@@ -1522,6 +1651,11 @@ run "systems_render_readiness_user_data_per_os" {
   assert {
     condition     = strcontains(local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data, "systemctl enable --now sshd")
     error_message = "Linux user_data should enable and start sshd."
+  }
+
+  assert {
+    condition     = strcontains(local.linux_ssh_user_data, "systemctl enable --now sshd || systemctl enable --now ssh")
+    error_message = "Linux user_data should fall back from sshd.service to ssh.service for Debian-family images."
   }
 
   assert {

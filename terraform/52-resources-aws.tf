@@ -1184,7 +1184,7 @@ resource "terraform_data" "readiness_gate" {
     connection {
       type        = each.value.is_windows ? "winrm" : "ssh"
       host        = each.value.private_ip
-      user        = each.value.is_windows ? "Administrator" : "ec2-user"
+      user        = coalesce(each.value.readiness_user, each.value.is_windows ? "Administrator" : "ec2-user")
       password    = each.value.is_windows ? each.value.password : null
       private_key = each.value.is_windows ? null : try(file(var.readiness_private_key_paths[each.value.key_name]), null)
       script_path = each.value.is_windows ? null : "${var.readiness_linux_script_dir}/terraform_%RAND%.sh"
