@@ -1,0 +1,58 @@
+# Copy this file to terraform.tfvars and replace every REPLACE_ME value before
+# planning or applying. Values here are placeholders, not deployable IDs.
+
+environment = "dev"
+
+# Required for a real apply. The map keys must match all_systems[*].key_name.
+readiness_private_key_paths = {
+  "app-linux-key" = "/secure/path/REPLACE_ME-app-linux-key.pem"
+  "win-admin-key" = "/secure/path/REPLACE_ME-win-admin-key.pem"
+}
+
+all_systems = [
+  {
+    region               = "us_west_2"
+    hostname             = "app01"
+    availability_zone    = "us-west-2a"
+    subnet_id            = "subnet-REPLACE_ME"
+    key_name             = "app-linux-key"
+    iam_instance_profile = "ec2-REPLACE_ME-profile"
+    aws_kms_alias        = "ebs-REPLACE_ME"
+    ami                  = "app-linux"
+
+    tags = {
+      Function = "app"
+    }
+
+    network_interfaces = [
+      {
+        private_ip      = "10.0.1.10"
+        security_groups = ["sg-REPLACE_ME"]
+      }
+    ]
+  },
+  {
+    region               = "us_east_1"
+    hostname             = "win01"
+    availability_zone    = "us-east-1a"
+    subnet_id            = "subnet-REPLACE_ME"
+    key_name             = "win-admin-key"
+    iam_instance_profile = "ec2-REPLACE_ME-profile"
+    aws_kms_alias        = "ebs-REPLACE_ME"
+    ami                  = "windows_server_2025_base"
+
+    tags = {
+      Function = "app"
+    }
+
+    network_interfaces = [
+      {
+        private_ip      = "10.0.2.10"
+        security_groups = ["sg-REPLACE_ME"]
+      }
+    ]
+  }
+]
+
+all_databases     = []
+all_load_balancers = []

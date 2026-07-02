@@ -1,0 +1,6 @@
+# Copy this file to backend.hcl, fill in real values, and pass it with
+# terraform -chdir=terraform init -backend-config=backend.hcl.
+bucket       = "REPLACE_ME-terraform-state-bucket"
+key          = "aws-terraform-framework/terraform.tfstate"
+region       = "us-west-2"
+use_lockfile = true

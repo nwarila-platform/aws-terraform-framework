@@ -12,6 +12,8 @@ inventory through Terraform variables.
 
 ## Quickstart
 
+### Contributor check
+
 Run the local quality gate before changing Terraform sources:
 
 ```shell
@@ -21,6 +23,32 @@ make ci
 The CI path runs Terraform formatting, init, validation, tests, TFLint,
 terraform-docs drift detection, documentation layout checks, and the repo's OPA
 policy target.
+
+### Deploy from this framework
+
+From the repository root, create local, ignored deployment files from the
+examples, then fill in real account, network, key-pair, KMS, and backend
+values:
+
+```shell
+cp terraform/backend.hcl.example terraform/backend.hcl
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+```
+
+Initialize the S3 backend with the partial backend config, then review and
+apply the plan:
+
+```shell
+terraform -chdir=terraform init -backend-config=backend.hcl
+terraform -chdir=terraform plan
+terraform -chdir=terraform apply
+terraform -chdir=terraform output -json aws_instances
+```
+
+A real apply must populate `readiness_private_key_paths` in
+`terraform.tfvars`. The readiness gate uses that map to find each launch key:
+Linux connects over SSH with the private key, and Windows decrypts the launch
+Administrator password for WinRM readiness.
 
 ## Documentation
 
