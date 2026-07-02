@@ -58,7 +58,7 @@ variable "all_systems" {
     tags = object({
       #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
       #Name                 = optional(string)
-      Backup   = optional(bool, false)
+      Backup   = optional(bool, true)
       Function = string
       #Terraform            = <Set Automatically to 'True'>
       #Environment          = <Set Automatically From 'var.environment'>
@@ -186,6 +186,11 @@ variable "all_systems" {
   }
 
   validation {
+    condition     = alltrue([for system in var.all_systems : length(system.network_interfaces) >= 1])
+    error_message = "Each all_systems entry must define at least one network_interface (the primary <hostname>-eni-0)."
+  }
+
+  validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
         for nic in system.network_interfaces : length(nic.security_groups) > 0
@@ -214,6 +219,7 @@ variable "all_databases" {
 
     tags = object({
       #Name        = <Set Automatically From 'db_name'>
+      Backup   = optional(bool, true)
       Function = string
       #Terraform   = <Set Automatically to 'True'>
       #Environment = <Set Automatically From 'var.environment'>
@@ -231,7 +237,7 @@ variable "all_databases" {
     manage_master_user_password = optional(bool, true)
     max_allocated_storage       = optional(string, "1000")
     skip_final_snapshot         = optional(bool, false)
-    storage_type                = optional(string)
+    storage_type                = optional(string, "gp3")
     vpc_security_group_ids      = optional(list(string), null)
 
   }))

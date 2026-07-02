@@ -214,11 +214,11 @@ locals {
         }
 
         tags = merge(
-          # Overwriteable Default Tags
-          {
-            Backup = try(system.tags["Backup"], "True")
-          },
           system.tags,
+          # Normalized Overwriteable Tags
+          {
+            Backup = system.tags["Backup"] ? "True" : "False"
+          },
           # Non-Overwritable Default Tags
           {
             Name        = system.hostname
@@ -551,15 +551,15 @@ locals {
         #region                     = < This is set statically >
         skip_final_snapshot    = nonsensitive(database.skip_final_snapshot)
         storage_encrypted      = true
-        storage_type           = nonsensitive(try(database.storage_type, "gp3"))
+        storage_type           = nonsensitive(database.storage_type)
         vpc_security_group_ids = nonsensitive(database.vpc_security_group_ids)
 
         tags = merge(
-          # Overwriteable Default Tags
-          {
-            Backup = try(nonsensitive(database.tags["Backup"]), "True")
-          },
           nonsensitive(database.tags),
+          # Normalized Overwriteable Tags
+          {
+            Backup = nonsensitive(database.tags["Backup"]) ? "True" : "False"
+          },
           # Non-Overwritable Default Tags
           {
             Name        = nonsensitive(database.db_name)
