@@ -94,7 +94,7 @@ variable "all_systems" {
         description     = optional(string)
         interface_type  = optional(string, null)
         private_ip      = string
-        security_groups = optional(list(string), null)
+        security_groups = list(string)
         tags            = optional(map(string), {})
       })
     )
@@ -163,6 +163,15 @@ variable "all_systems" {
     error_message = "Each all_systems entry must set a non-empty iam_instance_profile."
   }
 
+  validation {
+    condition = alltrue([
+      for system in var.all_systems : alltrue([
+        for nic in system.network_interfaces : length(nic.security_groups) > 0
+      ])
+    ])
+    error_message = "Each all_systems network_interfaces entry must specify at least one security group; an empty or omitted list makes AWS attach the VPC default (allow-all) security group."
+  }
+
   # validation {
   #   condition     = length(distinct([for s in var.baseline_ami_systems : s.ip])) == length(var.baseline_ami_systems)
   #   error_message = "Duplicate 'private_ip' values detected. Each server will need a unique IPv4 address."
@@ -203,7 +212,7 @@ variable "all_databases" {
     dedicated_log_volume        = optional(bool, true)
     delete_automated_backups    = optional(bool, true)
     deletion_protection         = optional(bool, true)
-    manage_master_user_password = optional(bool, false)
+    manage_master_user_password = optional(bool, true)
     max_allocated_storage       = optional(string, "1000")
     skip_final_snapshot         = optional(bool, false)
     storage_type                = optional(string)

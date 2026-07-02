@@ -31,6 +31,7 @@ def normalize_resource(change: dict[str, Any]) -> dict[str, Any]:
     if change.get("type") == "aws_instance":
         values = dict(values)
         values["metadata_options"] = normalize_metadata_options(values)
+        values["root_block_device"] = normalize_root_block_device(values)
 
     return {
         "address": change.get("address", ""),
@@ -53,6 +54,19 @@ def normalize_metadata_options(values: dict[str, Any]) -> dict[str, Any]:
         key: metadata_options[key]
         for key in ("http_tokens", "http_endpoint")
         if key in metadata_options
+    }
+
+
+def normalize_root_block_device(values: dict[str, Any]) -> dict[str, Any]:
+    root_block_device = values.get("root_block_device", {})
+    if isinstance(root_block_device, list):
+        root_block_device = root_block_device[0] if root_block_device else {}
+    if not isinstance(root_block_device, dict):
+        return {}
+    return {
+        key: root_block_device[key]
+        for key in ("encrypted",)
+        if key in root_block_device
     }
 
 

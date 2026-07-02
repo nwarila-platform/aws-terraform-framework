@@ -26,7 +26,8 @@ variables {
 
       network_interfaces = [
         {
-          private_ip = "10.0.0.10"
+          private_ip      = "10.0.0.10"
+          security_groups = ["sg-west"]
         }
       ]
     },
@@ -45,7 +46,8 @@ variables {
 
       network_interfaces = [
         {
-          private_ip = "10.0.0.11"
+          private_ip      = "10.0.0.11"
+          security_groups = ["sg-west"]
         }
       ]
     },
@@ -65,7 +67,8 @@ variables {
 
       network_interfaces = [
         {
-          private_ip = "10.0.0.12"
+          private_ip      = "10.0.0.12"
+          security_groups = ["sg-west"]
         }
       ]
     },
@@ -85,7 +88,8 @@ variables {
 
       network_interfaces = [
         {
-          private_ip = "10.1.0.10"
+          private_ip      = "10.1.0.10"
+          security_groups = ["sg-east"]
         }
       ]
     }
@@ -135,6 +139,16 @@ run "instance_state_created_only_when_set_state_is_not_null" {
     error_message = "EC2 instances should carry a non-overwritable ManagedBy=Terraform discovery tag."
   }
 
+  assert {
+    condition = alltrue(concat(
+      [for _, instance in aws_instance.us_west_2 : instance.root_block_device[0].encrypted == true],
+      [for _, instance in aws_instance.us_west_2_refresh : instance.root_block_device[0].encrypted == true],
+      [for _, instance in aws_instance.us_east_1 : instance.root_block_device[0].encrypted == true],
+      [for _, instance in aws_instance.us_east_1_refresh : instance.root_block_device[0].encrypted == true],
+    ))
+    error_message = "Every planned EC2 root block device should set encrypted = true."
+  }
+
 }
 
 run "aws_instances_output_exposes_non_secret_inventory" {
@@ -158,7 +172,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.9.10"
+            private_ip      = "10.0.9.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -178,7 +193,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         network_interfaces = [
           {
-            private_ip = "10.1.9.10"
+            private_ip      = "10.1.9.10"
+            security_groups = ["sg-east"]
           }
         ]
       },
@@ -199,7 +215,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.9.11"
+            private_ip      = "10.0.9.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -341,7 +358,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.5.10"
+            private_ip      = "10.0.5.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -367,7 +385,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.5.11"
+            private_ip      = "10.0.5.11"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -392,7 +411,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         network_interfaces = [
           {
-            private_ip = "10.1.5.10"
+            private_ip      = "10.1.5.10"
+            security_groups = ["sg-east"]
           }
         ]
       }
@@ -553,7 +573,8 @@ run "systems_reject_duplicate_hostnames" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.2.10"
+            private_ip      = "10.0.2.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -572,7 +593,8 @@ run "systems_reject_duplicate_hostnames" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.2.11"
+            private_ip      = "10.0.2.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -604,7 +626,8 @@ run "systems_reject_regions_outside_aws_config" {
 
         network_interfaces = [
           {
-            private_ip = "10.2.0.10"
+            private_ip      = "10.2.0.10"
+            security_groups = ["sg-eu"]
           }
         ]
       }
@@ -637,7 +660,8 @@ run "systems_reject_invalid_ami_identifiers" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.3.10"
+            private_ip      = "10.0.3.10"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -670,7 +694,8 @@ run "systems_accept_windows_server_2025_base_ami" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.3.11"
+            private_ip      = "10.0.3.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -703,7 +728,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.11.10"
+            private_ip      = "10.0.11.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -723,7 +749,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         network_interfaces = [
           {
-            private_ip = "10.1.11.10"
+            private_ip      = "10.1.11.10"
+            security_groups = ["sg-east"]
           }
         ]
       },
@@ -743,7 +770,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.11.11"
+            private_ip      = "10.0.11.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -856,7 +884,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.10.10"
+            private_ip      = "10.0.10.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -876,7 +905,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
 
         network_interfaces = [
           {
-            private_ip = "10.1.10.10"
+            private_ip      = "10.1.10.10"
+            security_groups = ["sg-east"]
           }
         ]
       }
@@ -957,7 +987,8 @@ run "systems_reject_windows_hostnames_over_15_characters" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.7.10"
+            private_ip      = "10.0.7.10"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -990,7 +1021,8 @@ run "systems_accept_valid_windows_hostnames" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.7.11"
+            private_ip      = "10.0.7.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -1055,7 +1087,8 @@ run "systems_render_readiness_user_data_per_os" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.8.10"
+            private_ip      = "10.0.8.10"
+            security_groups = ["sg-west"]
           }
         ]
       },
@@ -1075,7 +1108,8 @@ run "systems_render_readiness_user_data_per_os" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.8.11"
+            private_ip      = "10.0.8.11"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -1170,7 +1204,8 @@ run "systems_reject_kms_alias_prefix" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.4.10"
+            private_ip      = "10.0.4.10"
+            security_groups = ["sg-west"]
           }
         ]
       }
@@ -1202,7 +1237,41 @@ run "systems_reject_empty_iam_instance_profile" {
 
         network_interfaces = [
           {
-            private_ip = "10.0.6.10"
+            private_ip      = "10.0.6.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_systems,
+  ]
+}
+
+run "systems_reject_empty_network_interface_security_groups" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "empty-sg"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+
+        tags = {
+          Function = "Empty ENI security groups"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.6.11"
+            security_groups = []
           }
         ]
       }
@@ -1323,16 +1392,17 @@ run "databases_reject_empty_password_when_not_managed" {
   variables {
     all_databases = [
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "empty_password_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = ""
-        aws_kms_alias        = "west"
+        region                      = "us-west-2"
+        availability_zone           = "us-west-2a"
+        db_name                     = "empty_password_db"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        password                    = ""
+        manage_master_user_password = false
+        aws_kms_alias               = "west"
 
         tags = {
           Function = "Empty password database"
