@@ -409,6 +409,19 @@ resource "aws_iam_role_policy" "runner" {
         Resource = "*"
       },
       {
+        # RDS invokes these AS the runner (forward-access session) at DB-create
+        # time when manage_master_user_password=true. Verified via CloudTrail in
+        # the RBAC LP test: CreateSecret/TagResource run under the caller, while
+        # value ops + DeleteSecret run under AWSServiceRoleForRDS.
+        Sid    = "RdsManagedPasswordSecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:TagResource"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "UseHarnessKmsKey"
         Effect = "Allow"
         Action = [
