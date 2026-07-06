@@ -66,7 +66,58 @@ resolve_ami() {
     --output text
 }
 
-wait_for_ssh() {
+normalize_harness_path() {
+  local path=$1
+
+  if [[ -z "$path" || "$path" == "null" || "$path" == /* ]]; then
+    printf '%s\n' "$path"
+    return 0
+  fi
+
+  local dir base
+  dir=$(dirname -- "$path")
+  base=$(basename -- "$path")
+  (cd "$HARNESS_DIR/$dir" && printf '%s/%s\n' "$PWD" "$base")
+}
+
+fixture_amis_available() {
+  local count
+
+  [[ -n "${E2E_FIXTURE_APP_LINUX_V1_AMI:-}" ]] || return 1
+  [[ -n "${E2E_FIXTURE_APP_LINUX_V2_AMI:-}" ]] || return 1
+  [[ -n "${E2E_FIXTURE_APP_LINUX_EXTRA_V1_AMI:-}" ]] || return 1
+
+  count=$(aws ec2 describe-images \
+    --region "$REGION" \
+    --owners self \
+    --image-ids "$E2E_FIXTURE_APP_LINUX_V1_AMI" "$E2E_FIXTURE_APP_LINUX_V2_AMI" "$E2E_FIXTURE_APP_LINUX_EXTRA_V1_AMI" \
+    --query 'length(Images[?State==`available`])' \
+    --output text 2>/dev/null || printf '0')
+
+  [[ "$count" == "3" ]]
+}
+
+load_or_mint_fixture_amis() {
+  if [[ -f "$FIXTURE_ENV" && "${E2E_REMINT_FIXTURE_AMIS:-0}" != "1" ]]; then
+    # shellcheck source=/dev/null
+    source "$FIXTURE_ENV"
+    if fixture_amis_available; then
+      printf 'Reusing fixture AMIs from %s:\n' "$FIXTURE_ENV"
+      printf '  %s=%s\n' "$E2E_FIXTURE_APP_LINUX_V1_NAME" "$E2E_FIXTURE_APP_LINUX_V1_AMI"
+      printf '  %s=%s\n' "$E2E_FIXTURE_APP_LINUX_V2_NAME" "$E2E_FIXTURE_APP_LINUX_V2_AMI"
+      printf '  %s=%s\n' "$E2E_FIXTURE_APP_LINUX_EXTRA_V1_NAME" "$E2E_FIXTURE_APP_LINUX_EXTRA_V1_AMI"
+      return 0
+    fi
+    printf 'Existing fixture AMI metadata is stale; minting fresh fixture AMIs.\n'
+  fi
+
+  E2E_REGION="$REGION" E2E_NAME_PREFIX="$NAME_PREFIX" E2E_AL2023_AMI_ID="$AL2023_AMI_ID" \
+    "${SCRIPT_DIR}/mint-fixture-amis.sh"
+  # shellcheck source=/dev/null
+  source "$FIXTURE_ENV"
+}
+
+wait_for_runner_ready() {
   local public_ip=$1
   local key_path=$2
   local deadline=$((SECONDS + 600))
@@ -77,13 +128,14 @@ wait_for_ssh() {
       -o ConnectTimeout=5 \
       -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
-      "ec2-user@${public_ip}" "true" >/dev/null 2>&1; then
+      "ec2-user@${public_ip}" \
+      "command -v terraform >/dev/null && command -v opa >/dev/null && command -v aws >/dev/null && command -v jq >/dev/null && (command -v nc >/dev/null || command -v ncat >/dev/null)" >/dev/null 2>&1; then
       return 0
     fi
     sleep 10
   done
 
-  printf 'runner SSH did not become ready within 10 minutes\n' >&2
+  printf 'runner SSH/tooling did not become ready within 10 minutes\n' >&2
   return 1
 }
 
@@ -106,10 +158,10 @@ AL2023_AMI_ID="${E2E_AL2023_AMI_ID:-$(aws ssm get-parameter \
 UBUNTU_AMI_ID="${E2E_UBUNTU_AMI_ID:-$(resolve_ami 099720109477 'ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*')}"
 WINDOWS_2025_AMI_ID="${E2E_WINDOWS_2025_AMI_ID:-$(resolve_ami amazon 'Windows_Server-2025-English-Full-Base-*')}"
 
-E2E_REGION="$REGION" E2E_NAME_PREFIX="$NAME_PREFIX" E2E_AL2023_AMI_ID="$AL2023_AMI_ID" \
-  "${SCRIPT_DIR}/mint-fixture-amis.sh"
-# shellcheck source=/dev/null
-source "$FIXTURE_ENV"
+load_or_mint_fixture_amis
+E2E_AL2023_AMI_ID="$AL2023_AMI_ID"
+E2E_UBUNTU_AMI_ID="$UBUNTU_AMI_ID"
+E2E_WINDOWS_2025_AMI_ID="$WINDOWS_2025_AMI_ID"
 
 cat >"$HARNESS_TFVARS" <<EOF
 region        = "${REGION}"
@@ -125,7 +177,7 @@ terraform -chdir="$HARNESS_DIR" init -backend=false -input=false
 terraform -chdir="$HARNESS_DIR" apply -auto-approve -input=false -var-file="$HARNESS_TFVARS"
 terraform -chdir="$HARNESS_DIR" output -json >"${GENERATED_DIR}/harness-outputs.json"
 
-KEY_PATH=$(terraform -chdir="$HARNESS_DIR" output -raw key_path)
+KEY_PATH=$(normalize_harness_path "$(terraform -chdir="$HARNESS_DIR" output -raw key_path)")
 chmod 0400 "$KEY_PATH"
 
 E2E_PROJECT=$(tf_output project)
@@ -163,6 +215,7 @@ if [[ "$(tf_output enable_rds)" == "true" ]]; then
     username                    = "e2eadmin"
     aws_kms_alias               = "${E2E_KMS_ALIAS_NAME}"
     allocated_storage           = "20"
+    dedicated_log_volume        = false
     deletion_protection         = false
     skip_final_snapshot         = true
     manage_master_user_password = true
@@ -273,7 +326,7 @@ if [[ "$HARNESS_USE_RUNNER" == "true" ]]; then
     exit 1
   fi
 
-  wait_for_ssh "$RUNNER_PUBLIC_IP" "$KEY_PATH"
+  wait_for_runner_ready "$RUNNER_PUBLIC_IP" "$KEY_PATH"
 
   tar \
     --exclude .git \
@@ -287,13 +340,19 @@ if [[ "$HARNESS_USE_RUNNER" == "true" ]]; then
       -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
       "ec2-user@${RUNNER_PUBLIC_IP}" \
-      "rm -rf '${REMOTE_ROOT}' && mkdir -p '${REMOTE_ROOT}' && tar -xzf - -C '${REMOTE_ROOT}'"
+      "mkdir -p '${REMOTE_ROOT}' && tar -xzf - -C '${REMOTE_ROOT}'"
 
   ssh -i "$KEY_PATH" \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
     "ec2-user@${RUNNER_PUBLIC_IP}" \
     "mkdir -p '${REMOTE_ROOT}/test/e2e/.generated'"
+
+  ssh -i "$KEY_PATH" \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
+    "ec2-user@${RUNNER_PUBLIC_IP}" \
+    "rm -f '${REMOTE_ROOT}/test/e2e/.generated/${E2E_PROJECT}.pem' '${REMOTE_ROOT}/test/e2e/.generated/e2e.env' '${REMOTE_ROOT}/test/e2e/.generated/fixture-amis.env' '${REMOTE_ROOT}/test/e2e/.generated/harness-outputs.json'"
 
   scp -i "$KEY_PATH" \
     -o StrictHostKeyChecking=no \
@@ -317,7 +376,7 @@ if [[ "$HARNESS_USE_RUNNER" == "true" ]]; then
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
     "ec2-user@${RUNNER_PUBLIC_IP}" \
-    "bash -lc 'set -euo pipefail; cd ${REMOTE_ROOT}/terraform; terraform init -backend=false -input=false; terraform apply -auto-approve -input=false 2>&1 | tee ${REMOTE_ROOT}/test/e2e/.generated/framework-apply.log'" \
+    "bash -lc 'set -euo pipefail; cd ${REMOTE_ROOT}/terraform; sed -i \"/backend \\\"s3\\\" {}/d\" 00-providers.tf; terraform init -input=false; terraform apply -auto-approve -input=false 2>&1 | tee ${REMOTE_ROOT}/test/e2e/.generated/framework-apply.log'" \
     | tee "${GENERATED_DIR}/framework-apply.log"
 else
   cp "$RENDERED_TFVARS" "${FRAMEWORK_DIR}/framework.auto.tfvars"

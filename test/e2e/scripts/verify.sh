@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 E2E_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
 ROOT_DIR=$(cd -- "${E2E_DIR}/../.." && pwd)
+HARNESS_DIR="${E2E_DIR}/harness"
 FRAMEWORK_DIR="${E2E_FRAMEWORK_DIR:-${ROOT_DIR}/terraform}"
 GENERATED_DIR="${E2E_DIR}/.generated"
 RUN_ENV="${GENERATED_DIR}/e2e.env"
@@ -15,6 +16,9 @@ READINESS_KEY_PATH="${E2E_READINESS_KEY_PATH:-}"
 EXPECT_RDS="${E2E_EXPECT_RDS:-true}"
 EXPECT_LB="${E2E_EXPECT_LB:-true}"
 REFRESH_SERIAL="${E2E_REFRESH_SERIAL:-0}"
+USE_RUNNER="${E2E_USE_RUNNER:-true}"
+REMOTE_ROOT="${E2E_REMOTE_ROOT:-/home/ec2-user/e2e/aws-terraform-framework}"
+NC_BIN=""
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -150,6 +154,69 @@ tag_equals() {
   instance_jq "$host" "([.Tags[]? | select(.Key == \"${tag_key}\") | .Value][0]) == \"${expected}\""
 }
 
+tcp_check() {
+  local host_ip=$1
+  local port=$2
+
+  "$NC_BIN" -z -w 10 "$host_ip" "$port" >/dev/null
+}
+
+normalize_harness_path() {
+  local path=$1
+
+  if [[ -z "$path" || "$path" == "null" || "$path" == /* ]]; then
+    printf '%s\n' "$path"
+    return 0
+  fi
+
+  local dir base
+  dir=$(dirname -- "$path")
+  base=$(basename -- "$path")
+  (cd "$HARNESS_DIR/$dir" && printf '%s/%s\n' "$PWD" "$base")
+}
+
+remote_verify() {
+  local runner_public_ip key_path remote_cmd remote_tar verify_exit copy_exit
+
+  runner_public_ip=$(terraform -chdir="$HARNESS_DIR" output -raw runner_public_ip)
+  key_path=$(normalize_harness_path "$(terraform -chdir="$HARNESS_DIR" output -raw key_path)")
+
+  if [[ -z "$runner_public_ip" || "$runner_public_ip" == "null" || ! -f "$key_path" ]]; then
+    printf 'use_runner=true but runner outputs/key are unavailable for verification delegation.\n' >&2
+    return 1
+  fi
+
+  printf 'Delegating e2e verification to runner %s...\n' "$runner_public_ip"
+  remote_cmd=$(printf 'set -euo pipefail; cd %q; E2E_VERIFY_REMOTE_DELEGATED=1 test/e2e/scripts/verify.sh' "$REMOTE_ROOT")
+
+  set +e
+  ssh -i "$key_path" \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
+    "ec2-user@${runner_public_ip}" \
+    "bash -lc $(printf '%q' "$remote_cmd")" \
+    | tee "${GENERATED_DIR}/e2e-verify.remote.log"
+  verify_exit=${PIPESTATUS[0]}
+  set -e
+
+  remote_tar=$(printf 'set -euo pipefail; cd %q; tar -czf - .' "${REMOTE_ROOT}/test/e2e/.generated")
+  set +e
+  ssh -i "$key_path" \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
+    "ec2-user@${runner_public_ip}" \
+    "bash -lc $(printf '%q' "$remote_tar")" \
+    | tar -xzf - -C "$GENERATED_DIR"
+  copy_exit=$?
+  set -e
+
+  if [[ $copy_exit -ne 0 ]]; then
+    printf 'WARNING: failed to copy generated verification artifacts back from runner.\n' >&2
+  fi
+
+  return "$verify_exit"
+}
+
 if [[ -f "$RUN_ENV" ]]; then
   # shellcheck source=/dev/null
   source "$RUN_ENV"
@@ -158,10 +225,24 @@ if [[ -f "$RUN_ENV" ]]; then
   READINESS_KEY_PATH="${E2E_READINESS_KEY_PATH:-$READINESS_KEY_PATH}"
   EXPECT_RDS="${E2E_EXPECT_RDS:-$EXPECT_RDS}"
   EXPECT_LB="${E2E_EXPECT_LB:-$EXPECT_LB}"
+  USE_RUNNER="${E2E_USE_RUNNER:-$USE_RUNNER}"
+  REMOTE_ROOT="${E2E_REMOTE_ROOT:-$REMOTE_ROOT}"
 fi
 
-require aws jq nc opa ssh terraform
 mkdir -p "$GENERATED_DIR"
+
+if [[ "$USE_RUNNER" == "true" && "${E2E_VERIFY_REMOTE_DELEGATED:-0}" != "1" ]]; then
+  require ssh tar terraform
+  remote_verify
+  exit $?
+fi
+
+require aws jq opa ssh terraform
+NC_BIN=$(command -v nc || command -v ncat || true)
+if [[ -z "$NC_BIN" ]]; then
+  printf 'missing required command: nc or ncat\n' >&2
+  exit 127
+fi
 
 OUTPUT_JSON="${GENERATED_DIR}/aws_instances.output.json"
 INSTANCES_JSON="${GENERATED_DIR}/instances.describe.json"
@@ -206,7 +287,7 @@ else
   fail "readiness private key exists for SSH rechecks"
 fi
 
-check "WinRM 5986 is reachable on Windows host" nc -z -w 10 "$(ip_for e2e-win-25)" 5986
+check "WinRM 5986 is reachable on Windows host" tcp_check "$(ip_for e2e-win-25)" 5986
 
 check "raw Linux has /dev/sdd and /dev/sde data volumes" volume_devices_match e2e-lin-raw '["/dev/sdd","/dev/sde"]'
 check "Ubuntu has /dev/sdd data volume" volume_devices_match e2e-lin-ubu '["/dev/sdd"]'

@@ -513,8 +513,8 @@ resource "aws_instance" "runner" {
     #!/bin/bash
     set -euxo pipefail
 
-    dnf install -y awscli-2 curl gettext git gzip jq nmap-ncat openssh-clients tar unzip || \
-      dnf install -y awscli curl gettext git gzip jq nmap-ncat openssh-clients tar unzip
+    dnf install -y awscli-2 gettext git gzip jq nmap-ncat openssh-clients tar unzip || \
+      dnf install -y awscli gettext git gzip jq nmap-ncat openssh-clients tar unzip
 
     terraform_version="${local.terraform_version}"
     curl -fsSLo /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$${terraform_version}/terraform_$${terraform_version}_linux_amd64.zip"

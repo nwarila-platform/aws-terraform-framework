@@ -34,6 +34,20 @@ tf_output_or_null() {
   fi
 }
 
+normalize_harness_path() {
+  local path=$1
+
+  if [[ -z "$path" || "$path" == "null" || "$path" == /* ]]; then
+    printf '%s\n' "$path"
+    return 0
+  fi
+
+  local dir base
+  dir=$(dirname -- "$path")
+  base=$(basename -- "$path")
+  (cd "$HARNESS_DIR/$dir" && printf '%s/%s\n' "$PWD" "$base")
+}
+
 deregister_fixture_amis() {
   local images_json image_id snapshots snapshot_id
 
@@ -81,7 +95,7 @@ fi
 
 HARNESS_USE_RUNNER=$(tf_output_or_null use_runner)
 RUNNER_PUBLIC_IP=$(tf_output_or_null runner_public_ip)
-KEY_PATH=$(tf_output_or_null key_path)
+KEY_PATH=$(normalize_harness_path "$(tf_output_or_null key_path)")
 
 if [[ "$HARNESS_USE_RUNNER" == "true" && "$RUNNER_PUBLIC_IP" != "null" && -n "$RUNNER_PUBLIC_IP" && -f "$KEY_PATH" ]]; then
   printf 'Destroying framework from runner %s before harness teardown...\n' "$RUNNER_PUBLIC_IP"
@@ -89,7 +103,7 @@ if [[ "$HARNESS_USE_RUNNER" == "true" && "$RUNNER_PUBLIC_IP" != "null" && -n "$R
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile="${GENERATED_DIR}/known_hosts" \
     "ec2-user@${RUNNER_PUBLIC_IP}" \
-    "bash -lc 'set -euo pipefail; cd ${REMOTE_ROOT}/terraform; terraform destroy -auto-approve -input=false 2>&1 | tee ${REMOTE_ROOT}/test/e2e/.generated/framework-destroy.log'" \
+    "bash -lc 'set -euo pipefail; cd ${REMOTE_ROOT}/terraform; sed -i \"/backend \\\"s3\\\" {}/d\" 00-providers.tf; terraform init -input=false; terraform destroy -auto-approve -input=false 2>&1 | tee ${REMOTE_ROOT}/test/e2e/.generated/framework-destroy.log'" \
     | tee "${GENERATED_DIR}/framework-destroy.log" || true
 else
   printf 'Destroying framework locally (runner unavailable or use_runner=false)...\n'

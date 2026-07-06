@@ -47,7 +47,7 @@ Generated files live under `test/e2e/.generated/` and are ignored, including loc
 - `e2e-lin-ver`: self-built `app-linux:1`, proving version pinning.
 - `e2e-win-25`: `windows_server_2025_base`, `refresh = true`, WinRM 5986 readiness, one Windows data volume.
 
-RDS uses a managed master password, gp3, encryption, no public access, `allocated_storage = 20`, `deletion_protection = false`, and `skip_final_snapshot = true`. The live database name is `e2edb` because the framework passes `db_name` through to the AWS PostgreSQL database name field, which does not accept hyphens.
+RDS uses a managed master password, gp3, encryption, no public access, `allocated_storage = 20`, `dedicated_log_volume = false` for `db.t3.micro` compatibility, `deletion_protection = false`, and `skip_final_snapshot = true`. The live database name is `e2edb` because the framework passes `db_name` through to the AWS PostgreSQL database name field, which does not accept hyphens.
 
 The internal ALB uses explicit security groups, two private subnets, one target group for `e2e-lin-raw`, and one HTTP listener.
 
