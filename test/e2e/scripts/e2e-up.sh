@@ -184,11 +184,12 @@ if [[ "$(tf_output enable_lb)" == "true" ]]; then
   E2E_ALL_LOAD_BALANCERS=$(cat <<EOF
 [
   {
-    region             = "us_east_1"
-    resource_key       = "e2e_alb"
-    name               = "${E2E_PROJECT}-alb"
-    internal           = true
-    load_balancer_type = "application"
+    region                     = "us_east_1"
+    resource_key               = "e2e_alb"
+    name                       = "${E2E_PROJECT}-alb"
+    internal                   = true
+    enable_deletion_protection = false
+    load_balancer_type         = "application"
     security_groups    = ["${E2E_LOAD_BALANCER_SECURITY_GROUP_ID}"]
     subnets            = ${E2E_PRIVATE_SUBNET_IDS_HCL}
 
