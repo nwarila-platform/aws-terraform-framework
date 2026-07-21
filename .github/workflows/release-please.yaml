@@ -1,5 +1,8 @@
 name: Release Please
 
+# Caller for the canonical nwarila-platform/.github reusable-release-please
+# workflow (org ADR-0005: control-plane callers stay namespace-local).
+
 on:
   push:
     branches: [main]
@@ -14,15 +17,12 @@ concurrency:
 jobs:
   release-please:
     name: Release Please
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
     permissions:
       contents: write # required for release-please to create tags and GitHub releases
       pull-requests: write # required for release-please to open and update release PRs
       issues: write # required for release-please issue and label bookkeeping
-    steps:
-      - name: Run release-please
-        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+      actions: write # required by the reusable to dispatch the release-evidence task on new tags
+    uses: nwarila-platform/.github/.github/workflows/reusable-release-please.yaml@928b8a3d3dce43f4c2bdd8369fbf5ea86f53b681 # nwarila-platform/.github main @ 2026-07-20
+    with:
+      config_file: release-please-config.json
+      manifest_file: .release-please-manifest.json
