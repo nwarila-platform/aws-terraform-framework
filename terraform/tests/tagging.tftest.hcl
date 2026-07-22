@@ -16,22 +16,41 @@ variables {
       aws_kms_alias        = "preexisting"
       ami                  = "test-linux"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "tagging test host"
+        Backup   = true
       }
 
       root_block_device = {
         tags = {
           Team = "platform"
         }
+        delete_on_termination = true
+        iops                  = null
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
       }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.30"
           security_groups = ["sg-preexisting"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     }
   ]
 }
@@ -99,6 +118,8 @@ run "stable_only_metadata_omits_provenance_keys" {
       repository_id = "123456789"
       stack         = "wazuh-standing-us-east-1"
       owner         = "platform-engineering"
+      commit_sha    = null
+      run_id        = null
     }
   }
 
@@ -118,6 +139,7 @@ run "rejects_github_sha_style_uppercase" {
       stack         = "s"
       owner         = "o"
       commit_sha    = "ABC123"
+      run_id        = null
     }
   }
 
@@ -133,6 +155,8 @@ run "rejects_non_numeric_repository_id" {
       repository_id = "not-a-number"
       stack         = "s"
       owner         = "o"
+      commit_sha    = null
+      run_id        = null
     }
   }
 
@@ -148,6 +172,8 @@ run "rejects_reserved_prefix_in_consumer_tags" {
       repository_id = "123456789"
       stack         = "s"
       owner         = "o"
+      commit_sha    = null
+      run_id        = null
     }
 
     all_systems = [
@@ -161,22 +187,41 @@ run "rejects_reserved_prefix_in_consumer_tags" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "reserved prefix test"
+          Backup   = true
         }
 
         root_block_device = {
           tags = {
             "nwarila:management:owner-override" = "me"
           }
+          delete_on_termination = true
+          iops                  = null
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
         }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.31"
             security_groups = ["sg-preexisting"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -193,6 +238,8 @@ run "rejects_reserved_prefix_in_load_balancer_tags" {
       repository_id = "123456789"
       stack         = "s"
       owner         = "o"
+      commit_sha    = null
+      run_id        = null
     }
 
     all_load_balancers = [
@@ -206,6 +253,36 @@ run "rejects_reserved_prefix_in_load_balancer_tags" {
         tags = {
           "nwarila:management:owner-override" = "me"
         }
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }
@@ -222,6 +299,8 @@ run "rejects_reserved_prefix_in_target_group_tags" {
       repository_id = "123456789"
       stack         = "s"
       owner         = "o"
+      commit_sha    = null
+      run_id        = null
     }
 
     all_load_balancers = [
@@ -243,8 +322,51 @@ run "rejects_reserved_prefix_in_target_group_tags" {
             tags = {
               "nwarila:operations:owner-override" = "me"
             }
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
           }
         ]
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }

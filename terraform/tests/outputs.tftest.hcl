@@ -22,26 +22,58 @@ variables {
       aws_kms_alias        = "preexisting"
       ami                  = "test-linux"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "volume identity host"
+        Backup   = true
       }
 
       ebs_block_devices = [
         {
-          volume_size = "20"
-          tags        = { Function = "wsusdb" }
+          volume_size  = "20"
+          tags         = { Function = "wsusdb" }
+          iops         = null
+          snapshot_id  = null
+          skip_destroy = false
+          throughput   = null
+          volume_type  = "gp3"
         },
         {
-          volume_size = "30"
+          volume_size  = "30"
+          iops         = null
+          snapshot_id  = null
+          skip_destroy = false
+          tags         = {}
+          throughput   = null
+          volume_type  = "gp3"
         }
       ]
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.20"
           security_groups = ["sg-preexisting"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     }
   ]
 }

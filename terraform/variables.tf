@@ -123,10 +123,9 @@ variable "all_systems" {
     # ?Note: I may be able to get around this using conditional if deployments, but it will make
     # ?      the resources.tf file super cluttered, but overall that file isn't used for much
     # ?      so it shouldn't present a large operational challenge for long-term management.
-    # lifecycle = #   object({
-    #     ignore_changes        = list(string)
-    #   })
-    #
+    # lifecycle = object({
+    #   ignore_changes = list(string)
+    # })
 
   }))
 

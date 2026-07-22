@@ -17,16 +17,38 @@ variables {
       ami                  = "test-linux"
       set_state            = "stopped"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+
       tags = {
         Function = "West instance with state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
       region               = "us_east_1"
@@ -38,16 +60,39 @@ variables {
       aws_kms_alias        = "west"
       ami                  = "test-linux"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "West instance without state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.11"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
       region               = "us-east-1"
@@ -60,16 +105,38 @@ variables {
       ami                  = "test-linux"
       refresh              = true
 
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "West refresh instance"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.12"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
       region               = "us-east-1"
@@ -82,16 +149,38 @@ variables {
       ami                  = "test-linux"
       set_state            = "running"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+
       tags = {
         Function = "East instance with state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.1.0.10"
           security_groups = ["sg-east"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     }
   ]
 }
@@ -159,16 +248,39 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Backup default EC2"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.12.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -180,17 +292,39 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Backup   = false
           Function = "Backup disabled EC2"
         }
 
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.12.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
 
@@ -209,7 +343,21 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
 
         tags = {
           Function = "Backup default database"
+          Backup   = true
         }
+        password                    = null
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       },
       {
         region                 = "us-east-1"
@@ -227,6 +375,19 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
           Backup   = false
           Function = "Backup disabled database"
         }
+        password                    = null
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -303,16 +464,37 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         refresh              = true
         set_state            = "stopped"
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+
         tags = {
           Function = "West refresh instance with state control"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -348,16 +530,39 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Linux"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -369,16 +574,39 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         aws_kms_alias        = "east"
         ami                  = "windows_server_2025_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Windows"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.9.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -391,16 +619,38 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         ami                  = "test-linux"
         refresh              = true
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Refresh"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -525,29 +775,67 @@ run "ebs_volume_attachments_use_structured_wiring" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "125"
+            volume_size  = "125"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           },
           {
-            volume_size = "250"
+            volume_size  = "250"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           },
           {
             skip_destroy = true
             volume_size  = "500"
+            iops         = null
+            snapshot_id  = null
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -560,22 +848,48 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ami                  = "test-linux"
         refresh              = true
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS refresh"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "64"
+            volume_size  = "64"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -587,22 +901,49 @@ run "ebs_volume_attachments_use_structured_wiring" {
         aws_kms_alias        = "east"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "East EBS"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "32"
+            volume_size  = "32"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.1.5.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -614,22 +955,49 @@ run "ebs_volume_attachments_use_structured_wiring" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS max"
+          Backup   = true
         }
 
         ebs_block_devices = [
           for index in range(23) : {
-            volume_size = "10"
+            volume_size  = "10"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -810,22 +1178,49 @@ run "systems_reject_more_than_23_ebs_block_devices" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Too many EBS devices"
+          Backup   = true
         }
 
         ebs_block_devices = [
           for index in range(24) : {
-            volume_size = "10"
+            volume_size  = "10"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -850,16 +1245,39 @@ run "systems_reject_duplicate_hostnames" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Duplicate host A"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.2.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -871,16 +1289,39 @@ run "systems_reject_duplicate_hostnames" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Duplicate host B"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.2.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -905,16 +1346,39 @@ run "systems_reject_regions_outside_aws_config" {
         aws_kms_alias        = "eu"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Unsupported region"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.2.0.10"
             security_groups = ["sg-eu"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -969,16 +1433,39 @@ run "systems_reject_invalid_ami_identifiers" {
         aws_kms_alias        = "west"
         ami                  = "amazon_linux_2023:latest"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Invalid AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1004,16 +1491,38 @@ run "systems_reject_invalid_set_state" {
         ami                  = "test-linux"
         set_state            = "terminated"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+
         tags = {
           Function = "Invalid instance state"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1051,16 +1560,39 @@ run "systems_accept_windows_server_2025_base_ami" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2025_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows Server 2025"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1086,16 +1618,39 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Family self-built Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.11.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1107,16 +1662,39 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         aws_kms_alias        = "east"
         ami                  = "prod-rhel8"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Named self-built Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.11.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1128,16 +1706,39 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         aws_kms_alias        = "west"
         ami                  = "ttc-win22-sql19:1.2"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Versioned self-built Windows AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.11.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1244,16 +1845,39 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         aws_kms_alias        = "west"
         ami                  = "ami-0123456789abcdef0"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Direct Windows AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.10.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1265,16 +1889,39 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         aws_kms_alias        = "east"
         ami                  = "ami-0fedcba9876543210"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Direct Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.10.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1347,16 +1994,39 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname too long"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1381,16 +2051,39 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname invalid characters"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1415,16 +2108,39 @@ run "systems_reject_all_numeric_windows_hostnames" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname all numeric"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1449,16 +2165,39 @@ run "systems_accept_valid_windows_hostnames" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Valid Windows hostname"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1542,16 +2281,39 @@ run "readiness_gate_allows_empty_private_key_paths" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Readiness empty key map"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.13.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1590,16 +2352,39 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Readiness missing key"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.13.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1634,16 +2419,38 @@ run "readiness_targets_thread_per_system_readiness_user" {
         ami                  = "test-linux"
         readiness_user       = "ubuntu"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux readiness override"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1655,16 +2462,39 @@ run "readiness_targets_thread_per_system_readiness_user" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux readiness default"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1677,16 +2507,38 @@ run "readiness_targets_thread_per_system_readiness_user" {
         ami                  = "windows_server_2022_base"
         readiness_user       = "ReadinessAdmin"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows readiness override"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1698,16 +2550,39 @@ run "readiness_targets_thread_per_system_readiness_user" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows readiness default"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1762,16 +2637,39 @@ run "systems_render_readiness_user_data_per_os" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux SSH user data"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.8.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1783,16 +2681,39 @@ run "systems_render_readiness_user_data_per_os" {
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows SSH user data"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.8.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1885,16 +2806,39 @@ run "systems_reject_kms_alias_prefix" {
         aws_kms_alias        = "alias/west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Prefixed KMS alias"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.4.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1919,16 +2863,39 @@ run "systems_reject_empty_iam_instance_profile" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty IAM instance profile"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.6.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1953,16 +2920,39 @@ run "systems_reject_empty_network_interface_security_groups" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty ENI security groups"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.6.11"
             security_groups = []
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1987,11 +2977,31 @@ run "systems_reject_empty_network_interfaces" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty network interfaces"
+          Backup   = true
         }
 
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
         network_interfaces = []
+
+        associate_public_ip = false
       }
     ]
   }
@@ -2022,7 +3032,19 @@ run "databases_reject_null_vpc_security_group_ids" {
 
         tags = {
           Function = "Database with null security groups"
+          Backup   = true
         }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
@@ -2051,7 +3073,19 @@ run "databases_reject_empty_vpc_security_group_ids" {
 
         tags = {
           Function = "Database with empty security groups"
+          Backup   = true
         }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
@@ -2079,7 +3113,20 @@ run "databases_reject_duplicate_db_names" {
 
         tags = {
           Function = "Duplicate database A"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       },
       {
         region                 = "us-east-1"
@@ -2096,7 +3143,20 @@ run "databases_reject_duplicate_db_names" {
 
         tags = {
           Function = "Duplicate database B"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2126,7 +3186,20 @@ run "databases_reject_regions_outside_aws_config" {
 
         tags = {
           Function = "Unsupported database region"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2156,7 +3229,20 @@ run "databases_reject_kms_alias_prefix" {
 
         tags = {
           Function = "Prefixed database KMS alias"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2187,7 +3273,19 @@ run "databases_reject_empty_password_when_not_managed" {
 
         tags = {
           Function = "Empty password database"
+          Backup   = true
         }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
@@ -2217,7 +3315,20 @@ run "databases_keep_credentials_sensitive" {
 
         tags = {
           Function = "Sensitive database"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2285,7 +3396,20 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
 
         tags = {
           Function = "Managed password database"
+          Backup   = true
         }
+        password                 = null
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
@@ -2381,16 +3505,39 @@ run "readiness_gate_optout_creates_no_gate" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Gated system keeps its readiness gate"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -2403,16 +3550,38 @@ run "readiness_gate_optout_creates_no_gate" {
         ami                  = "test-linux"
         readiness_gate       = false
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
         tags = {
           Function = "Zero-inbound SSM system skips the readiness gate"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }

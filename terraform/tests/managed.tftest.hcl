@@ -20,16 +20,39 @@ variables {
       aws_kms_alias        = "preexisting"
       ami                  = "test-linux"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "wazuh-shaped baseline system"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
           security_groups = ["sg-preexisting"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     }
   ]
 }
@@ -70,6 +93,7 @@ run "managed_key_pair_created_from_public_key" {
     managed_keypairs = {
       "managed-key" = {
         public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly deploy@mock"
+        tags       = {}
       }
     }
 
@@ -84,16 +108,39 @@ run "managed_key_pair_created_from_public_key" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "System using a framework-managed key pair"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.11"
             security_groups = ["sg-preexisting"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -121,6 +168,7 @@ run "managed_key_pair_rejects_non_openssh_material" {
     managed_keypairs = {
       "bad-key" = {
         public_key = "-----BEGIN RSA PRIVATE KEY----- oops"
+        tags       = {}
       }
     }
   }
@@ -135,6 +183,7 @@ run "managed_key_pair_accepts_rsa_public_key" {
     managed_keypairs = {
       "rsa-key" = {
         public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 rsa@mock"
+        tags       = {}
       }
     }
   }
@@ -152,6 +201,7 @@ run "managed_key_pair_accepts_terminal_lf" {
     managed_keypairs = {
       "terminal-lf-key" = {
         public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly\n"
+        tags       = {}
       }
     }
   }
@@ -169,6 +219,7 @@ run "managed_key_pair_rejects_ecdsa" {
     managed_keypairs = {
       "ecdsa-key" = {
         public_key = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTY= ecdsa@mock"
+        tags       = {}
       }
     }
   }
@@ -183,6 +234,7 @@ run "managed_key_pair_rejects_embedded_lf" {
     managed_keypairs = {
       "embedded-lf-key" = {
         public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly first@mock\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 injected@mock"
+        tags       = {}
       }
     }
   }
@@ -197,6 +249,7 @@ run "managed_key_pair_rejects_embedded_crlf" {
     managed_keypairs = {
       "embedded-crlf-key" = {
         public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly first@mock\r\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 injected@mock"
+        tags       = {}
       }
     }
   }
@@ -214,10 +267,12 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
         vpc_id  = "vpc-preexisting"
         ingress = []
         egress = [
-          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0" },
-          { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0" },
-          { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0" },
+          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+          { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+          { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        tags        = {}
       }
     }
 
@@ -233,16 +288,38 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
         ami                  = "test-linux"
         readiness_gate       = false
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
         tags = {
           Function = "Zero-inbound SSM system on a managed security group"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
             security_groups = ["wsus-ssm"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -284,8 +361,11 @@ run "managed_sg_rejects_world_open_ipv4_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0" },
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -302,8 +382,11 @@ run "managed_sg_rejects_world_open_ipv6_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/0" },
+          { ip_protocol = "-1", cidr_ipv6 = "::/0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -320,8 +403,11 @@ run "managed_sg_rejects_zero_padded_world_open_ipv4_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/00" },
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/00", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -338,8 +424,11 @@ run "managed_sg_rejects_zero_padded_world_open_ipv6_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/00" },
+          { ip_protocol = "-1", cidr_ipv6 = "::/00", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -356,8 +445,11 @@ run "managed_sg_rejects_noncanonical_world_open_ipv4_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "1.2.3.4/0" },
+          { ip_protocol = "-1", cidr_ipv4 = "1.2.3.4/0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -374,8 +466,11 @@ run "managed_sg_rejects_noncanonical_world_open_ipv6_ingress" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "2001:db8::1/0" },
+          { ip_protocol = "-1", cidr_ipv6 = "2001:db8::1/0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -392,8 +487,11 @@ run "managed_sg_rejects_whitespace_ipv4_ingress_prefix" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/ 0" },
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/ 0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -410,8 +508,11 @@ run "managed_sg_rejects_whitespace_ipv6_ingress_prefix" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/ 0" },
+          { ip_protocol = "-1", cidr_ipv6 = "::/ 0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -428,8 +529,11 @@ run "managed_sg_rejects_hex_ipv4_ingress_prefix" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0x0" },
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0x0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -446,8 +550,11 @@ run "managed_sg_rejects_hex_ipv6_ingress_prefix" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/0x0" },
+          { ip_protocol = "-1", cidr_ipv6 = "::/0x0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -464,8 +571,11 @@ run "managed_sg_rejects_rule_without_exactly_one_destination" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         egress = [
-          { description = "no destination", ip_protocol = "tcp", from_port = 443, to_port = 443 },
+          { description = "no destination", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        ingress     = []
+        tags        = {}
       }
     }
   }
@@ -482,8 +592,11 @@ run "managed_sg_rejects_all_protocol_with_ports" {
         region = "us_east_1"
         vpc_id = "vpc-preexisting"
         egress = [
-          { ip_protocol = "-1", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0" },
+          { ip_protocol = "-1", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", description = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        ingress     = []
+        tags        = {}
       }
     }
   }
@@ -622,6 +735,8 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         vpc_cidr          = "10.20.0.0/24"
         subnet_cidr       = "10.20.0.0/28"
         public            = true
+        vpc_id            = null
+        tags              = {}
       }
     }
 
@@ -630,8 +745,11 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         region = "us_east_1"
         vpc_id = "wsus-poc"
         egress = [
-          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0" },
+          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
         ]
+        description = "Managed by aws-terraform-framework"
+        ingress     = []
+        tags        = {}
       }
     }
 
@@ -648,13 +766,34 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         associate_public_ip  = true
         readiness_gate       = false
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
         tags = {
           Function = "Fully managed-network system with public IPv4"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             security_groups = ["wsus-ssm"]
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            tags            = {}
           }
         ]
       }
@@ -701,6 +840,9 @@ run "managed_private_network_creates_no_igw_route_or_eip" {
         availability_zone = "us-east-1a"
         vpc_cidr          = "10.30.0.0/24"
         subnet_cidr       = "10.30.0.0/28"
+        vpc_id            = null
+        public            = false
+        tags              = {}
       }
     }
 
@@ -727,13 +869,20 @@ run "managed_byo_vpc_creates_subnet_only" {
         availability_zone = "us-east-1a"
         vpc_id            = "vpc-preexisting"
         subnet_cidr       = "172.31.64.0/28"
+        vpc_cidr          = null
+        public            = false
+        tags              = {}
       }
     }
 
     managed_security_groups = {
       "byo-sg" = {
-        region = "us_east_1"
-        vpc_id = "byo-net"
+        region      = "us_east_1"
+        vpc_id      = "byo-net"
+        description = "Managed by aws-terraform-framework"
+        ingress     = []
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -763,13 +912,20 @@ run "managed_network_rejects_unsupported_region" {
         availability_zone = "eu-west-1a"
         vpc_cidr          = "10.40.0.0/24"
         subnet_cidr       = "10.40.0.0/28"
+        vpc_id            = null
+        public            = false
+        tags              = {}
       }
     }
 
     managed_security_groups = {
       "wrong-region-sg" = {
-        region = "us_east_1"
-        vpc_id = "west-net"
+        region      = "us_east_1"
+        vpc_id      = "west-net"
+        description = "Managed by aws-terraform-framework"
+        ingress     = []
+        egress      = []
+        tags        = {}
       }
     }
   }
@@ -788,6 +944,9 @@ run "managed_network_rejects_subnet_outside_vpc" {
         availability_zone = "us-east-1a"
         vpc_cidr          = "10.50.0.0/24"
         subnet_cidr       = "10.50.1.0/28"
+        vpc_id            = null
+        public            = false
+        tags              = {}
       }
     }
   }
@@ -811,14 +970,35 @@ run "managed_network_rejects_public_ip_without_public_network" {
         ami                  = "test-linux"
         associate_public_ip  = true
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Public IP without managed public network"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.13"
             security_groups = ["sg-preexisting"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
       }
@@ -838,6 +1018,9 @@ run "managed_network_rejects_az_mismatch" {
         availability_zone = "us-east-1a"
         vpc_cidr          = "10.20.0.0/24"
         subnet_cidr       = "10.20.0.0/28"
+        vpc_id            = null
+        public            = false
+        tags              = {}
       }
     }
 
@@ -852,15 +1035,39 @@ run "managed_network_rejects_az_mismatch" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "AZ mismatch against managed network"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             security_groups = ["sg-preexisting"]
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -879,6 +1086,8 @@ run "managed_network_rejects_both_vpc_cidr_and_vpc_id" {
         vpc_cidr          = "10.20.0.0/24"
         vpc_id            = "vpc-also-set"
         subnet_cidr       = "10.20.0.0/28"
+        public            = false
+        tags              = {}
       }
     }
   }
