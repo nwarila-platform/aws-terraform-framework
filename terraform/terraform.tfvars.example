@@ -1,0 +1,118 @@
+# Copy this file to terraform.tfvars and replace every REPLACE_ME value before
+# planning or applying. Values here are placeholders, not deployable IDs.
+
+environment = "dev"
+
+# Required for a real apply. The readiness gate uses SSH for both Linux and
+# Windows, and the map keys must match all_systems[*].key_name. Windows logs in
+# as Administrator; WinRM is decommissioned.
+readiness_private_key_paths = {
+  "app-linux-key" = "/secure/path/REPLACE_ME-app-linux-key.pem"
+  "win-admin-key" = "/secure/path/REPLACE_ME-win-admin-key.pem"
+}
+
+all_systems = [
+  {
+    region               = "us_east_1"
+    hostname             = "app01"
+    availability_zone    = "us-east-1a"
+    subnet_id            = "subnet-REPLACE_ME"
+    key_name             = "app-linux-key"
+    iam_instance_profile = "ec2-REPLACE_ME-profile"
+    aws_kms_alias        = "ebs-REPLACE_ME"
+    ami                  = "app-linux"
+    refresh              = false
+    instance_type        = "m6i.large"
+    readiness_user       = null
+    readiness_gate       = true
+    set_state            = null
+
+    tags = {
+      Function = "app"
+      Backup   = true
+    }
+
+    root_block_device = {
+      delete_on_termination = true
+      iops                  = null
+      tags                  = {}
+      throughput            = null
+      volume_type           = "gp3"
+      volume_size           = "100"
+    }
+
+    ebs_block_devices = []
+
+    network_interfaces = [
+      {
+        private_ip      = "10.0.1.10"
+        security_groups = ["sg-REPLACE_ME"]
+        description     = null
+        interface_type  = null
+        tags            = {}
+      }
+    ]
+
+    associate_public_ip = false
+  },
+  {
+    region               = "us_east_1"
+    hostname             = "win01"
+    availability_zone    = "us-east-1a"
+    subnet_id            = "subnet-REPLACE_ME"
+    key_name             = "win-admin-key"
+    iam_instance_profile = "ec2-REPLACE_ME-profile"
+    aws_kms_alias        = "ebs-REPLACE_ME"
+    ami                  = "windows_server_2025_base"
+    refresh              = false
+    instance_type        = "m6i.large"
+    readiness_user       = null
+    readiness_gate       = true
+    set_state            = null
+
+    tags = {
+      Function = "app"
+      Backup   = true
+    }
+
+    root_block_device = {
+      delete_on_termination = true
+      iops                  = null
+      tags                  = {}
+      throughput            = null
+      volume_type           = "gp3"
+      volume_size           = "100"
+    }
+
+    ebs_block_devices = []
+
+    network_interfaces = [
+      {
+        private_ip      = "10.0.2.10"
+        security_groups = ["sg-REPLACE_ME"]
+        description     = null
+        interface_type  = null
+        tags            = {}
+      }
+    ]
+
+    associate_public_ip = false
+  }
+]
+
+# See docs/reference/terraform.md for fully-specified database and load balancer
+# object schemas when these collections are populated.
+all_databases      = []
+all_load_balancers = []
+
+# Deployment identity (optional). The deploy workflow injects this automatically as
+# TF_VAR_resource_metadata (see docs/reference/runner-protocol.md); set it manually only to
+# exercise the tagging path. Unset (the default) emits zero tags.
+# resource_metadata = {
+#   repository    = "nwarila-platform/aws-terraform-framework"
+#   repository_id = "123456789"
+#   stack         = "wsus-poc-us-east-1"
+#   owner         = "platform-engineering"
+#   commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+#   run_id        = "1234567890"
+# }
