@@ -1,11 +1,5 @@
-#% =========================================================================================== %#
-#% = File: 32-locals-aws.tf                                         | Category: locals (30-39) %#
-#% ------------------------------------------------------------------------------------------- %#
-#% The locals files is where the real heavy lifting for building the working objects used by   %#
-#%    resources blocks is done. within "locals", all objects defined elsewhere (i.e. data,     %#
-#%    variable, etc.) processed here to prepare the object(s) for action. This file is         %#
-#%    intentionally designed to be the "brain" of the plan.                                    %#
-#% =========================================================================================== %#
+# The brain of the plan: every object consumed by resources.tf is shaped here from
+# variables, data lookups, and managed-capability resources.
 
 # Statically Configured LOCALS
 locals {

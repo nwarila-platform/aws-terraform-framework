@@ -1,7 +1,5 @@
-#% =========================================================================================== %#
-#% = File: 02-provider-aws.tf                                    | Category: Providers (00-09) %#
-#% ----- [ Description ] --------------------------------------------------------------------- %#
-#% =========================================================================================== %#
+# Aliased regional providers. Twins exist because provider is a static meta-argument;
+# both stamp the deployment-identity default_tags.
 
 provider "aws" {
 

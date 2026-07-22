@@ -1,11 +1,9 @@
-#% =========================================================================================== %#
-#% = File: 52-aws-resources.tf                                   | Category: Resources (50-59) %#
-#% ----- [ Description ] --------------------------------------------------------------------- %#
-#% Resources are the most important element in the Terraform language. Each resource block     %#
-#%   describes one or more infrastructure objects, such as virtual networks, compute           %#
-#%   instances, or higher-level components such as DNS records.                                %#
-#% =========================================================================================== %#
+# Managed resources. Consumes the shaped maps from locals.tf; the refresh trigger
+# fleet-replaces refresh=true instances when var.refresh_serial increments.
 
+resource "terraform_data" "refresh" {
+  input = var.refresh_serial
+}
 
 #region ------ [ Create Managed EC2 Key Pairs ] ----------------------------------------------- #
 

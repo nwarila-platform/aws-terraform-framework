@@ -1,8 +1,5 @@
-#% =========================================================================================== %#
-#% = File: 22-data-aws.tf                                        | Category: variables (20-29) %#
-#% ------------------------------------------------------------------------------------------- %#
-#% =========================================================================================== %#
-
+# Pre-existing infrastructure lookups. Managed-capability names are excluded from these
+# lookups so a managed reference is never resolved as pre-existing.
 
 #region ------ [ Amazon Machine Image(s) ] ---------------------------------------------------- #
 
