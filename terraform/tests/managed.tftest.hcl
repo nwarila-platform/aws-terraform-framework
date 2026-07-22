@@ -1,8 +1,4 @@
 mock_provider "aws" {
-  alias = "us_west_2"
-}
-
-mock_provider "aws" {
   alias = "us_east_1"
 }
 
@@ -42,7 +38,7 @@ run "wazuh_preexisting_shape_is_zero_diff" {
   command = plan
 
   assert {
-    condition     = length(aws_key_pair.us_west_2) == 0 && length(aws_key_pair.us_east_1) == 0
+    condition     = length(aws_key_pair.us_east_1) == 0
     error_message = "With managed_keypairs unset, the framework must create zero key pairs."
   }
 
@@ -57,7 +53,7 @@ run "wazuh_preexisting_shape_is_zero_diff" {
   }
 
   assert {
-    condition     = length(aws_security_group.us_west_2) == 0 && length(aws_security_group.us_east_1) == 0 && length(aws_vpc_security_group_ingress_rule.us_east_1) == 0 && length(aws_vpc_security_group_egress_rule.us_east_1) == 0
+    condition     = length(aws_security_group.us_east_1) == 0 && length(aws_vpc_security_group_ingress_rule.us_east_1) == 0 && length(aws_vpc_security_group_egress_rule.us_east_1) == 0
     error_message = "With managed_security_groups unset, the framework must create zero security groups and zero rules."
   }
 
@@ -103,8 +99,8 @@ run "managed_key_pair_created_from_public_key" {
   }
 
   assert {
-    condition     = aws_key_pair.us_east_1["managed-key"].public_key != "" && aws_key_pair.us_west_2["managed-key"].public_key != ""
-    error_message = "Managed key pairs must be created in both supported regions."
+    condition     = aws_key_pair.us_east_1["managed-key"].public_key != ""
+    error_message = "Managed key pairs must be created in the supported region."
   }
 
   assert {
@@ -176,8 +172,8 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
   }
 
   assert {
-    condition     = contains(keys(aws_security_group.us_east_1), "wsus-ssm") && length(aws_security_group.us_west_2) == 0
-    error_message = "Managed security groups must be created only in their declared region."
+    condition     = contains(keys(aws_security_group.us_east_1), "wsus-ssm")
+    error_message = "Managed security groups must be created in the supported region."
   }
 
   assert {
@@ -304,8 +300,8 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
   }
 
   assert {
-    condition     = contains(keys(aws_eip.us_east_1), "wsus-poc-host") && contains(keys(aws_eip_association.us_east_1), "wsus-poc-host") && length(aws_eip.us_west_2) == 0
-    error_message = "associate_public_ip must allocate an EIP and bind it to the primary ENI in the system's region only."
+    condition     = contains(keys(aws_eip.us_east_1), "wsus-poc-host") && contains(keys(aws_eip_association.us_east_1), "wsus-poc-host")
+    error_message = "associate_public_ip must allocate an EIP and bind it to the primary ENI in the supported region."
   }
 
   assert {
@@ -377,14 +373,18 @@ run "managed_byo_vpc_creates_subnet_only" {
   }
 }
 
-run "managed_sg_rejects_managed_network_region_mismatch" {
+run "managed_network_rejects_unsupported_region" {
   command = plan
 
   variables {
+    aws_config = {
+      regions = ["us_east_1", "eu_west_1"]
+    }
+
     managed_networks = {
       "west-net" = {
-        region            = "us_west_2"
-        availability_zone = "us-west-2a"
+        region            = "eu_west_1"
+        availability_zone = "eu-west-1a"
         vpc_cidr          = "10.40.0.0/24"
         subnet_cidr       = "10.40.0.0/28"
       }
@@ -398,7 +398,8 @@ run "managed_sg_rejects_managed_network_region_mismatch" {
     }
   }
 
-  expect_failures = [var.managed_security_groups]
+  # Invalid var.aws_config suppresses var.managed_networks' cross-variable validation, foreclosing the SG-region-mismatch path.
+  expect_failures = [var.aws_config]
 }
 
 run "managed_network_rejects_subnet_outside_vpc" {

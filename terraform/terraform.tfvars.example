@@ -11,9 +11,9 @@ readiness_private_key_paths = {
 
 all_systems = [
   {
-    region               = "us_west_2"
+    region               = "us_east_1"
     hostname             = "app01"
-    availability_zone    = "us-west-2a"
+    availability_zone    = "us-east-1a"
     subnet_id            = "subnet-REPLACE_ME"
     key_name             = "app-linux-key"
     iam_instance_profile = "ec2-REPLACE_ME-profile"

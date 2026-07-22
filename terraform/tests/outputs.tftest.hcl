@@ -1,14 +1,4 @@
 mock_provider "aws" {
-  alias = "us_west_2"
-
-  mock_data "aws_kms_alias" {
-    defaults = {
-      target_key_arn = "arn:aws:kms:us-west-2:111122223333:key/00000000-0000-0000-0000-000000000000"
-    }
-  }
-}
-
-mock_provider "aws" {
   alias = "us_east_1"
 
   mock_data "aws_kms_alias" {

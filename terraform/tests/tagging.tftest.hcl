@@ -1,8 +1,4 @@
 mock_provider "aws" {
-  alias = "us_west_2"
-}
-
-mock_provider "aws" {
   alias = "us_east_1"
 }
 

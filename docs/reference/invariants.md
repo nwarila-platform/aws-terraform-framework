@@ -6,8 +6,10 @@ change at minimum.
 - Terraform Core and provider versions MUST remain exact-pinned.
 - `terraform/.terraform.lock.hcl` MUST be committed with checksums for the
   supported contributor and CI platforms.
-- Region bucketing MUST continue to accept both hyphenated (`us-west-2`) and
-  underscored (`us_west_2`) spellings for the supported commercial regions.
+- `aws_config.regions` MUST remain exactly `["us_east_1"]`; adding a region is
+  a code change, not a consumer configuration change.
+- Region bucketing MUST continue to accept both hyphenated (`us-east-1`) and
+  underscored (`us_east_1`) spellings for the supported commercial region.
 - Resource keys used in outputs MUST remain stable across patch versions.
 - RDS passwords and other secret inputs MUST NOT be emitted through outputs.
 - EBS volumes and RDS storage MUST remain encrypted by default.

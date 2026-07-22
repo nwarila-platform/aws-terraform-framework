@@ -1,7 +1,7 @@
 # aws-terraform-framework
 
-Terraform framework for modeling AWS infrastructure in the configured
-`us_east_1` and `us_west_2` regions. The module currently manages EC2
+Terraform framework for modeling AWS infrastructure in the supported
+`us_east_1` region. Adding another region requires a code change. The module currently manages EC2
 instances, network interfaces, EBS volumes and attachments, EC2 instance state,
 RDS database instances, load balancers, and refresh trigger resources.
 

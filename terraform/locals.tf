@@ -23,24 +23,20 @@ locals {
   amazon_machine_images = merge(
     {
       "windows_server_2022_base" = {
-        us_west_2 = try(data.aws_ami.us_west_2_windows_server_2022_base[0], null)
         us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
       }
       "windows_server_2025_base" = {
-        us_west_2 = try(data.aws_ami.us_west_2_windows_server_2025_base[0], null)
         us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
       }
     },
     {
       for ami, spec in local.ami_specs : ami => {
-        us_west_2 = try(data.aws_ami.us_west_2_direct[ami], null)
         us_east_1 = try(data.aws_ami.us_east_1_direct[ami], null)
       }
       if spec.is_direct_id
     },
     {
       for ami, spec in local.ami_specs : ami => {
-        us_west_2 = try(data.aws_ami.us_west_2_selfbuilt[ami], null)
         us_east_1 = try(data.aws_ami.us_east_1_selfbuilt[ami], null)
       }
       if !spec.is_direct_id && !spec.is_public_alias
@@ -128,10 +124,6 @@ locals {
   # the name matches a managed_keypairs entry, otherwise the pre-existing key-pair data lookup.
   # Same keys the EC2 resources already use, so managed adoption never re-keys any resource.
   key_pair_names = {
-    us_west_2 = merge(
-      { for name, keypair in data.aws_key_pair.us_west_2 : name => keypair.key_name },
-      { for name, keypair in aws_key_pair.us_west_2 : name => keypair.key_name },
-    )
     us_east_1 = merge(
       { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name },
       { for name, keypair in aws_key_pair.us_east_1 : name => keypair.key_name },
@@ -158,7 +150,6 @@ locals {
 
   # Name -> created SG id, used to resolve managed names inside NIC security_groups lists.
   managed_security_group_ids = {
-    us_west_2 = { for name, group in aws_security_group.us_west_2 : name => group.id }
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
 
@@ -172,10 +163,6 @@ locals {
 
   # Network key -> VPC id (framework-created VPC, or the BYO vpc_id passthrough).
   managed_vpc_ids = {
-    us_west_2 = {
-      for name, network in local.managed_networks_by_region.us_west_2 :
-      name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_west_2[name].id
-    }
     us_east_1 = {
       for name, network in local.managed_networks_by_region.us_east_1 :
       name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_east_1[name].id
@@ -184,7 +171,6 @@ locals {
 
   # Network key -> created subnet id, used to resolve managed names in all_systems[*].subnet_id.
   managed_subnet_ids = {
-    us_west_2 = { for name, subnet in aws_subnet.us_west_2 : name => subnet.id }
     us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
   }
 
@@ -255,13 +241,11 @@ locals {
     }
   }
 
-  # The ONLY place the physical instance resources are enumerated. Four resources exist because
-  # `provider` and `lifecycle` are static meta-arguments (2 regions x base/refresh); HCL cannot
+  # The ONLY place the physical instance resources are enumerated. Two resources exist because
+  # `lifecycle` is a static meta-argument (base/refresh); HCL cannot
   # iterate resource addresses, so they are merged here once. Hostnames are validated-unique and
   # each system lives in exactly one region, so this merge is a disjoint union.
   all_ec2_instances = merge(
-    aws_instance.us_west_2,
-    aws_instance.us_west_2_refresh,
     aws_instance.us_east_1,
     aws_instance.us_east_1_refresh,
   )

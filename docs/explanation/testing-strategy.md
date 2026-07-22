@@ -6,11 +6,11 @@
 configuration behavior without making AWS API calls.
 
 - `terraform/tests/load_balancers.tftest.hcl` verifies that load balancers are
-  bucketed into the correct region, inherit the environment tag, preserve
+  bucketed into the supported region, inherit the environment tag, preserve
   subnet or subnet-mapping shape, and plan with the expected load-balancer type.
 - `terraform/tests/systems.tftest.hcl` verifies that EC2 instance-state
   resources are created only for systems that explicitly set `set_state`, and
-  that hyphenated and underscored region inputs normalize to the same regional
+  that hyphenated and underscored east-region inputs normalize to the same regional
   bucket.
 - `make ci` also runs formatting, `terraform init`, validation, TFLint,
   terraform-docs drift detection, documentation layout checks, and the OPA

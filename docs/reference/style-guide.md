@@ -15,7 +15,7 @@ Canonical filenames only — no numeric prefixes:
 | --- | --- |
 | `versions.tf` | `terraform { required_version, required_providers }` — exact `=` pins |
 | `backend.tf` | `terraform { backend "..." {} }` (partial config; secrets never in-repo) |
-| `providers.tf` | provider blocks (aliased twins for multi-region), `default_tags` |
+| `providers.tf` | provider blocks (the supported AWS region uses alias `us_east_1`), `default_tags` |
 | `variables.tf` | every `variable` block |
 | `data.tf` | every `data` block |
 | `locals.tf` | every `locals` block — the "brain": all shaping happens here |
@@ -55,9 +55,11 @@ so inventory files can be shared across Terraform and Packer consumers:
 
 - Resources iterate maps via `for_each` with stable, human-readable keys; keys are
   part of the public contract and never re-derived incidentally.
-- Multi-region AWS uses the twin pattern (`<name>.us_west_2` / `<name>.us_east_1`)
-  because `provider` and `lifecycle` are static meta-arguments; region-partitioned
-  locals feed the twins. Global resources (IAM) are single un-aliased blocks.
+- AWS support is currently single-region: `us_east_1`. The historical twin
+  pattern remains the expansion mechanism because `provider` and `lifecycle`
+  are static meta-arguments; adding a region requires provider, data, local,
+  resource, output, and test changes. Global resources (IAM) remain single
+  un-aliased blocks.
 - Attribute access on shaped locals uses bracket notation
   (`each.value["name"]`), matching the Proxmox frameworks.
 - Resource blocks consume locals, not `var.*` directly (except trivially scalar

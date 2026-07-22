@@ -1,8 +1,4 @@
 mock_provider "aws" {
-  alias = "us_west_2"
-}
-
-mock_provider "aws" {
   alias = "us_east_1"
 }
 
@@ -11,7 +7,7 @@ variables {
 
   all_load_balancers = [
     {
-      region          = "us-west-2"
+      region          = "us-east-1"
       resource_key    = "west_alb"
       name            = "west-alb"
       security_groups = ["sg-west"]
@@ -49,13 +45,8 @@ run "load_balancers_bucket_by_region" {
   command = plan
 
   assert {
-    condition     = contains(keys(local.elastic_load_balancers.us_west_2), "west_alb")
-    error_message = "west_alb was not bucketed into us_west_2."
-  }
-
-  assert {
-    condition     = !contains(keys(local.elastic_load_balancers.us_east_1), "west_alb")
-    error_message = "west_alb was also bucketed into us_east_1."
+    condition     = contains(keys(local.elastic_load_balancers.us_east_1), "west_alb")
+    error_message = "west_alb was not bucketed into us_east_1."
   }
 
   assert {
@@ -64,12 +55,12 @@ run "load_balancers_bucket_by_region" {
   }
 
   assert {
-    condition     = local.elastic_load_balancers.us_west_2.west_alb.tags.Environment == "TEST"
+    condition     = local.elastic_load_balancers.us_east_1.west_alb.tags.Environment == "TEST"
     error_message = "west_alb did not inherit the environment tag."
   }
 
   assert {
-    condition     = local.elastic_load_balancers.us_west_2.west_alb.subnets != null
+    condition     = local.elastic_load_balancers.us_east_1.west_alb.subnets != null
     error_message = "west_alb subnets should be preserved."
   }
 
@@ -79,7 +70,7 @@ run "load_balancers_bucket_by_region" {
   }
 
   assert {
-    condition     = aws_lb.us_west_2["west_alb"].load_balancer_type == "application"
+    condition     = aws_lb.us_east_1["west_alb"].load_balancer_type == "application"
     error_message = "west_alb should plan as an application load balancer."
   }
 
@@ -89,27 +80,27 @@ run "load_balancers_bucket_by_region" {
   }
 
   assert {
-    condition     = length(local.lb_target_groups.us_west_2) == 0 && length(local.lb_target_groups.us_east_1) == 0
+    condition     = length(local.lb_target_groups.us_east_1) == 0
     error_message = "Load balancers without target_groups should not emit target groups."
   }
 
   assert {
-    condition     = length(local.lb_target_group_attachments.us_west_2) == 0 && length(local.lb_target_group_attachments.us_east_1) == 0
+    condition     = length(local.lb_target_group_attachments.us_east_1) == 0
     error_message = "Load balancers without target_groups should not emit target group attachments."
   }
 
   assert {
-    condition     = length(local.lb_listeners.us_west_2) == 0 && length(local.lb_listeners.us_east_1) == 0
+    condition     = length(local.lb_listeners.us_east_1) == 0
     error_message = "Load balancers without listeners should not emit listeners."
   }
 
   assert {
-    condition     = length(local.lb_listener_rules.us_west_2) == 0 && length(local.lb_listener_rules.us_east_1) == 0
+    condition     = length(local.lb_listener_rules.us_east_1) == 0
     error_message = "Load balancers without listener rules should not emit listener rules."
   }
 
   assert {
-    condition     = length(local.lb_listener_certificates.us_west_2) == 0 && length(local.lb_listener_certificates.us_east_1) == 0
+    condition     = length(local.lb_listener_certificates.us_east_1) == 0
     error_message = "Load balancers without additional listener certificates should not emit listener certificates."
   }
 }
@@ -120,9 +111,9 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "web-a"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-web-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
@@ -141,9 +132,9 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         }
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "web-refresh"
-        availability_zone    = "us-west-2b"
+        availability_zone    = "us-east-1b"
         subnet_id            = "subnet-web-b"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
@@ -163,9 +154,9 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         }
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "api-a"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-api-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
@@ -187,7 +178,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
 
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "function_alb"
         name            = "function-alb"
         security_groups = ["sg-lb"]
@@ -214,42 +205,42 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
   }
 
   assert {
-    condition     = contains(keys(aws_lb_target_group.us_west_2), "function_alb/web")
+    condition     = contains(keys(aws_lb_target_group.us_east_1), "function_alb/web")
     error_message = "The web target group should be planned with the composite function_alb/web key."
   }
 
   assert {
-    condition     = aws_lb_target_group.us_west_2["function_alb/web"].port == 443
+    condition     = aws_lb_target_group.us_east_1["function_alb/web"].port == 443
     error_message = "The web target group should preserve its configured target port."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_target_group.us_west_2), "function_alb/cache")
+    condition     = contains(keys(aws_lb_target_group.us_east_1), "function_alb/cache")
     error_message = "The zero-match cache target group should still be planned."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/web-a")
+    condition     = contains(keys(aws_lb_target_group_attachment.us_east_1), "function_alb/web/web-a")
     error_message = "The normal web instance should attach to the web target group."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/web-refresh")
+    condition     = contains(keys(aws_lb_target_group_attachment.us_east_1), "function_alb/web/web-refresh")
     error_message = "The refresh web instance should attach to the web target group."
   }
 
   assert {
-    condition     = length([for k, _ in aws_lb_target_group_attachment.us_west_2 : k if startswith(k, "function_alb/web/")]) == 2
+    condition     = length([for k, _ in aws_lb_target_group_attachment.us_east_1 : k if startswith(k, "function_alb/web/")]) == 2
     error_message = "Exactly the two Function=web systems should attach to the web target group."
   }
 
   assert {
-    condition     = !contains(keys(aws_lb_target_group_attachment.us_west_2), "function_alb/web/api-a")
+    condition     = !contains(keys(aws_lb_target_group_attachment.us_east_1), "function_alb/web/api-a")
     error_message = "The non-matching api system should not attach to the web target group."
   }
 
   assert {
-    condition     = length([for k, _ in aws_lb_target_group_attachment.us_west_2 : k if startswith(k, "function_alb/cache/")]) == 0
+    condition     = length([for k, _ in aws_lb_target_group_attachment.us_east_1 : k if startswith(k, "function_alb/cache/")]) == 0
     error_message = "A target group with no matching Function should produce zero attachments."
   }
 }
@@ -260,9 +251,9 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "web-listener"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-web-a"
         key_name             = "test-key"
         iam_instance_profile = "example-instance-profile"
@@ -284,7 +275,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
 
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "routing_alb"
         name            = "routing-alb"
         security_groups = ["sg-lb"]
@@ -306,9 +297,9 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
             port            = 443
             protocol        = "HTTPS"
             ssl_policy      = "ELBSecurityPolicy-2016-08"
-            certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/routing-default"
+            certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/routing-default"
             additional_certificate_arns = [
-              "arn:aws:acm:us-west-2:123456789012:certificate/routing-extra",
+              "arn:aws:acm:us-east-1:123456789012:certificate/routing-extra",
             ]
             default_action = {
               type             = "forward"
@@ -349,47 +340,47 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
   }
 
   assert {
-    condition     = local.lb_listeners.us_west_2["routing_alb/https"].default_action.target_group_key == "routing_alb/web"
+    condition     = local.lb_listeners.us_east_1["routing_alb/https"].default_action.target_group_key == "routing_alb/web"
     error_message = "The HTTPS listener default forward action should resolve to the composite routing_alb/web target group key."
   }
 
   assert {
-    condition     = local.lb_listeners.us_west_2["routing_alb/http"].default_action.target_group_key == null
+    condition     = local.lb_listeners.us_east_1["routing_alb/http"].default_action.target_group_key == null
     error_message = "The HTTP redirect listener should not resolve a target group key."
   }
 
   assert {
-    condition     = local.lb_listener_rules.us_west_2["routing_alb/https/web_path"].listener_key == "routing_alb/https"
+    condition     = local.lb_listener_rules.us_east_1["routing_alb/https/web_path"].listener_key == "routing_alb/https"
     error_message = "The listener rule should resolve to the composite routing_alb/https listener key."
   }
 
   assert {
-    condition     = local.lb_listener_rules.us_west_2["routing_alb/https/web_path"].action.target_group_key == "routing_alb/web"
+    condition     = local.lb_listener_rules.us_east_1["routing_alb/https/web_path"].action.target_group_key == "routing_alb/web"
     error_message = "The listener rule forward action should resolve to the composite routing_alb/web target group key."
   }
 
   assert {
-    condition     = local.lb_listener_certificates.us_west_2["routing_alb/https/arn:aws:acm:us-west-2:123456789012:certificate/routing-extra"].listener_key == "routing_alb/https"
+    condition     = local.lb_listener_certificates.us_east_1["routing_alb/https/arn:aws:acm:us-east-1:123456789012:certificate/routing-extra"].listener_key == "routing_alb/https"
     error_message = "The additional certificate should carry the explicit composite listener key instead of parsing it from the map key."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_listener.us_west_2), "routing_alb/https")
+    condition     = contains(keys(aws_lb_listener.us_east_1), "routing_alb/https")
     error_message = "The HTTPS listener should be planned with the composite routing_alb/https key."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_listener.us_west_2), "routing_alb/http")
+    condition     = contains(keys(aws_lb_listener.us_east_1), "routing_alb/http")
     error_message = "The HTTP redirect listener should be planned with the composite routing_alb/http key."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_listener_rule.us_west_2), "routing_alb/https/web_path")
+    condition     = contains(keys(aws_lb_listener_rule.us_east_1), "routing_alb/https/web_path")
     error_message = "The HTTPS path listener rule should be planned with the composite routing_alb/https/web_path key."
   }
 
   assert {
-    condition     = contains(keys(aws_lb_listener_certificate.us_west_2), "routing_alb/https/arn:aws:acm:us-west-2:123456789012:certificate/routing-extra")
+    condition     = contains(keys(aws_lb_listener_certificate.us_east_1), "routing_alb/https/arn:aws:acm:us-east-1:123456789012:certificate/routing-extra")
     error_message = "The HTTPS additional listener certificate should be planned with the composite routing_alb/https/<arn> key."
   }
 
@@ -420,7 +411,7 @@ run "load_balancer_rejects_missing_default_target_group_key_reference" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -452,7 +443,7 @@ run "load_balancer_rejects_public_internal_false" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "public_alb"
         name            = "public-alb"
         internal        = false
@@ -473,7 +464,7 @@ run "load_balancer_rejects_empty_security_groups" {
   variables {
     all_load_balancers = [
       {
-        region             = "us-west-2"
+        region             = "us-east-1"
         resource_key       = "empty_sg_alb"
         name               = "empty-sg-alb"
         load_balancer_type = "application"
@@ -494,7 +485,7 @@ run "load_balancer_rejects_connection_logs_on_network_type" {
   variables {
     all_load_balancers = [
       {
-        region             = "us-west-2"
+        region             = "us-east-1"
         resource_key       = "network_connection_logs"
         name               = "network-connection-logs"
         load_balancer_type = "network"
@@ -519,7 +510,7 @@ run "load_balancer_rejects_health_check_logs_on_network_type" {
   variables {
     all_load_balancers = [
       {
-        region             = "us-west-2"
+        region             = "us-east-1"
         resource_key       = "network_health_logs"
         name               = "network-health-logs"
         load_balancer_type = "network"
@@ -544,7 +535,7 @@ run "load_balancer_rejects_xff_header_processing_mode_on_network_type" {
   variables {
     all_load_balancers = [
       {
-        region                     = "us-west-2"
+        region                     = "us-east-1"
         resource_key               = "network_xff_mode"
         name                       = "network-xff-mode"
         load_balancer_type         = "network"
@@ -566,7 +557,7 @@ run "load_balancer_rejects_secondary_ips_on_application_type" {
   variables {
     all_load_balancers = [
       {
-        region                                 = "us-west-2"
+        region                                 = "us-east-1"
         resource_key                           = "application_secondary_ips"
         name                                   = "application-secondary-ips"
         load_balancer_type                     = "application"
@@ -588,7 +579,7 @@ run "load_balancer_rejects_security_groups_on_gateway_type" {
   variables {
     all_load_balancers = [
       {
-        region             = "us-west-2"
+        region             = "us-east-1"
         resource_key       = "gateway_security_groups"
         name               = "gateway-security-groups"
         load_balancer_type = "gateway"
@@ -609,7 +600,7 @@ run "load_balancer_rejects_duplicate_target_group_resource_keys" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -658,7 +649,7 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -728,7 +719,7 @@ run "load_balancer_rejects_forward_action_with_redirect_payload" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -773,7 +764,7 @@ run "load_balancer_rejects_condition_with_two_types" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -831,7 +822,7 @@ run "load_balancer_rejects_non_instance_target_type" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -874,7 +865,7 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
   variables {
     all_load_balancers = [
       {
-        region          = "us-west-2"
+        region          = "us-east-1"
         resource_key    = "schema_alb"
         name            = "schema-alb"
         security_groups = ["sg-schema"]
@@ -895,7 +886,7 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
             resource_key    = "https"
             port            = 443
             protocol        = "HTTPS"
-            certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/schema"
+            certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/schema"
             default_action = {
               type             = "forward"
               target_group_key = "web"

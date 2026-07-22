@@ -19,11 +19,15 @@ The module currently declares:
 ## Inputs And Locals
 
 Consumers provide inventory through `all_systems`, `all_databases`, and
-`all_load_balancers`. The module normalizes region strings by accepting both
-hyphenated AWS names and underscored Terraform map keys, then builds local maps
+`all_load_balancers`. The module supports only `us_east_1` and normalizes its
+hyphenated AWS name and underscored Terraform map key before building local maps
 under `elastic_compute_cloud`, `elastic_network_interfaces`,
 `ebs_block_devices`, `relational_database_service`, and
 `elastic_load_balancers`.
+
+Provider aliases are static, so adding another region is a code change across
+providers, data lookups, locals, resources, outputs, and tests rather than an
+`aws_config` variable-only change.
 
 That local-map layer is the module's contract boundary: resources should read
 from normalized locals rather than reimplementing input parsing in each

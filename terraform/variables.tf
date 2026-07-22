@@ -356,13 +356,13 @@ variable "aws_config" {
   })
 
   default = {
-    regions = ["us_east_1", "us_west_2"]
+    regions = ["us_east_1"]
   }
   nullable = false
 
   validation {
-    condition     = length(var.aws_config.regions) == 2 && toset(var.aws_config.regions) == toset(["us_east_1", "us_west_2"])
-    error_message = "aws_config.regions must be exactly [\"us_east_1\", \"us_west_2\"]. Supporting other/additional regions requires new provider aliases and per-region resource blocks (a code change), not just a variable edit."
+    condition     = var.aws_config.regions == tolist(["us_east_1"])
+    error_message = "aws_config.regions must be exactly [\"us_east_1\"]. Supporting additional regions requires new provider aliases and per-region resource blocks (a code change), not just a variable edit."
   }
 }
 
@@ -1044,7 +1044,7 @@ variable "all_load_balancers" {
 }
 
 variable "managed_keypairs" {
-  description = "EC2 key pairs this framework creates instead of consuming pre-existing ones. Map key = the key-pair name that all_systems[*].key_name references; the value supplies the PUBLIC half only, so the private key stays wherever the deploy pipeline keeps its secrets and never enters Terraform state. Each managed key pair is created in both supported regions so any system may reference it. The empty default preserves the consume-pre-existing behavior exactly (zero plan change for existing consumers)."
+  description = "EC2 key pairs this framework creates instead of consuming pre-existing ones. Map key = the key-pair name that all_systems[*].key_name references; the value supplies the PUBLIC half only, so the private key stays wherever the deploy pipeline keeps its secrets and never enters Terraform state. Each managed key pair is created in us-east-1, the supported region. The empty default preserves the consume-pre-existing behavior exactly (zero plan change for existing consumers)."
 
   type = map(object({
     public_key = string

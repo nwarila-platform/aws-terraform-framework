@@ -13,9 +13,9 @@ What this module guarantees:
 - EC2 instances, network interfaces, EBS volumes and attachments, EC2 instance
   state resources, RDS database instances, load balancers, and refresh trigger
   resources are derived from typed variables under `terraform/variables.tf`.
-- Region input accepts the configured commercial region keys (`us-east-1` and
-  `us-west-2`) in either hyphenated or underscored form and normalizes them
-  before resources are bucketed.
+- Region input accepts the supported commercial region in either hyphenated
+  (`us-east-1`) or underscored (`us_east_1`) form and normalizes it before
+  resources are bucketed. `aws_config` rejects every non-singleton region set.
 - EBS volumes and RDS storage are always encrypted; callers provide the KMS alias
   used to resolve the final key ARN.
 - RDS passwords are normalized through `sensitive()` before they flow into

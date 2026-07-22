@@ -31,9 +31,9 @@ Choose the least-privilege policies that match those instance responsibilities.
 ```hcl
 all_systems = [
   {
-    region               = "us_west_2"
+    region               = "us_east_1"
     hostname             = "app01"
-    availability_zone    = "us-west-2a"
+    availability_zone    = "us-east-1a"
     subnet_id            = "subnet-0123456789abcdef0"
     key_name             = "app-ssh-key"
     iam_instance_profile = "ec2-base-profile"
