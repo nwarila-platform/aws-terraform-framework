@@ -141,3 +141,31 @@ test_encrypted_internal_resources_are_allowed if {
 	]}
 	count(result) == 0
 }
+
+test_complete_identity_tags_are_allowed if {
+	result := deny with input as {"resources": [{
+		"address": "aws_ebs_volume.tagged",
+		"type": "aws_ebs_volume",
+		"values": {"encrypted": true, "tags": {
+			"nwarila:management:managed-by": "terraform",
+			"nwarila:management:repository": "nwarila-platform/aws-terraform-framework",
+			"nwarila:management:repository-id": "123456789",
+			"nwarila:management:stack": "wsus-poc-us-east-1",
+			"nwarila:management:environment": "poc",
+			"nwarila:operations:owner": "platform-engineering",
+		}},
+	}]}
+	count(result) == 0
+}
+
+test_partial_identity_tags_are_denied if {
+	result := deny with input as {"resources": [{
+		"address": "aws_ebs_volume.half_tagged",
+		"type": "aws_ebs_volume",
+		"values": {"encrypted": true, "tags": {
+			"nwarila:management:managed-by": "terraform",
+			"nwarila:management:repository": "nwarila-platform/aws-terraform-framework",
+		}},
+	}]}
+	count(result) == 1
+}

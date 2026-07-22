@@ -102,6 +102,23 @@ locals {
       - systemctl enable --now sshd || systemctl enable --now ssh
   LINUX_USER_DATA
 
+  # Deployment identity tags. Applied to every taggable AWS resource through provider default_tags
+  # (02-provider-aws.tf) and merged explicitly into EC2 root_block_device tags below, which
+  # provider default_tags cannot reach. Null resource_metadata (the default) emits zero tags so
+  # consumers that have not opted in keep byte-identical plans.
+  deployment_tags = var.resource_metadata == null ? {} : merge(
+    {
+      "nwarila:management:managed-by"    = "terraform"
+      "nwarila:management:repository"    = var.resource_metadata.repository
+      "nwarila:management:repository-id" = var.resource_metadata.repository_id
+      "nwarila:management:stack"         = var.resource_metadata.stack
+      "nwarila:management:environment"   = var.environment
+      "nwarila:operations:owner"         = var.resource_metadata.owner
+    },
+    var.resource_metadata.commit_sha == null ? {} : { "nwarila:provenance:commit-sha" = var.resource_metadata.commit_sha },
+    var.resource_metadata.run_id == null ? {} : { "nwarila:provenance:run-id" = var.resource_metadata.run_id },
+  )
+
   # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
   # over SSH. Each blocks until the OS launch/provisioning agent reports completion after Terraform
   # has first connected.
@@ -218,7 +235,8 @@ locals {
               index       = 0
               Name        = system.hostname
               Environment = var.environment
-            }
+            },
+            local.deployment_tags
           )
         }
 

@@ -294,3 +294,58 @@ variable "all_databases" {
     error_message = "Each all_databases entry must set a non-empty password unless manage_master_user_password is true."
   }
 }
+
+variable "resource_metadata" {
+  description = "Deployment identity stamped onto every taggable AWS resource through provider default_tags (plus EC2 root volumes, which default_tags cannot reach). Stable fields answer who owns and manages a resource; commit_sha and run_id trace it to the exact commit and workflow run (the run record holds actors, timestamps, and approvals - those stay in deployment evidence, not tags). The deploy workflow populates this (see docs/reference/runner-protocol.md); the null default emits zero tags, so existing consumers and local plans are byte-identical until they opt in."
+
+  type = object({
+    repository    = string
+    repository_id = string
+    stack         = string
+    owner         = string
+    commit_sha    = optional(string)
+    run_id        = optional(string)
+  })
+
+  default  = null
+  nullable = true
+
+  validation {
+    condition     = var.resource_metadata == null ? true : can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.resource_metadata.repository))
+    error_message = "resource_metadata.repository must be an owner/name slug (e.g. nwarila-platform/aws-terraform-framework)."
+  }
+
+  validation {
+    condition     = var.resource_metadata == null ? true : can(regex("^[0-9]+$", var.resource_metadata.repository_id))
+    error_message = "resource_metadata.repository_id must be the numeric, rename-stable GitHub repository id."
+  }
+
+  validation {
+    condition     = var.resource_metadata == null ? true : (length(trimspace(var.resource_metadata.stack)) > 0 && length(trimspace(var.resource_metadata.owner)) > 0)
+    error_message = "resource_metadata.stack and owner must be non-empty (owner is a team, not a person)."
+  }
+
+  validation {
+    condition     = var.resource_metadata == null ? true : (var.resource_metadata.commit_sha == null ? true : can(regex("^[0-9a-f]{40}$", var.resource_metadata.commit_sha)))
+    error_message = "resource_metadata.commit_sha must be the lowercase 40-character checked-out commit SHA (git rev-parse HEAD after checkout, not github.sha)."
+  }
+
+  validation {
+    condition     = var.resource_metadata == null ? true : (var.resource_metadata.run_id == null ? true : can(regex("^[0-9]+$", var.resource_metadata.run_id)))
+    error_message = "resource_metadata.run_id must be the numeric GitHub Actions run id."
+  }
+
+  validation {
+    condition = var.resource_metadata == null ? true : alltrue([
+      for tags in concat(
+        [for system in var.all_systems : system.root_block_device.tags],
+        flatten([for system in var.all_systems : [for volume in system.ebs_block_devices : volume.tags]]),
+        flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags]]),
+        [for name, keypair in var.managed_keypairs : keypair.tags],
+        [for name, group in var.managed_security_groups : group.tags],
+        [for name, network in var.managed_networks : network.tags],
+      ) : alltrue([for key in keys(tags) : !startswith(lower(key), "nwarila:")])
+    ])
+    error_message = "The nwarila: tag namespace is reserved for resource_metadata-derived tags; consumer-supplied tag maps must not use it."
+  }
+}

@@ -56,3 +56,15 @@ all_systems = [
 
 all_databases     = []
 all_load_balancers = []
+
+# Deployment identity (optional). The deploy workflow injects this automatically as
+# TF_VAR_resource_metadata (see docs/reference/runner-protocol.md); set it manually only to
+# exercise the tagging path. Unset (the default) emits zero tags.
+# resource_metadata = {
+#   repository    = "nwarila-platform/aws-terraform-framework"
+#   repository_id = "123456789"
+#   stack         = "wsus-poc-us-east-1"
+#   owner         = "platform-engineering"
+#   commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+#   run_id        = "1234567890"
+# }

@@ -67,3 +67,23 @@ has_security_group(values) if {
 	is_array(sgs)
 	count(sgs) > 0
 }
+
+# Deployment-identity tag consistency: any resource that carries the nwarila managed-by marker
+# (stamped when var.resource_metadata is supplied) must carry the complete stable identity set.
+# Resources without the marker are ignored, so plans from non-opted-in consumers are unaffected.
+required_identity_tags := {
+	"nwarila:management:repository",
+	"nwarila:management:repository-id",
+	"nwarila:management:stack",
+	"nwarila:management:environment",
+	"nwarila:operations:owner",
+}
+
+deny contains msg if {
+	resource := input.resources[_]
+	tags := object.get(resource.values, "tags", {})
+	tags["nwarila:management:managed-by"]
+	missing := [key | some key in required_identity_tags; not tags[key]]
+	count(missing) > 0
+	msg := sprintf("%s carries nwarila identity tags but is missing %v", [resource.address, missing])
+}
