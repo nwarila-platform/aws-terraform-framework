@@ -97,4 +97,5 @@ This file is overwritten by `terraform-docs` on every PR via the
 | aws\_load\_balancers | Stable Elastic Load Balancer attributes keyed by all\_load\_balancers resource\_key. |
 | aws\_target\_group\_arns | Elastic Load Balancer Target Group ARNs keyed by all\_load\_balancers and target\_groups resource\_key. |
 | aws\_target\_groups | Stable Elastic Load Balancer Target Group attributes keyed by all\_load\_balancers and target\_groups resource\_key. |
+| ebs\_volumes | Data-volume identity map for consumer-side disk resolution, keyed like the aws\_ebs\_volume resources (<hostname>-ebs-<index>). Exposes the real volume-id (on Nitro the NVMe serial equals the volume-id, so on-box tooling can match disks with zero AWS API calls) alongside the authored Function/DeviceName/Name tags. function is null for volumes that declare no Function tag. |
 <!-- END_TF_DOCS -->

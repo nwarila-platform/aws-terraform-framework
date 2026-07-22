@@ -573,3 +573,25 @@ output "aws_listener_arns" {
 }
 
 #endregion --- [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
+
+
+#region ------ [ Resource(s): aws_ebs_volume ] ------------------------------------------------ #
+
+output "ebs_volumes" {
+  description = "Data-volume identity map for consumer-side disk resolution, keyed like the aws_ebs_volume resources (<hostname>-ebs-<index>). Exposes the real volume-id (on Nitro the NVMe serial equals the volume-id, so on-box tooling can match disks with zero AWS API calls) alongside the authored Function/DeviceName/Name tags. function is null for volumes that declare no Function tag."
+  value = {
+    for key, volume in merge(
+      aws_ebs_volume.us_west_2,
+      aws_ebs_volume.us_west_2_refresh,
+      aws_ebs_volume.us_east_1,
+      aws_ebs_volume.us_east_1_refresh,
+      ) : key => {
+      volume_id   = volume.id
+      function    = try(volume.tags["Function"], null)
+      device_name = try(volume.tags["DeviceName"], null)
+      hostname    = try(volume.tags["Name"], null)
+    }
+  }
+}
+
+#endregion --- [ Resource(s): aws_ebs_volume ] ------------------------------------------------ #
