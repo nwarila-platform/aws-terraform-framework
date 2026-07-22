@@ -181,6 +181,11 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
   }
 
   assert {
+    condition     = aws_security_group.us_east_1["wsus-ssm"].vpc_id == "vpc-preexisting"
+    error_message = "A literal managed-security-group vpc_id must pass through unchanged."
+  }
+
+  assert {
     condition     = length(aws_vpc_security_group_ingress_rule.us_east_1) == 0
     error_message = "A managed group declaring no ingress must create zero ingress rules (zero-inbound posture)."
   }
@@ -235,7 +240,7 @@ run "managed_sg_rejects_all_protocol_with_ports" {
 }
 
 run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
-  command = plan
+  command = apply
 
   variables {
     managed_networks = {
@@ -251,7 +256,7 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
     managed_security_groups = {
       "wsus-ssm" = {
         region = "us_east_1"
-        vpc_id = "vpc-preexisting"
+        vpc_id = "wsus-poc"
         egress = [
           { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0" },
         ]
@@ -304,6 +309,11 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
   }
 
   assert {
+    condition     = aws_security_group.us_east_1["wsus-ssm"].vpc_id == aws_vpc.us_east_1["wsus-poc"].id
+    error_message = "A managed-security-group vpc_id matching a managed-network key must resolve to the managed VPC ID."
+  }
+
+  assert {
     condition     = local.elastic_network_interfaces.us_east_1["wsus-poc-host-eni-0"].private_ips == null
     error_message = "An omitted private_ip must let AWS pick the address (private_ips null on the ENI)."
   }
@@ -321,6 +331,7 @@ run "managed_private_network_creates_no_igw_route_or_eip" {
         subnet_cidr       = "10.30.0.0/28"
       }
     }
+
   }
 
   assert {
@@ -346,12 +357,65 @@ run "managed_byo_vpc_creates_subnet_only" {
         subnet_cidr       = "172.31.64.0/28"
       }
     }
+
+    managed_security_groups = {
+      "byo-sg" = {
+        region = "us_east_1"
+        vpc_id = "byo-net"
+      }
+    }
   }
 
   assert {
     condition     = length(aws_vpc.us_east_1) == 0 && aws_subnet.us_east_1["byo-net"].vpc_id == "vpc-preexisting"
     error_message = "A BYO vpc_id network must create only the subnet, attached to the supplied VPC."
   }
+
+  assert {
+    condition     = aws_security_group.us_east_1["byo-sg"].vpc_id == "vpc-preexisting"
+    error_message = "A managed-security-group vpc_id matching a BYO-network key must resolve to that network's supplied VPC ID."
+  }
+}
+
+run "managed_sg_rejects_managed_network_region_mismatch" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "west-net" = {
+        region            = "us_west_2"
+        availability_zone = "us-west-2a"
+        vpc_cidr          = "10.40.0.0/24"
+        subnet_cidr       = "10.40.0.0/28"
+      }
+    }
+
+    managed_security_groups = {
+      "wrong-region-sg" = {
+        region = "us_east_1"
+        vpc_id = "west-net"
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_network_rejects_subnet_outside_vpc" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "outside-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.50.0.0/24"
+        subnet_cidr       = "10.50.1.0/28"
+      }
+    }
+  }
+
+  expect_failures = [var.managed_networks]
 }
 
 run "managed_network_rejects_public_ip_without_public_network" {

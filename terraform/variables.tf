@@ -1064,7 +1064,7 @@ variable "managed_keypairs" {
 }
 
 variable "managed_security_groups" {
-  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
+  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Each vpc_id accepts either a managed_networks key, resolving to that network's framework-created VPC or supplied BYO vpc_id, or a literal VPC ID; when a key and literal have the same value, the managed-network key wins. Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
 
   type = map(object({
     region      = string
@@ -1113,6 +1113,14 @@ variable "managed_security_groups" {
       length(trimspace(group.vpc_id)) > 0
     ])
     error_message = "Each managed_security_groups entry must set a non-empty vpc_id."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups :
+      !contains(keys(var.managed_networks), group.vpc_id) || replace(group.region, "-", "_") == replace(var.managed_networks[group.vpc_id].region, "-", "_")
+    ])
+    error_message = "A managed_security_groups vpc_id referencing a managed_networks key must be declared in the same region as that network."
   }
 
   validation {
@@ -1176,6 +1184,18 @@ variable "managed_networks" {
       can(cidrhost(network.subnet_cidr, 0)) && (network.vpc_cidr == null ? true : can(cidrhost(network.vpc_cidr, 0)))
     ])
     error_message = "managed_networks subnet_cidr and vpc_cidr must be valid IPv4 CIDR blocks."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks : network.vpc_cidr == null ? true : try(
+        tonumber(split("/", network.subnet_cidr)[1]) >= tonumber(split("/", network.vpc_cidr)[1]) &&
+        sum([for index, octet in split(".", cidrhost(network.subnet_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) >= sum([for index, octet in split(".", cidrhost(network.vpc_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) &&
+        sum([for index, octet in split(".", cidrhost(network.subnet_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) + pow(2, 32 - tonumber(split("/", network.subnet_cidr)[1])) - 1 <= sum([for index, octet in split(".", cidrhost(network.vpc_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) + pow(2, 32 - tonumber(split("/", network.vpc_cidr)[1])) - 1,
+        false
+      )
+    ])
+    error_message = "Each managed_networks subnet_cidr must be wholly contained within its vpc_cidr."
   }
 
   validation {

@@ -72,7 +72,7 @@ resource "aws_security_group" "us_west_2" {
 
   name        = each.key
   description = each.value.description
-  vpc_id      = each.value.vpc_id
+  vpc_id      = lookup(local.managed_vpc_ids.us_west_2, each.value.vpc_id, each.value.vpc_id)
 
   tags = merge(
     each.value.tags,
@@ -94,7 +94,7 @@ resource "aws_security_group" "us_east_1" {
 
   name        = each.key
   description = each.value.description
-  vpc_id      = each.value.vpc_id
+  vpc_id      = lookup(local.managed_vpc_ids.us_east_1, each.value.vpc_id, each.value.vpc_id)
 
   tags = merge(
     each.value.tags,
@@ -383,6 +383,9 @@ resource "aws_eip_association" "us_west_2" {
   allocation_id        = aws_eip.us_west_2[each.key].id
   network_interface_id = aws_network_interface.us_west_2["${each.key}-eni-0"].id
 
+  # EC2 requires the VPC internet gateway to exist before an EIP can be associated.
+  depends_on = [aws_internet_gateway.us_west_2]
+
 }
 
 resource "aws_vpc" "us_east_1" {
@@ -533,6 +536,9 @@ resource "aws_eip_association" "us_east_1" {
 
   allocation_id        = aws_eip.us_east_1[each.key].id
   network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
+
+  # EC2 requires the VPC internet gateway to exist before an EIP can be associated.
+  depends_on = [aws_internet_gateway.us_east_1]
 
 }
 
