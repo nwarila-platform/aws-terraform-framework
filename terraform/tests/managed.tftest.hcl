@@ -311,6 +311,126 @@ run "managed_sg_rejects_all_protocol_with_ports" {
   expect_failures = [var.managed_security_groups]
 }
 
+run "managed_sg_rejects_portless_tcp" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "bad-sg" = {
+        region      = "us_east_1"
+        vpc_id      = "vpc-preexisting"
+        description = "Portless TCP must fail"
+        ingress     = []
+        egress = [
+          {
+            description                  = "Portless TCP"
+            ip_protocol                  = "tcp"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          },
+        ]
+        tags = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_portless_udp" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "bad-sg" = {
+        region      = "us_east_1"
+        vpc_id      = "vpc-preexisting"
+        description = "Portless UDP must fail"
+        ingress     = []
+        egress = [
+          {
+            description                  = "Portless UDP"
+            ip_protocol                  = "udp"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          },
+        ]
+        tags = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_portless_numeric_tcp" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "bad-sg" = {
+        region      = "us_east_1"
+        vpc_id      = "vpc-preexisting"
+        description = "Portless numeric TCP must fail"
+        ingress     = []
+        egress = [
+          {
+            description                  = "Portless numeric TCP"
+            ip_protocol                  = "6"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          },
+        ]
+        tags = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_portless_numeric_udp" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "bad-sg" = {
+        region      = "us_east_1"
+        vpc_id      = "vpc-preexisting"
+        description = "Portless numeric UDP must fail"
+        ingress     = []
+        egress = [
+          {
+            description                  = "Portless numeric UDP"
+            ip_protocol                  = "17"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          },
+        ]
+        tags = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
 run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
   command = apply
 

@@ -20,6 +20,14 @@ deny contains msg if {
 
 deny contains msg if {
 	resource := input.resources[_]
+	resource.type == "aws_vpc_security_group_ingress_rule"
+	some cidr in [object.get(resource.values, "cidr_ipv4", null), object.get(resource.values, "cidr_ipv6", null)]
+	cidr in {"0.0.0.0/0", "::/0"}
+	msg := sprintf("%s must not allow world-open ingress", [resource.address])
+}
+
+deny contains msg if {
+	resource := input.resources[_]
 	encrypted_resource_types[resource.type]
 	object.get(resource.values, "encrypted", false) != true
 	msg := sprintf("%s must enable encryption", [resource.address])

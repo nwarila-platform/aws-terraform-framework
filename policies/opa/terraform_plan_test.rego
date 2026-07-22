@@ -41,6 +41,33 @@ test_network_interface_with_security_groups_is_allowed if {
 	count(result) == 0
 }
 
+test_scoped_security_group_ingress_is_allowed if {
+	result := deny with input as {"resources": [{
+		"address": "aws_vpc_security_group_ingress_rule.scoped",
+		"type": "aws_vpc_security_group_ingress_rule",
+		"values": {"cidr_ipv4": "10.0.0.0/8"},
+	}]}
+	count(result) == 0
+}
+
+test_world_open_ipv4_security_group_ingress_is_denied if {
+	result := deny with input as {"resources": [{
+		"address": "aws_vpc_security_group_ingress_rule.world_ipv4",
+		"type": "aws_vpc_security_group_ingress_rule",
+		"values": {"cidr_ipv4": "0.0.0.0/0"},
+	}]}
+	"aws_vpc_security_group_ingress_rule.world_ipv4 must not allow world-open ingress" in result
+}
+
+test_world_open_ipv6_security_group_ingress_is_denied if {
+	result := deny with input as {"resources": [{
+		"address": "aws_vpc_security_group_ingress_rule.world_ipv6",
+		"type": "aws_vpc_security_group_ingress_rule",
+		"values": {"cidr_ipv6": "::/0"},
+	}]}
+	"aws_vpc_security_group_ingress_rule.world_ipv6 must not allow world-open ingress" in result
+}
+
 test_unencrypted_ebs_volume_is_denied if {
 	result := deny with input as {"resources": [{
 		"address": "aws_ebs_volume.unencrypted",

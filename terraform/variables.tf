@@ -1066,7 +1066,7 @@ variable "managed_keypairs" {
 }
 
 variable "managed_security_groups" {
-  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Each vpc_id accepts either a managed_networks key, resolving to that network's framework-created VPC or supplied BYO vpc_id, or a literal VPC ID; when a key and literal have the same value, the managed-network key wins. Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
+  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Each vpc_id accepts either a managed_networks key, resolving to that network's framework-created VPC or supplied BYO vpc_id, or a literal VPC ID; when a key and literal have the same value, the managed-network key wins. Rules using the tcp/udp names or their numeric protocol encodings 6/17 must set both from_port and to_port. Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
 
   type = map(object({
     region      = string
@@ -1143,6 +1143,16 @@ variable "managed_security_groups" {
       ])
     ])
     error_message = "Rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups : alltrue([
+        for rule in concat(group.ingress, group.egress) :
+        !contains(["tcp", "udp", "6", "17"], rule.ip_protocol) || (rule.from_port != null && rule.to_port != null)
+      ])
+    ])
+    error_message = "Rules using ip_protocol tcp, udp, \"6\", or \"17\" must set both from_port and to_port."
   }
 }
 
