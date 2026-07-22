@@ -275,6 +275,186 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
   }
 }
 
+run "managed_sg_rejects_world_open_ipv4_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "world-open-ipv4" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "world-open-ipv6" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv6 = "::/0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_zero_padded_world_open_ipv4_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "zero-padded-world-open-ipv4" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/00" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_zero_padded_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "zero-padded-world-open-ipv6" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv6 = "::/00" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_noncanonical_world_open_ipv4_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "noncanonical-world-open-ipv4" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv4 = "1.2.3.4/0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_noncanonical_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "noncanonical-world-open-ipv6" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv6 = "2001:db8::1/0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_whitespace_ipv4_ingress_prefix" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "whitespace-ipv4-prefix" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/ 0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_whitespace_ipv6_ingress_prefix" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "whitespace-ipv6-prefix" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv6 = "::/ 0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_hex_ipv4_ingress_prefix" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "hex-ipv4-prefix" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0x0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_sg_rejects_hex_ipv6_ingress_prefix" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "hex-ipv6-prefix" = {
+        region = "us_east_1"
+        vpc_id = "vpc-preexisting"
+        ingress = [
+          { ip_protocol = "-1", cidr_ipv6 = "::/0x0" },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
 run "managed_sg_rejects_rule_without_exactly_one_destination" {
   command = plan
 

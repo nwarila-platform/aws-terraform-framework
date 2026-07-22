@@ -12,7 +12,16 @@ change at minimum.
   underscored (`us_east_1`) spellings for the supported commercial region.
 - Resource keys used in outputs MUST remain stable across patch versions.
 - RDS passwords and other secret inputs MUST NOT be emitted through outputs.
+- Security invariants owned by this module MUST be hard-coded directly on
+  resources wherever possible and covered by native Terraform test assertions.
+- Terraform variable validations MUST be reserved for valid-typeable consumer
+  settings that objectively deviate from the established security baseline and
+  cannot be hard-coded.
 - EBS volumes and RDS storage MUST remain encrypted by default.
+- Managed security-group ingress rules MUST NOT accept world-open IPv4
+  (`0.0.0.0/0`) or IPv6 (`::/0`) sources; unrestricted egress remains supported.
+- Every RDS database MUST attach at least one explicitly supplied VPC security
+  group instead of falling back to the VPC default security group.
 - `aws_ec2_instance_state` resources MUST be created only when a system
   explicitly sets `set_state`.
 - Generated Terraform docs MUST be produced by the pinned `terraform-docs`

@@ -67,6 +67,7 @@
 !/docs/decision-records/org/0005-keep-github-control-planes-namespace-local.md
 !/docs/decision-records/repo/
 !/docs/decision-records/repo/.gitkeep
+!/docs/decision-records/repo/0001-hardcode-first-security-baseline.md
 !/docs/decision-records/template/
 !/docs/decision-records/template/.gitkeep
 !/docs/decision-records/template/README.md
@@ -78,11 +79,4 @@
 # Tools
 !/tools/
 !/tools/check_docs_layout.py
-!/tools/build_plan_input.py
 !/tools/install_ci_tools.sh
-
-# Policies
-!/policies/
-!/policies/opa/
-!/policies/opa/terraform_plan.rego
-!/policies/opa/terraform_plan_test.rego

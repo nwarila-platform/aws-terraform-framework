@@ -94,9 +94,11 @@ matching Packer variable declarations for every top-level variable it assigns.
   validation rule.
 - Mock data sources whose values must satisfy provider-side validation (ARNs)
   set `mock_data` defaults rather than letting random strings fail.
-- OPA plan policy asserts security invariants resource-by-resource; policy rules
-  that depend on opt-in features key on a marker the feature stamps, so
-  non-opted-in plans stay silent.
+- Security invariants owned by the framework are hard-coded directly on resources
+  whenever possible and covered by native Terraform test assertions. Variable
+  validations are reserved for valid-typeable consumer settings that objectively
+  deviate from the established security baseline and cannot be hard-coded. Any
+  additional policy evaluation belongs to consumers.
 - The release layer supplies the zero-diff proof for each pinned consumer. In
   isolated baseline (the consumer's current pin) and candidate checkouts, it uses
   identical lockfiles and the consumer's real tfvars, runs `terraform plan -out`,

@@ -21,8 +21,7 @@ make ci
 ```
 
 The CI path runs Terraform formatting, init, validation, tests, TFLint,
-terraform-docs drift detection, documentation layout checks, and the repo's OPA
-policy target.
+terraform-docs drift detection, and documentation layout checks.
 
 ### Deploy from this framework
 

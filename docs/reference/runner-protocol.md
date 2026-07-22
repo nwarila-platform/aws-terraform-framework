@@ -102,7 +102,7 @@ reserved; consumer tag maps may not use it (validated). Because `commit-sha`
 and `run-id` change per deployment, standing estates see two in-place tag
 updates per deploy; ephemeral deploy-and-destroy stacks see none. Leaving
 `resource_metadata` unset emits zero tags and keeps plans byte-identical -
-the OPA gate enforces set-completeness only on resources that carry the
+native Terraform tests verify set-completeness on resources that carry the
 `managed-by` marker.
 
 ## Backend Selection
@@ -143,7 +143,7 @@ Runner-shaped release evidence snapshots `terraform/repos/`, records
 `terraform plan` or `apply`.
 
 Framework repositories use `repo_type: framework`, which runs Terraform
-validation, OPA policy on the plan, docs-diff, and reference snapshots.
+validation, native framework tests, docs-diff, and reference snapshots.
 Runner-template repositories use `repo_type: template` until they are forked
 into real runner repositories.
 

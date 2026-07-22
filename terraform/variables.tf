@@ -291,6 +291,14 @@ variable "all_databases" {
     ]))
     error_message = "Each all_databases entry must set a non-empty password unless manage_master_user_password is true."
   }
+
+  validation {
+    condition = nonsensitive(alltrue([
+      for database in var.all_databases :
+      try(length(database.vpc_security_group_ids), 0) > 0
+    ]))
+    error_message = "Each all_databases entry must specify at least one vpc_security_group_id; a null or empty list makes AWS attach the VPC default security group."
+  }
 }
 
 variable "resource_metadata" {
@@ -1133,6 +1141,17 @@ variable "managed_security_groups" {
       ])
     ])
     error_message = "Every managed security-group rule must set exactly one destination: cidr_ipv4, cidr_ipv6, prefix_list_id, or referenced_security_group_id."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups : alltrue([
+        for rule in group.ingress :
+        (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
+        (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
+      ])
+    ])
+    error_message = "A managed security-group ingress rule CIDR prefix must be a positive decimal."
   }
 
   validation {

@@ -196,30 +196,32 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
 
     all_databases = [
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "backupdefaultdb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "backupdefaultdb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Backup default database"
         }
       },
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "backupdisableddb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "backupdisableddb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Backup   = false
@@ -276,6 +278,11 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
   assert {
     condition     = local.relational_database_service.us_east_1["backupdefaultdb"].storage_type == "gp3" && aws_db_instance.us_east_1["backupdefaultdb"].storage_type == "gp3"
     error_message = "RDS storage_type should default to gp3 when omitted."
+  }
+
+  assert {
+    condition     = alltrue([for _, database in aws_db_instance.us_east_1 : database.storage_encrypted == true])
+    error_message = "Every planned RDS database should set storage_encrypted = true."
   }
 }
 
@@ -777,6 +784,14 @@ run "ebs_volume_attachments_use_structured_wiring" {
   assert {
     condition     = aws_volume_attachment.us_east_1["east-ebs-ebs-0"].volume_id == "vol-east-ebs-0" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].instance_id == "i-east-ebs" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].device_name == "/dev/sdd"
     error_message = "The east EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+
+  assert {
+    condition = alltrue(concat(
+      [for _, volume in aws_ebs_volume.us_east_1 : volume.encrypted == true],
+      [for _, volume in aws_ebs_volume.us_east_1_refresh : volume.encrypted == true],
+    ))
+    error_message = "Every planned normal and refresh EBS data volume should set encrypted = true."
   }
 }
 
@@ -1986,38 +2001,98 @@ run "systems_reject_empty_network_interfaces" {
   ]
 }
 
+run "databases_reject_null_vpc_security_group_ids" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "null_security_groups_db"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        password                    = "test-password"
+        aws_kms_alias               = "west"
+        vpc_security_group_ids      = null
+        manage_master_user_password = false
+
+        tags = {
+          Function = "Database with null security groups"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
+run "databases_reject_empty_vpc_security_group_ids" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "empty_security_groups_db"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        password                    = "test-password"
+        aws_kms_alias               = "west"
+        vpc_security_group_ids      = []
+        manage_master_user_password = false
+
+        tags = {
+          Function = "Database with empty security groups"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
 run "databases_reject_duplicate_db_names" {
   command = plan
 
   variables {
     all_databases = [
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "duplicate_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "duplicate_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Duplicate database A"
         }
       },
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "duplicate_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "east"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "duplicate_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "east"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Duplicate database B"
@@ -2037,16 +2112,17 @@ run "databases_reject_regions_outside_aws_config" {
   variables {
     all_databases = [
       {
-        region               = "eu-west-1"
-        availability_zone    = "eu-west-1a"
-        db_name              = "bad_region_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "eu"
+        region                 = "eu-west-1"
+        availability_zone      = "eu-west-1a"
+        db_name                = "bad_region_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "eu"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Unsupported database region"
@@ -2066,16 +2142,17 @@ run "databases_reject_kms_alias_prefix" {
   variables {
     all_databases = [
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "prefixed_kms_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "alias/west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "prefixed_kms_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "alias/west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Prefixed database KMS alias"
@@ -2106,6 +2183,7 @@ run "databases_reject_empty_password_when_not_managed" {
         password                    = ""
         manage_master_user_password = false
         aws_kms_alias               = "west"
+        vpc_security_group_ids      = ["sg-database"]
 
         tags = {
           Function = "Empty password database"
@@ -2125,16 +2203,17 @@ run "databases_keep_credentials_sensitive" {
   variables {
     all_databases = [
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "sensitivedb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "sensitivedb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Sensitive database"
@@ -2202,6 +2281,7 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
         username                    = "dbadmin"
         manage_master_user_password = true
         aws_kms_alias               = "west"
+        vpc_security_group_ids      = ["sg-database"]
 
         tags = {
           Function = "Managed password database"
