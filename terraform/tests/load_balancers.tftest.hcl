@@ -13,6 +13,37 @@ variables {
       security_groups = ["sg-west"]
       subnets         = ["subnet-west-a", "subnet-west-b"]
 
+      access_logs                                                  = null
+      client_keep_alive                                            = null
+      connection_logs                                              = null
+      customer_owned_ipv4_pool                                     = null
+      desync_mitigation_mode                                       = null
+      dns_record_client_routing_policy                             = null
+      drop_invalid_header_fields                                   = null
+      enable_cross_zone_load_balancing                             = null
+      enable_deletion_protection                                   = true
+      enable_http2                                                 = null
+      enable_tls_version_and_cipher_suite_headers                  = null
+      enable_waf_fail_open                                         = null
+      enable_xff_client_port                                       = null
+      enable_zonal_shift                                           = null
+      enforce_security_group_inbound_rules_on_private_link_traffic = null
+      health_check_logs                                            = null
+      idle_timeout                                                 = null
+      internal                                                     = true
+      ip_address_type                                              = "ipv4"
+      ipam_pools                                                   = null
+      load_balancer_type                                           = "application"
+      minimum_load_balancer_capacity                               = null
+      name_prefix                                                  = null
+      preserve_host_header                                         = null
+      secondary_ips_auto_assigned_per_subnet                       = null
+      subnet_mapping                                               = []
+      target_groups                                                = []
+      listeners                                                    = []
+      timeouts                                                     = null
+      xff_header_processing_mode                                   = null
+
       tags = {
         Function = "West ALB"
       }
@@ -25,12 +56,47 @@ variables {
       load_balancer_type               = "network"
       security_groups                  = ["sg-east"]
 
+      access_logs                                                  = null
+      client_keep_alive                                            = null
+      connection_logs                                              = null
+      customer_owned_ipv4_pool                                     = null
+      desync_mitigation_mode                                       = null
+      drop_invalid_header_fields                                   = null
+      enable_cross_zone_load_balancing                             = null
+      enable_deletion_protection                                   = true
+      enable_http2                                                 = null
+      enable_tls_version_and_cipher_suite_headers                  = null
+      enable_waf_fail_open                                         = null
+      enable_xff_client_port                                       = null
+      enable_zonal_shift                                           = null
+      enforce_security_group_inbound_rules_on_private_link_traffic = null
+      health_check_logs                                            = null
+      idle_timeout                                                 = null
+      internal                                                     = true
+      ip_address_type                                              = "ipv4"
+      ipam_pools                                                   = null
+      minimum_load_balancer_capacity                               = null
+      name_prefix                                                  = null
+      preserve_host_header                                         = null
+      secondary_ips_auto_assigned_per_subnet                       = null
+      subnets                                                      = []
+      target_groups                                                = []
+      listeners                                                    = []
+      timeouts                                                     = null
+      xff_header_processing_mode                                   = null
+
       subnet_mapping = [
         {
-          subnet_id = "subnet-east-a"
+          allocation_id        = null
+          ipv6_address         = null
+          private_ipv4_address = null
+          subnet_id            = "subnet-east-a"
         },
         {
-          subnet_id = "subnet-east-b"
+          allocation_id        = null
+          ipv6_address         = null
+          private_ipv4_address = null
+          subnet_id            = "subnet-east-b"
         }
       ]
 
@@ -120,16 +186,38 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.10"
             security_groups = ["sg-web"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
 
         tags = {
           Function = "web"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices   = []
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -142,16 +230,37 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         ami                  = "test-linux"
         refresh              = true
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.11"
             security_groups = ["sg-web"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
 
         tags = {
           Function = "web"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices   = []
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -163,16 +272,38 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
             security_groups = ["sg-api"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
 
         tags = {
           Function = "api"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices   = []
+        associate_public_ip = false
       }
     ]
 
@@ -184,20 +315,79 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         security_groups = ["sg-lb"]
         subnets         = ["subnet-web-a", "subnet-web-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "web"
-            vpc_id       = "vpc-test"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                      = "web"
+            function                          = "web"
+            vpc_id                            = "vpc-test"
+            port                              = 443
+            protocol                          = "HTTPS"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           },
           {
-            resource_key = "cache"
-            function     = "cache"
-            vpc_id       = "vpc-test"
-            port         = 6379
-            protocol     = "TCP"
+            resource_key                      = "cache"
+            function                          = "cache"
+            vpc_id                            = "vpc-test"
+            port                              = 6379
+            protocol                          = "TCP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
       }
@@ -260,16 +450,38 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.20"
             security_groups = ["sg-web"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
 
         tags = {
           Function = "web"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices   = []
+        associate_public_ip = false
       }
     ]
 
@@ -281,13 +493,57 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         security_groups = ["sg-lb"]
         subnets         = ["subnet-web-a", "subnet-web-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "web"
-            vpc_id       = "vpc-test"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "web"
+            vpc_id                            = "vpc-test"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
@@ -297,6 +553,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
             port            = 443
             protocol        = "HTTPS"
             ssl_policy      = "ELBSecurityPolicy-2016-08"
+            alpn_policy     = null
             certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/routing-default"
             additional_certificate_arns = [
               "arn:aws:acm:us-east-1:123456789012:certificate/routing-extra",
@@ -304,6 +561,8 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
             rules = [
               {
@@ -312,27 +571,44 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
                 action = {
                   type             = "forward"
                   target_group_key = "web"
+                  redirect         = null
+                  fixed_response   = null
                 }
                 conditions = [
                   {
-                    path_pattern = ["/web/*"]
+                    host_header         = null
+                    path_pattern        = ["/web/*"]
+                    http_request_method = null
+                    source_ip           = null
+                    http_header         = null
+                    query_string        = null
                   }
                 ]
               }
             ]
           },
           {
-            resource_key = "http"
-            port         = 80
-            protocol     = "HTTP"
+            resource_key                = "http"
+            port                        = 80
+            protocol                    = "HTTP"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
-              type = "redirect"
+              type             = "redirect"
+              target_group_key = null
               redirect = {
+                host        = null
+                path        = null
                 port        = "443"
                 protocol    = "HTTPS"
+                query       = null
                 status_code = "HTTP_301"
               }
+              fixed_response = null
             }
+            rules = []
           }
         ]
       }
@@ -417,15 +693,53 @@ run "load_balancer_rejects_missing_default_target_group_key_reference" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "missing"
+              redirect         = null
+              fixed_response   = null
             }
+            rules = []
           }
         ]
       }
@@ -449,6 +763,37 @@ run "load_balancer_rejects_public_internal_false" {
         internal        = false
         security_groups = ["sg-public"]
         subnets         = ["subnet-public-a", "subnet-public-b"]
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }
@@ -470,6 +815,37 @@ run "load_balancer_rejects_empty_security_groups" {
         load_balancer_type = "application"
         security_groups    = []
         subnets            = ["subnet-empty-a", "subnet-empty-b"]
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }
@@ -492,8 +868,40 @@ run "load_balancer_rejects_connection_logs_on_network_type" {
         security_groups    = ["sg-network"]
         subnets            = ["subnet-network-a", "subnet-network-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         connection_logs = {
-          bucket = "lb-connection-logs"
+          bucket  = "lb-connection-logs"
+          enabled = null
+          prefix  = null
         }
       }
     ]
@@ -517,8 +925,40 @@ run "load_balancer_rejects_health_check_logs_on_network_type" {
         security_groups    = ["sg-network"]
         subnets            = ["subnet-network-a", "subnet-network-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         health_check_logs = {
-          bucket = "lb-health-check-logs"
+          bucket  = "lb-health-check-logs"
+          enabled = null
+          prefix  = null
         }
       }
     ]
@@ -542,6 +982,36 @@ run "load_balancer_rejects_xff_header_processing_mode_on_network_type" {
         security_groups            = ["sg-network"]
         subnets                    = ["subnet-network-a", "subnet-network-b"]
         xff_header_processing_mode = "append"
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
       }
     ]
   }
@@ -564,6 +1034,36 @@ run "load_balancer_rejects_secondary_ips_on_application_type" {
         security_groups                        = ["sg-application"]
         subnets                                = ["subnet-application-a", "subnet-application-b"]
         secondary_ips_auto_assigned_per_subnet = 1
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }
@@ -585,6 +1085,37 @@ run "load_balancer_rejects_security_groups_on_gateway_type" {
         load_balancer_type = "gateway"
         security_groups    = ["sg-gateway"]
         subnets            = ["subnet-gateway-a", "subnet-gateway-b"]
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = []
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
       }
     ]
   }
@@ -606,32 +1137,97 @@ run "load_balancer_rejects_duplicate_target_group_resource_keys" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           },
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8081
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8081
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
+            rules = []
           }
         ]
       }
@@ -655,24 +1251,74 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
             rules = [
               {
@@ -681,10 +1327,17 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
                 action = {
                   type             = "forward"
                   target_group_key = "web"
+                  redirect         = null
+                  fixed_response   = null
                 }
                 conditions = [
                   {
-                    path_pattern = ["/web/*"]
+                    host_header         = null
+                    path_pattern        = ["/web/*"]
+                    http_request_method = null
+                    source_ip           = null
+                    http_header         = null
+                    query_string        = null
                   }
                 ]
               },
@@ -694,10 +1347,17 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
                 action = {
                   type             = "forward"
                   target_group_key = "web"
+                  redirect         = null
+                  fixed_response   = null
                 }
                 conditions = [
                   {
-                    path_pattern = ["/admin/*"]
+                    host_header         = null
+                    path_pattern        = ["/admin/*"]
+                    http_request_method = null
+                    source_ip           = null
+                    http_header         = null
+                    query_string        = null
                   }
                 ]
               }
@@ -725,28 +1385,83 @@ run "load_balancer_rejects_forward_action_with_redirect_payload" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
               redirect = {
+                host        = null
+                path        = null
+                port        = null
+                protocol    = null
+                query       = null
                 status_code = "HTTP_301"
               }
+              fixed_response = null
             }
+            rules = []
           }
         ]
       }
@@ -770,24 +1485,74 @@ run "load_balancer_rejects_condition_with_two_types" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
             rules = [
               {
@@ -796,11 +1561,17 @@ run "load_balancer_rejects_condition_with_two_types" {
                 action = {
                   type             = "forward"
                   target_group_key = "web"
+                  redirect         = null
+                  fixed_response   = null
                 }
                 conditions = [
                   {
-                    host_header  = ["app.example.com"]
-                    path_pattern = ["/web/*"]
+                    host_header         = ["app.example.com"]
+                    path_pattern        = ["/web/*"]
+                    http_request_method = null
+                    source_ip           = null
+                    http_header         = null
+                    query_string        = null
                   }
                 ]
               }
@@ -828,26 +1599,76 @@ run "load_balancer_rejects_non_instance_target_type" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
-            target_type  = "ip"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            target_type                       = "ip"
+            protocol_version                  = null
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key = "https"
-            port         = 443
-            protocol     = "HTTPS"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
+            rules = []
           }
         ]
       }
@@ -871,39 +1692,99 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
         security_groups = ["sg-schema"]
         subnets         = ["subnet-schema-a", "subnet-schema-b"]
 
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+
         target_groups = [
           {
-            resource_key = "web"
-            function     = "Jenkins Server"
-            vpc_id       = "vpc-schema"
-            port         = 8080
-            protocol     = "HTTP"
+            resource_key                      = "web"
+            function                          = "Jenkins Server"
+            vpc_id                            = "vpc-schema"
+            port                              = 8080
+            protocol                          = "HTTP"
+            protocol_version                  = null
+            target_type                       = "instance"
+            deregistration_delay              = null
+            slow_start                        = null
+            load_balancing_algorithm_type     = null
+            load_balancing_anomaly_mitigation = null
+            load_balancing_cross_zone_enabled = null
+            preserve_client_ip                = null
+            proxy_protocol_v2                 = null
+            connection_termination            = null
+            ip_address_type                   = null
+            health_check                      = null
+            stickiness                        = null
+            tags                              = {}
           }
         ]
 
         listeners = [
           {
-            resource_key    = "https"
-            port            = 443
-            protocol        = "HTTPS"
-            certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/schema"
+            resource_key                = "https"
+            port                        = 443
+            protocol                    = "HTTPS"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = "arn:aws:acm:us-east-1:123456789012:certificate/schema"
+            additional_certificate_arns = []
             default_action = {
               type             = "forward"
               target_group_key = "web"
+              redirect         = null
+              fixed_response   = null
             }
+            rules = []
           },
           {
-            resource_key = "http"
-            port         = 80
-            protocol     = "HTTP"
+            resource_key                = "http"
+            port                        = 80
+            protocol                    = "HTTP"
+            ssl_policy                  = null
+            alpn_policy                 = null
+            certificate_arn             = null
+            additional_certificate_arns = []
             default_action = {
-              type = "redirect"
+              type             = "redirect"
+              target_group_key = null
               redirect = {
+                host        = null
+                path        = null
                 port        = "443"
                 protocol    = "HTTPS"
+                query       = null
                 status_code = "HTTP_301"
               }
+              fixed_response = null
             }
+            rules = []
           }
         ]
       }
