@@ -66,6 +66,7 @@
 !/docs/explanation/threat-model.md
 !/docs/reference/
 !/docs/reference/invariants.md
+!/docs/reference/style-guide.md
 !/docs/reference/mirroring.md
 !/docs/reference/release-gates.md
 !/docs/reference/runner-protocol.md
