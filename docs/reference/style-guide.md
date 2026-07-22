@@ -28,25 +28,33 @@ they disabled that gate and encoded ordering the filenames now carry semanticall
 Tests live in `terraform/tests/*.tftest.hcl`, named by subject
 (`systems`, `managed`, `tagging`, `outputs`, …).
 
-## Variable declarations — Packer-compatible syntax
+## Value-file-compatible variable surfaces
 
-Variable declarations MUST restrict themselves to syntax Packer HCL2 also accepts,
-so inventory files can be shared across Terraform and Packer consumers:
+The shared artifact is the value file, not the declaration blocks. Packer reads
+explicitly supplied `*.pkrvars.hcl` or `*.pkrvars.json` files and automatically loads
+`*.auto.pkrvars.hcl` and `*.auto.pkrvars.json` files, but never raw `*.tfvars` files.
+Each shared Terraform value file MUST therefore have a byte-identical copy or symlink
+whose suffix preserves its format: `*.pkrvars.hcl` for HCL or `*.pkrvars.json` for
+JSON. Supply it explicitly to Packer unless it uses an auto-loaded name, and provide
+matching Packer variable declarations for every top-level variable it assigns.
 
-- **No `optional()` type modifiers, anywhere.** Every object attribute is required;
-  consumers write every value explicitly. Optionality is expressed by the value
-  (`null`, `[]`, `{}`), never by the type.
-- **No `nullable = true` defaults by omission**: declare `nullable = false` on every
-  variable except those whose documented "off switch" is the value `null`.
-- Variables carrying a genuine feature switch default to their empty value
-  (`{}` / `[]` / `null`) so unconfigured consumers get zero resources and
-  byte-identical plans.
-- `description` is a `<<-EOT` heredoc: first sentence says what it is; following
-  sentences say how consumers use it, what validates it, and what happens when it
-  is empty. Descriptions are contracts, not captions.
-- Every externally supplied scalar gets a `validation` block with a `can(regex(...))`
-  or structural condition and an error message that states the exact accepted form.
-  Cross-variable validations are allowed and preferred over runtime surprises.
+- **No `optional()` type modifiers, anywhere.** This explicitness policy makes one
+  fully explicit value file satisfiable by both parsers: every object attribute is
+  required, and consumers express optionality with a value (`null`, `[]`, or `{}`),
+  never with a type modifier.
+- In Terraform declarations, declare `nullable = false` on every variable except
+  those whose documented "off switch" is the value `null`.
+- Terraform variables carrying a genuine feature switch default to their empty value
+  (`{}` / `[]` / `null`) so unconfigured consumers get zero resources and the
+  release proof retains an empty normalized resource delta.
+- In Terraform declarations, `description` is a `<<-EOT` heredoc: the first sentence
+  says what the variable is; following sentences say how consumers use it, what
+  validates it, and what happens when it is empty. Descriptions are contracts, not
+  captions.
+- Every externally supplied scalar in a Terraform declaration gets a `validation`
+  block with a `can(regex(...))` or structural condition and an error message that
+  states the exact accepted form. Cross-variable validations are allowed and
+  preferred over runtime surprises.
 - Defaults that `optional()` used to inject move into the documented example
   (`terraform.tfvars.example`) and the how-to docs — visible in every consumer's
   tfvars, not hidden in type constraints.
@@ -81,7 +89,7 @@ so inventory files can be shared across Terraform and Packer consumers:
 ## Validation and testing
 
 - `terraform test` with `mock_provider` per alias is the unit layer: every
-  capability ships a default-off zero-diff anchor run, at least one opt-in run
+  capability ships a default-off zero-resource anchor run, at least one opt-in run
   asserting concrete planned values, and `expect_failures` runs for each
   validation rule.
 - Mock data sources whose values must satisfy provider-side validation (ARNs)
@@ -89,11 +97,30 @@ so inventory files can be shared across Terraform and Packer consumers:
 - OPA plan policy asserts security invariants resource-by-resource; policy rules
   that depend on opt-in features key on a marker the feature stamps, so
   non-opted-in plans stay silent.
+- The release layer supplies the zero-diff proof for each pinned consumer. In
+  isolated baseline (the consumer's current pin) and candidate checkouts, it uses
+  identical lockfiles and the consumer's real tfvars, runs `terraform plan -out`,
+  then renders the saved plans with `terraform show -json`. The streamed JSONL UI
+  from `terraform plan -json` is not a proof artifact.
+- The proof canonically projects `resource_changes` and `output_changes` from both
+  saved-plan JSON documents, normalizes ordering and non-semantic metadata, and
+  compares the projections. Acceptance requires an empty normalized resource delta;
+  output-only differences MUST be explicitly enumerated.
+- Proof runs require backend and state access and credentials. Run the baseline and
+  candidate plans back-to-back; any drift detected during either plan's in-memory
+  refresh invalidates the comparison and requires a rerun after the drift is resolved.
+  T14 is the harness that produces these artifacts; count-based anchor runs and grep
+  proxies do not substitute for reviewer verification of the proof semantics.
 - `make ci` is the single local gate and CI runs exactly it.
 
 ## Releases and history
 
 - Squash-merge titles are Conventional Commits; breaking changes use `!` and a
   `BREAKING CHANGE:` footer. Automation prefixes stay in PR bodies.
-- Consumer-affecting behavior changes ship with a zero-diff proof (or an explicit
-  migration note) against each pinned consumer's tfvars.
+- Consumer-affecting behavior changes ship with the release-layer zero-diff proof
+  against each pinned consumer's real tfvars.
+- A breaking variable-shape change also ships with a ready-to-apply migration tfvars
+  patch for each pinned consumer. Its proof pairs the baseline ref with the
+  consumer's original tfvars and the candidate ref with the migrated tfvars.
+- The framework attaches each migration patch but never commits or applies it to a
+  consumer repository; the consumer's owners apply it.
