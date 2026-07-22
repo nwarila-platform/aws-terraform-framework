@@ -26,10 +26,10 @@ jobs:
     steps:
       - name: Drift gate (framework-template baseline)
         # renovate: datasource=git-refs depName=NWarila/drift-gate
-        uses: NWarila/drift-gate@dac07c2b2a30a084b3577d4712549291ae99879c # NWarila/drift-gate main @ 2026-05-30
+        uses: NWarila/drift-gate@3864401ce520ecb851311efb4ba1a199808768fb # NWarila/drift-gate main @ 2026-07-22
         with:
           source-repo: NWarila/terraform-framework-template
-          # renovate: depName=NWarila/terraform-framework-template packageName=NWarila/terraform-framework-template
-          source-ref: 2114aec93668cde41003beb6445b85a68cf12ec5 # NWarila/terraform-framework-template remediation baseline
+          # renovate: datasource=git-refs depName=NWarila/terraform-framework-template packageName=https://github.com/NWarila/terraform-framework-template.git currentValue=main
+          source-ref: ba73041b808ceae584f482e6bec2970c1bdc019b # NWarila/terraform-framework-template main @ 2026-07-22
           manifest: baseline-manifest.json
           check-name: framework-template / verify
