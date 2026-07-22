@@ -51,12 +51,12 @@ variable "all_systems" {
     iam_instance_profile = string
     aws_kms_alias        = string
     ami                  = string
-    refresh              = optional(bool, false)
+    refresh              = bool
 
     tags = object({
       #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
-      #Name                 = optional(string)
-      Backup   = optional(bool, true)
+      #Name                 = string
+      Backup   = bool
       Function = string
       #Terraform            = <Set Automatically to 'True'>
       #Environment          = <Set Automatically From 'var.environment'>
@@ -64,58 +64,52 @@ variable "all_systems" {
     })
 
     /* Optional Parameters */
-    instance_type = optional(string, "m6i.large")
+    instance_type = string
     # SSH login user for the readiness gate. Defaults to ec2-user on Linux and Administrator on Windows; override for images with a different default user (for example, ubuntu, rocky, or admin).
-    readiness_user = optional(string)
+    readiness_user = string
     # Set false to skip the SSH readiness gate for this system entirely (no terraform_data resource
     # is created). Required for zero-inbound systems reached only through SSM, where the machine
     # running Terraform cannot open a TCP connection to the instance's private IP.
-    readiness_gate = optional(bool, true)
-    set_state      = optional(string)
+    readiness_gate = bool
+    set_state      = string
 
-    root_block_device = optional(
+    root_block_device = object({
+      delete_on_termination = bool
+      #encrypted            = # Statically set to 'true'
+      iops = string
+      #kms_key_id           = # Calculated automatically from system.aws_kms_alias
+      tags        = map(string)
+      throughput  = string
+      volume_type = string
+      volume_size = string
+    })
+
+    ebs_block_devices = list(
       object({
-        delete_on_termination = optional(bool, true)
+        #device_name          = # Calculated automatically from index of volume.
         #encrypted            = # Statically set to 'true'
-        iops = optional(string, null)
+        iops = string
         #kms_key_id           = # Calculated automatically from system.aws_kms_alias
-        tags        = optional(map(string), {})
-        throughput  = optional(string, null)
-        volume_type = optional(string, "gp3")
-        volume_size = optional(string, "100")
-      }),
-      {}
-    )
-
-    ebs_block_devices = optional(
-      list(
-        object({
-          #device_name          = # Calculated automatically from index of volume.
-          #encrypted            = # Statically set to 'true'
-          iops = optional(string, null)
-          #kms_key_id           = # Calculated automatically from system.aws_kms_alias
-          snapshot_id  = optional(string, null)
-          skip_destroy = optional(bool, false)
-          tags         = optional(map(string), {})
-          throughput   = optional(string, null)
-          volume_type  = optional(string, "gp3")
-          volume_size  = optional(string, "100")
-        })
-      ),
-      []
+        snapshot_id  = string
+        skip_destroy = bool
+        tags         = map(string)
+        throughput   = string
+        volume_type  = string
+        volume_size  = string
+      })
     )
 
     network_interfaces = list(
       object({
         #subnet_ip      = # Calculated automatically from parent object
         #region         = # Calculated automatically from parent object
-        description    = optional(string)
-        interface_type = optional(string, null)
+        description    = string
+        interface_type = string
         # Omit (null) to let AWS pick a free address from the subnet CIDR - the usual choice for
         # managed_networks subnets whose CIDR the consumer does not want to hand-allocate.
-        private_ip      = optional(string)
+        private_ip      = string
         security_groups = list(string)
-        tags            = optional(map(string), {})
+        tags            = map(string)
       })
     )
 
@@ -123,17 +117,16 @@ variable "all_systems" {
     # Requires subnet_id to reference a managed_networks entry with public = true: with an
     # explicitly attached ENI, subnet auto-assign public IPs are inert, so an EIP is the only
     # public-IPv4 path this framework supports.
-    associate_public_ip = optional(bool, false)
+    associate_public_ip = bool
 
     # lifecycle doesn't allow variable declaration.
     # ?Note: I may be able to get around this using conditional if deployments, but it will make
     # ?      the resources.tf file super cluttered, but overall that file isn't used for much
     # ?      so it shouldn't present a large operational challenge for long-term management.
-    # lifecycle = optional(
-    #   object({
-    #     ignore_changes        = optional(list(string))
+    # lifecycle = #   object({
+    #     ignore_changes        = list(string)
     #   })
-    # )
+    #
 
   }))
 
@@ -230,32 +223,32 @@ variable "all_databases" {
     engine               = string
     engine_version       = string
     instance_class       = string
-    password             = optional(string)
+    password             = string
     region               = string
     username             = string
 
     tags = object({
       #Name        = <Set Automatically From 'db_name'>
-      Backup   = optional(bool, true)
+      Backup   = bool
       Function = string
       #Terraform   = <Set Automatically to 'True'>
       #Environment = <Set Automatically From 'var.environment'>
     })
 
     /* Optional Parameters */
-    allocated_storage           = optional(string, "100")
-    backup_retention_period     = optional(string, null)
-    backup_window               = optional(string, null)
-    blue_green_update           = optional(bool, false)
-    ca_cert_identifier          = optional(string, null)
-    dedicated_log_volume        = optional(bool, true)
-    delete_automated_backups    = optional(bool, true)
-    deletion_protection         = optional(bool, true)
-    manage_master_user_password = optional(bool, true)
-    max_allocated_storage       = optional(string, "1000")
-    skip_final_snapshot         = optional(bool, false)
-    storage_type                = optional(string, "gp3")
-    vpc_security_group_ids      = optional(list(string), null)
+    allocated_storage           = string
+    backup_retention_period     = string
+    backup_window               = string
+    blue_green_update           = bool
+    ca_cert_identifier          = string
+    dedicated_log_volume        = bool
+    delete_automated_backups    = bool
+    deletion_protection         = bool
+    manage_master_user_password = bool
+    max_allocated_storage       = string
+    skip_final_snapshot         = bool
+    storage_type                = string
+    vpc_security_group_ids      = list(string)
 
   }))
 
@@ -309,8 +302,8 @@ variable "resource_metadata" {
     repository_id = string
     stack         = string
     owner         = string
-    commit_sha    = optional(string)
-    run_id        = optional(string)
+    commit_sha    = string
+    run_id        = string
   })
 
   default  = null
@@ -399,160 +392,160 @@ variable "all_load_balancers" {
     resource_key = string
 
     /* Optional Parameters */
-    access_logs = optional(object({
+    access_logs = object({
       bucket  = string
-      enabled = optional(bool)
-      prefix  = optional(string)
-    }))
-    client_keep_alive = optional(number)
-    connection_logs = optional(object({
+      enabled = bool
+      prefix  = string
+    })
+    client_keep_alive = number
+    connection_logs = object({
       bucket  = string
-      enabled = optional(bool)
-      prefix  = optional(string)
-    }))
-    customer_owned_ipv4_pool                                     = optional(string)
-    desync_mitigation_mode                                       = optional(string)
-    dns_record_client_routing_policy                             = optional(string)
-    drop_invalid_header_fields                                   = optional(bool)
-    enable_cross_zone_load_balancing                             = optional(bool)
-    enable_deletion_protection                                   = optional(bool, true)
-    enable_http2                                                 = optional(bool)
-    enable_tls_version_and_cipher_suite_headers                  = optional(bool)
-    enable_waf_fail_open                                         = optional(bool)
-    enable_xff_client_port                                       = optional(bool)
-    enable_zonal_shift                                           = optional(bool)
-    enforce_security_group_inbound_rules_on_private_link_traffic = optional(string)
-    health_check_logs = optional(object({
+      enabled = bool
+      prefix  = string
+    })
+    customer_owned_ipv4_pool                                     = string
+    desync_mitigation_mode                                       = string
+    dns_record_client_routing_policy                             = string
+    drop_invalid_header_fields                                   = bool
+    enable_cross_zone_load_balancing                             = bool
+    enable_deletion_protection                                   = bool
+    enable_http2                                                 = bool
+    enable_tls_version_and_cipher_suite_headers                  = bool
+    enable_waf_fail_open                                         = bool
+    enable_xff_client_port                                       = bool
+    enable_zonal_shift                                           = bool
+    enforce_security_group_inbound_rules_on_private_link_traffic = string
+    health_check_logs = object({
       bucket  = string
-      enabled = optional(bool)
-      prefix  = optional(string)
-    }))
-    idle_timeout    = optional(number)
-    internal        = optional(bool, true)
-    ip_address_type = optional(string, "ipv4")
-    ipam_pools = optional(object({
+      enabled = bool
+      prefix  = string
+    })
+    idle_timeout    = number
+    internal        = bool
+    ip_address_type = string
+    ipam_pools = object({
       ipv4_ipam_pool_id = string
-    }))
-    load_balancer_type = optional(string, "application")
-    minimum_load_balancer_capacity = optional(object({
+    })
+    load_balancer_type = string
+    minimum_load_balancer_capacity = object({
       capacity_units = number
-    }))
-    name                                   = optional(string)
-    name_prefix                            = optional(string)
-    preserve_host_header                   = optional(bool)
-    secondary_ips_auto_assigned_per_subnet = optional(number)
-    security_groups                        = optional(list(string))
-    subnet_mapping = optional(list(object({
-      allocation_id        = optional(string)
-      ipv6_address         = optional(string)
-      private_ipv4_address = optional(string)
+    })
+    name                                   = string
+    name_prefix                            = string
+    preserve_host_header                   = bool
+    secondary_ips_auto_assigned_per_subnet = number
+    security_groups                        = list(string)
+    subnet_mapping = list(object({
+      allocation_id        = string
+      ipv6_address         = string
+      private_ipv4_address = string
       subnet_id            = string
-    })), [])
-    subnets = optional(list(string), [])
-    target_groups = optional(list(object({
+    }))
+    subnets = list(string)
+    target_groups = list(object({
       resource_key                      = string
       function                          = string
       vpc_id                            = string
       port                              = number
       protocol                          = string
-      protocol_version                  = optional(string)
-      target_type                       = optional(string, "instance")
-      deregistration_delay              = optional(number)
-      slow_start                        = optional(number)
-      load_balancing_algorithm_type     = optional(string)
-      load_balancing_anomaly_mitigation = optional(string)
-      load_balancing_cross_zone_enabled = optional(string)
-      preserve_client_ip                = optional(string)
-      proxy_protocol_v2                 = optional(bool)
-      connection_termination            = optional(bool)
-      ip_address_type                   = optional(string)
-      health_check = optional(object({
-        enabled             = optional(bool)
-        healthy_threshold   = optional(number)
-        interval            = optional(number)
-        matcher             = optional(string)
-        path                = optional(string)
-        port                = optional(string)
-        protocol            = optional(string)
-        timeout             = optional(number)
-        unhealthy_threshold = optional(number)
-      }))
-      stickiness = optional(object({
+      protocol_version                  = string
+      target_type                       = string
+      deregistration_delay              = number
+      slow_start                        = number
+      load_balancing_algorithm_type     = string
+      load_balancing_anomaly_mitigation = string
+      load_balancing_cross_zone_enabled = string
+      preserve_client_ip                = string
+      proxy_protocol_v2                 = bool
+      connection_termination            = bool
+      ip_address_type                   = string
+      health_check = object({
+        enabled             = bool
+        healthy_threshold   = number
+        interval            = number
+        matcher             = string
+        path                = string
+        port                = string
+        protocol            = string
+        timeout             = number
+        unhealthy_threshold = number
+      })
+      stickiness = object({
         type            = string
-        cookie_duration = optional(number)
-        cookie_name     = optional(string)
-        enabled         = optional(bool, true)
-      }))
-      tags = optional(map(string), {})
-    })), [])
-    listeners = optional(list(object({
+        cookie_duration = number
+        cookie_name     = string
+        enabled         = bool
+      })
+      tags = map(string)
+    }))
+    listeners = list(object({
       resource_key                = string
       port                        = number
-      protocol                    = optional(string)
-      ssl_policy                  = optional(string)
-      alpn_policy                 = optional(string)
-      certificate_arn             = optional(string)
-      additional_certificate_arns = optional(list(string), [])
+      protocol                    = string
+      ssl_policy                  = string
+      alpn_policy                 = string
+      certificate_arn             = string
+      additional_certificate_arns = list(string)
       default_action = object({
-        type             = optional(string, "forward")
-        target_group_key = optional(string)
-        redirect = optional(object({
+        type             = string
+        target_group_key = string
+        redirect = object({
           status_code = string
-          host        = optional(string)
-          path        = optional(string)
-          port        = optional(string)
-          protocol    = optional(string)
-          query       = optional(string)
-        }))
-        fixed_response = optional(object({
+          host        = string
+          path        = string
+          port        = string
+          protocol    = string
+          query       = string
+        })
+        fixed_response = object({
           content_type = string
-          message_body = optional(string)
-          status_code  = optional(string)
-        }))
+          message_body = string
+          status_code  = string
+        })
       })
-      rules = optional(list(object({
+      rules = list(object({
         resource_key = string
         priority     = number
         action = object({
-          type             = optional(string, "forward")
-          target_group_key = optional(string)
-          redirect = optional(object({
+          type             = string
+          target_group_key = string
+          redirect = object({
             status_code = string
-            host        = optional(string)
-            path        = optional(string)
-            port        = optional(string)
-            protocol    = optional(string)
-            query       = optional(string)
-          }))
-          fixed_response = optional(object({
+            host        = string
+            path        = string
+            port        = string
+            protocol    = string
+            query       = string
+          })
+          fixed_response = object({
             content_type = string
-            message_body = optional(string)
-            status_code  = optional(string)
-          }))
+            message_body = string
+            status_code  = string
+          })
         })
         conditions = list(object({
-          host_header         = optional(list(string))
-          path_pattern        = optional(list(string))
-          http_request_method = optional(list(string))
-          source_ip           = optional(list(string))
-          http_header = optional(object({
+          host_header         = list(string)
+          path_pattern        = list(string)
+          http_request_method = list(string)
+          source_ip           = list(string)
+          http_header = object({
             http_header_name = string
             values           = list(string)
-          }))
-          query_string = optional(list(object({
-            key   = optional(string)
+          })
+          query_string = list(object({
+            key   = string
             value = string
-          })))
+          }))
         }))
-      })), [])
-    })), [])
-    tags = optional(map(string), {})
-    timeouts = optional(object({
-      create = optional(string)
-      delete = optional(string)
-      update = optional(string)
+      }))
     }))
-    xff_header_processing_mode = optional(string)
+    tags = map(string)
+    timeouts = object({
+      create = string
+      delete = string
+      update = string
+    })
+    xff_header_processing_mode = string
   }))
 
   default  = []
@@ -1058,7 +1051,7 @@ variable "managed_keypairs" {
 
   type = map(object({
     public_key = string
-    tags       = optional(map(string), {})
+    tags       = map(string)
   }))
 
   default  = {}
@@ -1079,31 +1072,31 @@ variable "managed_security_groups" {
   type = map(object({
     region      = string
     vpc_id      = string
-    description = optional(string, "Managed by aws-terraform-framework")
+    description = string
 
-    ingress = optional(list(object({
-      description                  = optional(string)
+    ingress = list(object({
+      description                  = string
       ip_protocol                  = string
-      from_port                    = optional(number)
-      to_port                      = optional(number)
-      cidr_ipv4                    = optional(string)
-      cidr_ipv6                    = optional(string)
-      prefix_list_id               = optional(string)
-      referenced_security_group_id = optional(string)
-    })), [])
+      from_port                    = number
+      to_port                      = number
+      cidr_ipv4                    = string
+      cidr_ipv6                    = string
+      prefix_list_id               = string
+      referenced_security_group_id = string
+    }))
 
-    egress = optional(list(object({
-      description                  = optional(string)
+    egress = list(object({
+      description                  = string
       ip_protocol                  = string
-      from_port                    = optional(number)
-      to_port                      = optional(number)
-      cidr_ipv4                    = optional(string)
-      cidr_ipv6                    = optional(string)
-      prefix_list_id               = optional(string)
-      referenced_security_group_id = optional(string)
-    })), [])
+      from_port                    = number
+      to_port                      = number
+      cidr_ipv4                    = string
+      cidr_ipv6                    = string
+      prefix_list_id               = string
+      referenced_security_group_id = string
+    }))
 
-    tags = optional(map(string), {})
+    tags = map(string)
   }))
 
   default  = {}
@@ -1184,10 +1177,10 @@ variable "managed_networks" {
     subnet_cidr       = string
     # Exactly one of vpc_cidr (framework-managed VPC) or vpc_id (BYO routable VPC: the framework
     # creates only the subnet and assumes the VPC already routes - no IGW or route table).
-    vpc_cidr = optional(string)
-    vpc_id   = optional(string)
-    public   = optional(bool, false)
-    tags     = optional(map(string), {})
+    vpc_cidr = string
+    vpc_id   = string
+    public   = bool
+    tags     = map(string)
   }))
 
   default  = {}
