@@ -1225,10 +1225,10 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   assert {
     condition = alltrue([
       local.elastic_compute_cloud.us_west_2["selfwin01"].is_windows == true,
-      aws_instance.us_west_2["selfwin01"].get_password_data == true,
+      aws_instance.us_west_2["selfwin01"].get_password_data == false,
       local.readiness_targets["selfwin01"].is_windows == true,
       output.aws_instances["selfwin01"].os_family == "windows",
-      strcontains(local.elastic_compute_cloud.us_west_2["selfwin01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+      strcontains(local.elastic_compute_cloud.us_west_2["selfwin01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
     ])
     error_message = "Self-built AMIs with platform=windows should classify as Windows even if platform_details is misleading."
   }
@@ -1315,12 +1315,12 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   assert {
     condition = alltrue([
       local.elastic_compute_cloud.us_west_2["direct-win01"].is_windows == true,
-      aws_instance.us_west_2["direct-win01"].get_password_data == true,
+      aws_instance.us_west_2["direct-win01"].get_password_data == false,
       local.readiness_targets["direct-win01"].is_windows == true,
       output.aws_instances["direct-win01"].os_family == "windows",
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Transport HTTPS"),
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "LocalPort 5986"),
+      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "administrators_authorized_keys"),
+      !strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "5986"),
     ])
     error_message = "A raw Windows AMI should classify as Windows exclusively from platform metadata."
   }
@@ -1789,7 +1789,7 @@ run "systems_render_readiness_user_data_per_os" {
         ami                  = "windows_server_2022_base"
 
         tags = {
-          Function = "Windows WinRM user data"
+          Function = "Windows SSH user data"
         }
 
         network_interfaces = [
@@ -1837,36 +1837,36 @@ run "systems_render_readiness_user_data_per_os" {
 
   assert {
     condition     = aws_instance.us_west_2["win-ssh-01"].user_data != null
-    error_message = "Windows instances should receive rendered WinRM user_data."
+    error_message = "Windows instances should receive rendered SSH user_data."
   }
 
   assert {
     condition = alltrue([
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Negotiate"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Basic"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\AllowUnencrypted"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "New-SelfSignedCertificate"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Transport HTTPS"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "CertificateThumbprint"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5986"),
-      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5985"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name WinRM -StartupType Automatic"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "administrators_authorized_keys"),
+      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "X-aws-ec2-metadata-token"),
     ])
-    error_message = "Windows user_data should enable WinRM over HTTPS 5986, require encrypted Negotiate auth, and avoid exposing TCP 5985."
+    error_message = "Windows user_data should bootstrap OpenSSH Server and install the launch public key for administrator SSH."
   }
 
   assert {
     condition = alltrue([
-      strcontains(local.windows_ssh_user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
-      strcontains(local.windows_ssh_user_data, "administrators_authorized_keys"),
+      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WinRM"),
+      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan"),
+      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "5986"),
     ])
-    error_message = "Dormant Windows OpenSSH user_data should remain available for owner-managed AMIs."
+    error_message = "WinRM is decommissioned; Windows user_data must not configure WSMan/WinRM listeners."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["win-ssh-01"].get_password_data == true
-    error_message = "Windows instances should compute get_password_data = true for WinRM readiness."
+    condition     = local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data == trimspace(local.windows_ssh_user_data)
+    error_message = "Windows systems must render exactly the promoted OpenSSH bootstrap user_data."
+  }
+
+  assert {
+    condition     = aws_instance.us_west_2["win-ssh-01"].get_password_data == false
+    error_message = "WinRM is decommissioned; Windows instances must not fetch launch password data."
   }
 
   assert {
@@ -2312,5 +2312,67 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   assert {
     condition     = aws_instance.us_west_2["west-no-state"].get_password_data == false
     error_message = "Linux instances should compute get_password_data = false."
+  }
+}
+
+run "readiness_gate_optout_creates_no_gate" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-west-2"
+        hostname             = "west-gated"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        tags = {
+          Function = "Gated system keeps its readiness gate"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.9.10"
+            security_groups = ["sg-west"]
+          }
+        ]
+      },
+      {
+        region               = "us-west-2"
+        hostname             = "west-ssm"
+        availability_zone    = "us-west-2a"
+        subnet_id            = "subnet-west-b"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+        readiness_gate       = false
+
+        tags = {
+          Function = "Zero-inbound SSM system skips the readiness gate"
+        }
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.9.11"
+            security_groups = ["sg-west"]
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition     = length(terraform_data.readiness_gate) == 1 && contains(keys(terraform_data.readiness_gate), "west-gated")
+    error_message = "Systems with the default readiness_gate = true must create exactly their own gate."
+  }
+
+  assert {
+    condition     = !contains(keys(terraform_data.readiness_gate), "west-ssm")
+    error_message = "readiness_gate = false must exclude the system from terraform_data.readiness_gate entirely."
   }
 }

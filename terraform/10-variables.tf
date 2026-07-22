@@ -34,7 +34,7 @@ variable "readiness_linux_script_dir" {
 }
 
 variable "readiness_private_key_paths" {
-  description = "Map of EC2 key_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the readiness gate (terraform_data.readiness_gate): Linux authenticates directly with this key over SSH, and Windows uses it to decrypt the launch Administrator password for WinRM. Leave empty (default) for plan/CI; a real apply must supply a path for each key_name in use, or the gate cannot connect."
+  description = "Map of EC2 key_name => filesystem path (on the machine running Terraform) to the matching OpenSSH private key. Used ONLY by the readiness gate (terraform_data.readiness_gate): every platform authenticates over SSH with the launch key pair — the Windows OpenSSH bootstrap installs the launch public key for Administrator, so the same private key logs in there too (WinRM and password decryption are decommissioned). Leave empty (default) for plan/CI; a real apply must supply a path for each key_name on gated systems, or the gate cannot connect. Systems with readiness_gate = false need no entry."
   type        = map(string)
   default     = {}
   nullable    = false
@@ -67,8 +67,12 @@ variable "all_systems" {
 
     /* Optional Parameters */
     instance_type = optional(string, "m6i.large")
-    # SSH/WinRM login user for the readiness gate. Defaults to ec2-user on Linux and Administrator on Windows; override for images with a different default user (for example, ubuntu, rocky, or admin).
+    # SSH login user for the readiness gate. Defaults to ec2-user on Linux and Administrator on Windows; override for images with a different default user (for example, ubuntu, rocky, or admin).
     readiness_user = optional(string)
+    # Set false to skip the SSH readiness gate for this system entirely (no terraform_data resource
+    # is created). Required for zero-inbound systems reached only through SSM, where the machine
+    # running Terraform cannot open a TCP connection to the instance's private IP.
+    readiness_gate = optional(bool, true)
     set_state      = optional(string)
 
     root_block_device = optional(

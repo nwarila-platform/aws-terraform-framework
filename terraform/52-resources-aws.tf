@@ -890,7 +890,7 @@ resource "aws_instance" "us_west_2" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.is_windows
+  get_password_data           = false
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
@@ -957,7 +957,7 @@ resource "aws_instance" "us_west_2_refresh" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_west_2"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.is_windows
+  get_password_data           = false
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
@@ -1030,7 +1030,7 @@ resource "aws_instance" "us_east_1" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.is_windows
+  get_password_data           = false
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
@@ -1097,7 +1097,7 @@ resource "aws_instance" "us_east_1_refresh" {
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = each.value.is_windows
+  get_password_data           = false
   tags                        = each.value.tags
   key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
@@ -1158,13 +1158,15 @@ resource "aws_instance" "us_east_1_refresh" {
 
 #region ------ [ Readiness Gate ] ------------------------------------------------------------- #
 
-# Block `apply` until each instance finishes provisioning and is reachable over its readiness
-# transport: SSH on Linux, WinRM on Windows. The connection retry (10-minute timeout) waits for the
-# transport; the OS-native inline command then waits for the launch agent to finish (cloud-init on
-# Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit. Linux authenticates with
-# the launch key pair (path supplied by var.readiness_private_key_paths); Windows authenticates
-# with the decrypted launch Administrator password. On a SEPARATE terraform_data so a gate failure
-# taints only this resource, never the EC2 instance.
+# Block `apply` until each instance finishes provisioning and is reachable over SSH — the single
+# readiness transport for every platform (WinRM is decommissioned). The connection retry
+# (10-minute timeout) waits for sshd; the OS-native inline command then waits for the launch agent
+# to finish (cloud-init on Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit.
+# Both platforms authenticate with the launch key pair (path supplied by
+# var.readiness_private_key_paths; the Windows bootstrap installs the launch public key for
+# Administrator). Systems with readiness_gate = false are absent from readiness_targets and create
+# no gate at all. On a SEPARATE terraform_data so a gate failure taints only this resource, never
+# the EC2 instance.
 resource "terraform_data" "readiness_gate" {
 
   for_each = local.readiness_targets
@@ -1182,17 +1184,13 @@ resource "terraform_data" "readiness_gate" {
 
   provisioner "remote-exec" {
     connection {
-      type        = each.value.is_windows ? "winrm" : "ssh"
-      host        = each.value.private_ip
-      user        = coalesce(each.value.readiness_user, each.value.is_windows ? "Administrator" : "ec2-user")
-      password    = each.value.is_windows ? each.value.password : null
-      private_key = each.value.is_windows ? null : try(file(var.readiness_private_key_paths[each.value.key_name]), null)
-      script_path = each.value.is_windows ? null : "${var.readiness_linux_script_dir}/terraform_%RAND%.sh"
-      port        = each.value.is_windows ? 5986 : null
-      https       = each.value.is_windows ? true : null
-      insecure    = each.value.is_windows ? true : null
-      use_ntlm    = each.value.is_windows ? true : null
-      timeout     = "10m"
+      type            = "ssh"
+      host            = each.value.private_ip
+      user            = coalesce(each.value.readiness_user, each.value.is_windows ? "Administrator" : "ec2-user")
+      private_key     = try(file(var.readiness_private_key_paths[each.value.key_name]), null)
+      target_platform = each.value.is_windows ? "windows" : "unix"
+      script_path     = each.value.is_windows ? null : "${var.readiness_linux_script_dir}/terraform_%RAND%.sh"
+      timeout         = "10m"
     }
 
     inline = [

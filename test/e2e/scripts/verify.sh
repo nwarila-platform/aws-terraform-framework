@@ -287,7 +287,7 @@ else
   fail "readiness private key exists for SSH rechecks"
 fi
 
-check "WinRM 5986 is reachable on Windows host" tcp_check "$(ip_for e2e-win-25)" 5986
+check "SSH 22 is reachable on Windows host" tcp_check "$(ip_for e2e-win-25)" 22
 
 check "raw Linux has /dev/sdd and /dev/sde data volumes" volume_devices_match e2e-lin-raw '["/dev/sdd","/dev/sde"]'
 check "Ubuntu has /dev/sdd data volume" volume_devices_match e2e-lin-ubu '["/dev/sdd"]'

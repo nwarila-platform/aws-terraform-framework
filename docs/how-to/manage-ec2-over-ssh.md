@@ -1,16 +1,18 @@
-# Manage EC2 with SSH and WinRM readiness
+# Manage EC2 over SSH
 
-Use this guide when adding Linux EC2 instances that are reached over SSH, or
-Windows EC2 instances whose Terraform readiness gate uses WinRM HTTPS before
-hand-off to a separate configuration-management pipeline.
+Use this guide when adding EC2 instances whose Terraform readiness gate runs
+over SSH before hand-off to a separate configuration-management pipeline. SSH
+is the single readiness transport for every platform; WinRM is decommissioned.
 
 ## Operating model
 
-Linux readiness and management use SSH on TCP 22. Windows readiness uses an
-in-box WinRM HTTPS listener on TCP 5986, configured at first boot by this
-framework's Windows `user_data`. The repository does not configure a long-term
-Windows management transport. Ansible runs outside this repository, in a
-separate pipeline job, using its own connection settings.
+Readiness and management use SSH on TCP 22 on both Linux and Windows. The
+Windows `user_data` bootstraps the in-box OpenSSH server at first boot and
+installs the launch key pair's public key for Administrator. The repository
+does not configure a long-term Windows management transport. Ansible runs
+outside this repository, in a separate pipeline job, using its own connection
+settings. Zero-inbound systems reached only through SSM set
+`readiness_gate = false` and skip the gate entirely.
 
 This repository stops at creating reachable instances, gating initial readiness,
 and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
@@ -73,11 +75,14 @@ latest means most recently built, not highest semantic version. A direct
 
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. The framework resolves those keys to the public
-Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` enables the
-in-box WS-Management service, creates a self-signed HTTPS listener on TCP 5986,
-enables NTLM authentication, disables Basic authentication, and disables
-unencrypted WinRM traffic. It installs no SSH server, uses no
-Feature-on-Demand payload, and requires no outbound egress for readiness.
+Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` ensures the
+OpenSSH Server capability is present (Windows Server 2025 ships it in-box;
+2022 installs it as a Feature-on-Demand from Windows Update, or from
+`var.windows_openssh_source` in no-egress environments), starts `sshd`, and
+installs the launch key pair's public key to
+`administrators_authorized_keys` from IMDSv2. On Windows Server 2022 without
+egress, set `windows_openssh_source` or the bootstrap fails loudly rather
+than leaving an unreachable box.
 
 Runtime verification beyond the Terraform readiness gate is outside this
 repository. The pipeline should check that each emitted target is reachable
@@ -100,18 +105,14 @@ rules.
 Use this network posture:
 
 - Allow inbound TCP 22 from the Terraform apply host and management or
-  controller source for Linux readiness and SSH management.
-- Allow inbound TCP 5986 from the Terraform apply host for Windows readiness.
+  controller source for readiness and SSH management on both platforms.
 - Ensure private subnet instances are reachable from the Ansible controller
   through routing, VPN, a bastion path, or another consumer-managed path.
-- RDP on 3389 and WinRM on 5985 remain consumer opt-in and are not the
-  management path for this framework.
-
-The Windows WinRM readiness listener on TCP 5986 is a standing in-box listener
-configured with firewall profile `Any`; it remains listening after readiness
-completes. Treat the consumer-supplied security group as the control point:
-scope inbound 5986 to the Terraform apply host or management CIDR. Consumers
-that want the listener closed post-provision should do that out of band.
+- RDP on 3389 and WinRM remain consumer opt-in and are not the management
+  path for this framework; the framework no longer configures any WinRM
+  listener.
+- Systems with `readiness_gate = false` need no inbound access at all from
+  the apply host (SSM-only posture).
 
 ## Hand off inventory
 
@@ -155,35 +156,34 @@ This module only prepares the EC2 systems and emits infrastructure facts.
 
 This module gates instance readiness before configuration management. On
 `terraform apply`, `terraform_data.readiness_gate` runs a per-instance
-`remote-exec` probe that first waits for the readiness transport (SSH on Linux,
-WinRM on Windows) with Terraform's 10-minute connection timeout, then runs the
+`remote-exec` probe that first waits for SSH with Terraform's 10-minute
+connection timeout, then runs the
 OS-native launch-agent wait:
 `cloud-init status --wait` on Linux and
 `"C:\Program Files\Amazon\EC2Launch\EC2Launch.exe" status -b` on Windows.
 The Terraform step does not complete, and its duration captures the wait, until
 each instance is provisioned and reachable.
 
-Linux readiness authenticates with the instance key pair using
-`var.readiness_private_key_paths`. Windows readiness uses the same map to
-decrypt the launch Administrator password with
-`rsadecrypt(password_data, readiness_private_key_paths[key_name])`, then
-connects to WinRM over HTTPS with NTLM. Leave the map empty for plan and CI; a
-real apply must populate a filesystem path for every `key_name` in use.
+Both platforms authenticate with the instance key pair using
+`var.readiness_private_key_paths`; on Windows the bootstrap has installed the
+matching public key for Administrator, so no password decryption occurs and
+`password_data` is never fetched. Leave the map empty for plan and CI; a real
+apply must populate a filesystem path for every `key_name` used by gated
+systems.
 
 ## Treat the key pair as the readiness credential
 
-`key_name` is required for every `all_systems` entry. On Linux, it names the EC2
-key pair whose private key the controller uses for SSH readiness and later SSH
-management. On Windows, the launch key decrypts the generated Administrator
-password that EC2 returns as `password_data`; the active Windows `user_data`
-does not install an SSH login key.
+`key_name` is required for every `all_systems` entry. On both platforms it
+names the EC2 key pair whose private key the controller uses for SSH readiness
+and later SSH management; the Windows bootstrap installs that key pair's
+public key for Administrator at first boot.
 
 The login user and Ansible inventory variables stay in the separate pipeline
 job.
 
-The EC2 resources set `user_data_replace_on_change = true`. Changing the Linux
-SSH bootstrap or the Windows WinRM bootstrap later forces instance replacement
-so the boot payload actually runs.
+The EC2 resources set `user_data_replace_on_change = true`. Changing either
+platform's SSH bootstrap later forces instance replacement so the boot payload
+actually runs.
 
 ## Manage EBS data volumes
 
@@ -211,7 +211,7 @@ If you are upgrading from an older configuration that set
 
 These responsibilities stay outside this repository:
 
-- Windows management methods beyond the WinRM readiness shim.
+- Windows management methods beyond the OpenSSH readiness bootstrap.
 - Ansible execution.
 - Controller IAM for the Ansible job.
 - Networking, NAT, VPC endpoints, and security group rule creation.

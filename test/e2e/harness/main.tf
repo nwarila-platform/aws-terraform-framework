@@ -168,14 +168,6 @@ resource "aws_security_group" "framework" {
     security_groups = [aws_security_group.runner.id]
   }
 
-  ingress {
-    description     = "Runner WinRM readiness"
-    from_port       = 5986
-    to_port         = 5986
-    protocol        = "tcp"
-    security_groups = [aws_security_group.runner.id]
-  }
-
   egress {
     description = "Private VPC egress only"
     from_port   = 0

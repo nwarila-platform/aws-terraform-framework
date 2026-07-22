@@ -53,69 +53,6 @@ locals {
     }
   )
 
-  # Windows WinRM readiness shim selected for Windows in the elastic_compute_cloud map below. This
-  # uses only in-box WS-Management components so no Feature-on-Demand install, Windows Update, or
-  # egress is required. Terraform connects with NTLM over HTTPS; TLS supplies the message encryption
-  # WinRM requires while keeping Basic auth and unencrypted SOAP disabled.
-  windows_winrm_user_data = <<-WINDOWS_USER_DATA
-    <powershell>
-    $ErrorActionPreference = "Stop"
-
-    Enable-PSRemoting -Force -SkipNetworkProfileCheck
-
-    Set-Item -Path WSMan:\localhost\Service\Auth\Negotiate -Value $true
-    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $false
-    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $false
-
-    $certFriendlyName = "Terraform WinRM HTTPS"
-    $cert = Get-ChildItem -Path Cert:\LocalMachine\My |
-      Where-Object { $_.FriendlyName -eq $certFriendlyName -and $_.HasPrivateKey } |
-      Sort-Object -Property NotAfter -Descending |
-      Select-Object -First 1
-
-    if (-not $cert) {
-      $cert = New-SelfSignedCertificate `
-        -DnsName $env:COMPUTERNAME `
-        -CertStoreLocation Cert:\LocalMachine\My `
-        -FriendlyName $certFriendlyName `
-        -KeyAlgorithm RSA `
-        -KeyLength 2048 `
-        -HashAlgorithm SHA256 `
-        -NotAfter (Get-Date).AddYears(5)
-    }
-
-    Get-ChildItem -Path WSMan:\localhost\Listener |
-      Where-Object { $_.Keys -contains "Transport=HTTP" } |
-      ForEach-Object { Remove-Item -Path $_.PSPath -Recurse -Force }
-
-    Get-ChildItem -Path WSMan:\localhost\Listener |
-      Where-Object { $_.Keys -contains "Transport=HTTPS" } |
-      ForEach-Object { Remove-Item -Path $_.PSPath -Recurse -Force }
-
-    New-Item `
-      -Path WSMan:\localhost\Listener `
-      -Transport HTTPS `
-      -Address "*" `
-      -CertificateThumbprint $cert.Thumbprint `
-      -Force
-
-    Get-NetFirewallRule -DisplayGroup "Windows Remote Management" -ErrorAction SilentlyContinue |
-      Disable-NetFirewallRule
-
-    $ruleName = "Terraform WinRM HTTPS 5986"
-    $rule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
-    if ($rule) {
-      Set-NetFirewallRule -DisplayName $ruleName -Enabled True -Direction Inbound -Action Allow -Profile Any
-      Get-NetFirewallRule -DisplayName $ruleName | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 5986
-    } else {
-      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986 -Profile Any
-    }
-
-    Set-Service -Name WinRM -StartupType Automatic
-    Start-Service -Name WinRM
-    </powershell>
-  WINDOWS_USER_DATA
-
   # SSH bootstrap user_data.
   # Windows: self-contained, idempotent, version-aware OpenSSH bootstrap. It (1) installs the
   #   OpenSSH.Server capability only if not already Present (WS2025 ships it; WS2019/2022 install it
@@ -126,9 +63,6 @@ locals {
   #   default shell is intentionally left as cmd; setting it to PowerShell breaks Terraform
   #   remote-exec SCP upload when this dormant SSH bootstrap is re-activated.
   # Linux: cloud-init enables sshd.
-  # Windows OpenSSH user_data is retained unused and will be re-activated when owner-managed AMIs
-  # include SSH in the image.
-  # tflint-ignore: terraform_unused_declarations
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
@@ -168,8 +102,9 @@ locals {
       - systemctl enable --now sshd || systemctl enable --now ssh
   LINUX_USER_DATA
 
-  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate). Each blocks until
-  # the OS launch/provisioning agent reports completion after Terraform has first connected.
+  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
+  # over SSH. Each blocks until the OS launch/provisioning agent reports completion after Terraform
+  # has first connected.
   windows_readiness_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
   linux_readiness_command   = "cloud-init status --wait"
 }
@@ -188,10 +123,11 @@ locals {
         is_windows           = local.amazon_machine_images[system.ami][region].platform == "windows"
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_winrm_user_data : local.linux_ssh_user_data)
+        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_ssh_user_data : local.linux_ssh_user_data)
         hostname             = system.hostname
         instance_type        = system.instance_type
         readiness_user       = system.readiness_user
+        readiness_gate       = system.readiness_gate
         refresh              = system.refresh
         set_state            = system.set_state
 
@@ -249,9 +185,11 @@ locals {
   # Config entries keyed by hostname across all regions (disjoint union; see above).
   systems_by_hostname = merge(values(local.elastic_compute_cloud)...)
 
-  # Combine each instance's runtime facts (id, private IP, key pair name, decrypted Windows password)
-  # with its OS so the readiness gate can pick the right transport, login user, wait command, and
-  # credential per instance.
+  # Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the
+  # readiness gate can pick the right login user and wait command per instance. Both platforms
+  # authenticate over SSH with the launch key pair (the Windows bootstrap installs the launch
+  # public key for Administrator); WinRM is decommissioned. Systems that set
+  # readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded entirely.
   readiness_targets = {
     for hostname, instance in local.all_ec2_instances : hostname => {
       id             = instance.id
@@ -259,8 +197,8 @@ locals {
       key_name       = instance.key_name
       is_windows     = local.systems_by_hostname[hostname].is_windows
       readiness_user = local.systems_by_hostname[hostname].readiness_user
-      password       = local.systems_by_hostname[hostname].is_windows ? try(sensitive(rsadecrypt(instance.password_data, file(var.readiness_private_key_paths[instance.key_name]))), null) : null
     }
+    if local.systems_by_hostname[hostname].readiness_gate
   }
 
   elastic_network_interfaces = {

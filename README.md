@@ -46,9 +46,11 @@ terraform -chdir=terraform output -json aws_instances
 ```
 
 A real apply must populate `readiness_private_key_paths` in
-`terraform.tfvars`. The readiness gate uses that map to find each launch key:
-Linux connects over SSH with the private key, and Windows decrypts the launch
-Administrator password for WinRM readiness.
+`terraform.tfvars` for gated systems. The readiness gate uses that map to find
+each launch key and connects over SSH on every platform: the Windows OpenSSH
+bootstrap installs the launch public key for Administrator, so the same private
+key logs in there too (WinRM is decommissioned). Zero-inbound systems reached
+only through SSM set `readiness_gate = false` and skip the gate.
 
 ## Documentation
 

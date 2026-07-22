@@ -8,7 +8,7 @@ The harness is intentionally separate from `terraform/`: it has its own provider
 
 - No script should be run without owner AWS credentials and an explicit `E2E_OPERATOR_CIDR`.
 - The runner is the only public EC2 host. Framework instances are launched in private subnets with no NAT route.
-- The framework apply runs from the runner by default so SSH/WinRM readiness reaches private IPs.
+- The framework apply runs from the runner by default so SSH readiness reaches private IPs.
 - `MAX_MINUTES` defaults to `180`; `residue-sweep.sh` can trigger teardown if the marker shows the stack has exceeded that window.
 - `e2e-down.sh` destroys the framework first, then the harness, then fixture AMIs/snapshots, then runs the independent residue sweep.
 
@@ -45,7 +45,7 @@ Generated files live under `test/e2e/.generated/` and are ignored, including loc
 - `e2e-lin-ubu`: raw Ubuntu AMI, `readiness_user = "ubuntu"`, stopped after the readiness gate, Backup tag override.
 - `e2e-lin-fam`: self-built `app-linux`, proving newest family resolution.
 - `e2e-lin-ver`: self-built `app-linux:1`, proving version pinning.
-- `e2e-win-25`: `windows_server_2025_base`, `refresh = true`, WinRM 5986 readiness, one Windows data volume.
+- `e2e-win-25`: `windows_server_2025_base`, `refresh = true`, SSH readiness over the in-box OpenSSH server, one Windows data volume.
 
 RDS uses a managed master password, gp3, encryption, no public access, `allocated_storage = 20`, `dedicated_log_volume = false` for `db.t3.micro` compatibility, `deletion_protection = false`, and `skip_final_snapshot = true`. The live database name is `e2edb` because the framework passes `db_name` through to the AWS PostgreSQL database name field, which does not accept hyphens.
 
@@ -56,7 +56,7 @@ The internal ALB uses explicit security groups, two private subnets, one target 
 `verify.sh` prints PASS/FAIL lines and exits non-zero on any miss. It checks:
 
 - apply completion/readiness log
-- EC2 states, AMI IDs, IMDSv2, tags, readiness users, WinRM port
+- EC2 states, AMI IDs, IMDSv2, tags, readiness users, Windows SSH port
 - EBS device names, encryption, and `skip_destroy`
 - stopped-state ordering for Ubuntu
 - RDS managed secret, gp3, encryption, no plaintext state password
