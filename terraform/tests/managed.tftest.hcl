@@ -24,6 +24,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
       set_state      = null
 
       tags = {
@@ -112,6 +113,7 @@ run "managed_key_pair_created_from_public_key" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -287,6 +289,7 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
         readiness_gate       = false
+        imds_hop_limit       = 1
 
         refresh        = false
         instance_type  = "m6i.large"
@@ -765,6 +768,7 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         ami                  = "test-linux"
         associate_public_ip  = true
         readiness_gate       = false
+        imds_hop_limit       = 1
 
         refresh        = false
         instance_type  = "m6i.large"
@@ -974,6 +978,7 @@ run "managed_network_rejects_public_ip_without_public_network" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1039,6 +1044,7 @@ run "managed_network_rejects_az_mismatch" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {

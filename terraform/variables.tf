@@ -72,6 +72,10 @@ variable "all_systems" {
     # running Terraform cannot open a TCP connection to the instance's private IP.
     readiness_gate = bool
     set_state      = string
+    # IMDSv2 PUT response hop limit. Use 1 unless the system runs containers that need
+    # instance-role credentials, where Docker's NAT adds one hop (2). http_tokens stays
+    # module-owned and always "required" (ADR repo/0001).
+    imds_hop_limit = number
 
     root_block_device = object({
       delete_on_termination = bool
@@ -160,6 +164,16 @@ variable "all_systems" {
       system.instance_type != null
     ])
     error_message = "Each all_systems entry must set instance_type explicitly; use \"m6i.large\" to preserve the former default."
+  }
+
+  # IMDS hop limit: explicit and bounded. 1 is the former hardcode; 2 exists only for
+  # container hosts whose workloads need IMDS credentials through Docker's NAT hop.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.imds_hop_limit != null && contains([1, 2], system.imds_hop_limit)
+    ])
+    error_message = "Each all_systems entry must set imds_hop_limit explicitly to 1 or 2; use 1 to preserve the former hardcode, 2 only for systems running containers that need IMDS credentials."
   }
 
   validation {

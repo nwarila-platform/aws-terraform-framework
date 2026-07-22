@@ -158,11 +158,17 @@ The repository MUST:
 
 ## Confirmation
 
-1. `terraform/resources.tf` MUST keep module-owned encryption, IMDSv2, private
-   database, and related fixed security attributes hard-coded.
+1. `terraform/resources.tf` MUST keep module-owned encryption, IMDSv2 token
+   enforcement (`http_tokens = "required"`), the disabled IMDS IPv6 endpoint,
+   disabled instance-metadata tags, private database, and related fixed security
+   attributes hard-coded. The IMDS PUT response hop limit is the sanctioned
+   exception: it is consumer-set through `all_systems[*].imds_hop_limit` because
+   container hosts legitimately need 2, and it MUST stay guarded by a variable
+   validation bounding it to 1 or 2.
 2. `terraform/tests/systems.tftest.hcl` MUST assert EBS encryption across both
    normal and refresh collections, RDS storage encryption, EC2 root encryption,
-   and IMDSv2.
+   and IMDSv2 (token enforcement, disabled IMDS IPv6, disabled metadata tags,
+   hop-limit pass-through, and rejection of out-of-bounds hop limits).
 3. `managed_security_groups` validation MUST reject ingress sources
    `0.0.0.0/0` and `::/0`, with isolated negative tests for each address family
    and a passing unrestricted-egress control.
@@ -241,3 +247,4 @@ encryption, and metadata-service baselines are enforced in module code.
 | Date       | Change                                             | Reason                                        | Author/Role          | Body-diff? |
 | ---------- | -------------------------------------------------- | --------------------------------------------- | -------------------- | ---------- |
 | 2026-07-22 | Accepted the hardcode-first security baseline ADR. | Record the maintainer's enforcement ruling.   | Portfolio maintainer | Yes        |
+| 2026-07-22 | Sanctioned `imds_hop_limit` as a validated input.  | Container hosts need hop limit 2; bounded 1-2 with explicit-null rejection per the exposure rule this ADR defines. | Portfolio maintainer | Yes        |

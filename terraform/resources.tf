@@ -774,10 +774,16 @@ resource "aws_instance" "us_east_1" {
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
+  # http_tokens, http_protocol_ipv6, and instance_metadata_tags are module-owned
+  # (ADR repo/0001): IMDSv2 is always enforced, the IMDS IPv6 endpoint stays off in this
+  # IPv4-only framework, and instance tags are never exposed through the metadata service.
+  # Only the hop limit is consumer-set (validated 1-2 in variables.tf).
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = each.value.imds_hop_limit
+    http_protocol_ipv6          = "disabled"
+    instance_metadata_tags      = "disabled"
   }
 
   root_block_device {
@@ -841,10 +847,16 @@ resource "aws_instance" "us_east_1_refresh" {
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
+  # http_tokens, http_protocol_ipv6, and instance_metadata_tags are module-owned
+  # (ADR repo/0001): IMDSv2 is always enforced, the IMDS IPv6 endpoint stays off in this
+  # IPv4-only framework, and instance tags are never exposed through the metadata service.
+  # Only the hop limit is consumer-set (validated 1-2 in variables.tf).
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = each.value.imds_hop_limit
+    http_protocol_ipv6          = "disabled"
+    instance_metadata_tags      = "disabled"
   }
 
   root_block_device {

@@ -199,6 +199,7 @@ locals {
         readiness_gate       = system.readiness_gate
         refresh              = system.refresh
         set_state            = system.set_state
+        imds_hop_limit       = system.imds_hop_limit
 
         root_block_device = {
           volume_size           = system.root_block_device.volume_size

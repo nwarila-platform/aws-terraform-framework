@@ -190,6 +190,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         network_interfaces = [
@@ -233,6 +234,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         network_interfaces = [
@@ -276,6 +278,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         network_interfaces = [
@@ -454,6 +457,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         network_interfaces = [
