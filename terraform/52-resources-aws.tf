@@ -58,6 +58,176 @@ resource "aws_key_pair" "us_east_1" {
 #endregion --- [ Create Managed EC2 Key Pairs ] ------------------------------------------------ #
 
 
+#region ------ [ Create Managed Security Groups ] ---------------------------------------------- #
+
+# Optional framework-managed security groups (var.managed_security_groups). A group with no
+# ingress entries is zero-inbound (the SSM posture). Rules are granular
+# aws_vpc_security_group_*_rule resources with stable "<sg>/<direction>-<index>" addresses.
+# Empty default map creates nothing.
+
+resource "aws_security_group" "us_west_2" {
+
+  # Set the provider in which to deploy the security group.
+  provider = aws.us_west_2
+
+  for_each = local.managed_security_groups_by_region.us_west_2
+
+  name        = each.key
+  description = each.value.description
+  vpc_id      = each.value.vpc_id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_security_group" "us_east_1" {
+
+  # Set the provider in which to deploy the security group.
+  provider = aws.us_east_1
+
+  for_each = local.managed_security_groups_by_region.us_east_1
+
+  name        = each.key
+  description = each.value.description
+  vpc_id      = each.value.vpc_id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_vpc_security_group_ingress_rule" "us_west_2" {
+
+  # Set the provider in which to deploy the rule.
+  provider = aws.us_west_2
+
+  for_each = {
+    for key, rule in local.managed_security_group_rules.us_west_2 : key => rule
+    if rule.direction == "ingress"
+  }
+
+  security_group_id = aws_security_group.us_west_2[each.value.sg_key].id
+
+  description                  = each.value.description
+  ip_protocol                  = each.value.ip_protocol
+  from_port                    = each.value.from_port
+  to_port                      = each.value.to_port
+  cidr_ipv4                    = each.value.cidr_ipv4
+  cidr_ipv6                    = each.value.cidr_ipv6
+  prefix_list_id               = each.value.prefix_list_id
+  referenced_security_group_id = each.value.referenced_security_group_id
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+resource "aws_vpc_security_group_ingress_rule" "us_east_1" {
+
+  # Set the provider in which to deploy the rule.
+  provider = aws.us_east_1
+
+  for_each = {
+    for key, rule in local.managed_security_group_rules.us_east_1 : key => rule
+    if rule.direction == "ingress"
+  }
+
+  security_group_id = aws_security_group.us_east_1[each.value.sg_key].id
+
+  description                  = each.value.description
+  ip_protocol                  = each.value.ip_protocol
+  from_port                    = each.value.from_port
+  to_port                      = each.value.to_port
+  cidr_ipv4                    = each.value.cidr_ipv4
+  cidr_ipv6                    = each.value.cidr_ipv6
+  prefix_list_id               = each.value.prefix_list_id
+  referenced_security_group_id = each.value.referenced_security_group_id
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+resource "aws_vpc_security_group_egress_rule" "us_west_2" {
+
+  # Set the provider in which to deploy the rule.
+  provider = aws.us_west_2
+
+  for_each = {
+    for key, rule in local.managed_security_group_rules.us_west_2 : key => rule
+    if rule.direction == "egress"
+  }
+
+  security_group_id = aws_security_group.us_west_2[each.value.sg_key].id
+
+  description                  = each.value.description
+  ip_protocol                  = each.value.ip_protocol
+  from_port                    = each.value.from_port
+  to_port                      = each.value.to_port
+  cidr_ipv4                    = each.value.cidr_ipv4
+  cidr_ipv6                    = each.value.cidr_ipv6
+  prefix_list_id               = each.value.prefix_list_id
+  referenced_security_group_id = each.value.referenced_security_group_id
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+resource "aws_vpc_security_group_egress_rule" "us_east_1" {
+
+  # Set the provider in which to deploy the rule.
+  provider = aws.us_east_1
+
+  for_each = {
+    for key, rule in local.managed_security_group_rules.us_east_1 : key => rule
+    if rule.direction == "egress"
+  }
+
+  security_group_id = aws_security_group.us_east_1[each.value.sg_key].id
+
+  description                  = each.value.description
+  ip_protocol                  = each.value.ip_protocol
+  from_port                    = each.value.from_port
+  to_port                      = each.value.to_port
+  cidr_ipv4                    = each.value.cidr_ipv4
+  cidr_ipv6                    = each.value.cidr_ipv6
+  prefix_list_id               = each.value.prefix_list_id
+  referenced_security_group_id = each.value.referenced_security_group_id
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+#endregion --- [ Create Managed Security Groups ] ---------------------------------------------- #
+
+
 #region ------ [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #
 
 #region ------ [ Create All Elastic Network Interfaces (ENIs) - us-west-2 ] ------------- #

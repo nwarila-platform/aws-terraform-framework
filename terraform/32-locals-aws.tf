@@ -127,6 +127,30 @@ locals {
     )
   }
 
+  # Managed security groups partitioned per region (same normalization rule the systems use).
+  managed_security_groups_by_region = {
+    for region in var.aws_config.regions : region => {
+      for name, group in var.managed_security_groups : name => group
+      if replace(group.region, "-", "_") == region
+    }
+  }
+
+  # Managed SG rules flattened to stable per-rule addresses: "<sg>/<direction>-<index>".
+  managed_security_group_rules = {
+    for region in var.aws_config.regions : region => merge(concat([{}], [
+      for name, group in local.managed_security_groups_by_region[region] : merge(
+        { for index, rule in group.ingress : "${name}/ingress-${index}" => merge(rule, { sg_key = name, direction = "ingress" }) },
+        { for index, rule in group.egress : "${name}/egress-${index}" => merge(rule, { sg_key = name, direction = "egress" }) },
+      )
+    ])...)
+  }
+
+  # Name -> created SG id, used to resolve managed names inside NIC security_groups lists.
+  managed_security_group_ids = {
+    us_west_2 = { for name, group in aws_security_group.us_west_2 : name => group.id }
+    us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
+  }
+
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => {
@@ -222,13 +246,16 @@ locals {
         "${system.hostname}-eni-${index}" => {
 
           # AWS Network Interface Properties
-          description     = system.network_interfaces[index].description
-          hostname        = system.hostname
-          index           = index
-          interface_type  = system.network_interfaces[index].interface_type
-          private_ips     = [system.network_interfaces[index].private_ip]
-          security_groups = system.network_interfaces[index].security_groups
-          subnet_id       = system.subnet_id
+          description    = system.network_interfaces[index].description
+          hostname       = system.hostname
+          index          = index
+          interface_type = system.network_interfaces[index].interface_type
+          private_ips    = [system.network_interfaces[index].private_ip]
+          security_groups = [
+            for group in system.network_interfaces[index].security_groups :
+            lookup(local.managed_security_group_ids[region], group, group)
+          ]
+          subnet_id = system.subnet_id
 
           # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
           # ?      calculated tags. The default tags cannot be overwritten, if the user provides

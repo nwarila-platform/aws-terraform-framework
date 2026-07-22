@@ -717,3 +717,76 @@ variable "managed_keypairs" {
     error_message = "managed_keypairs public_key values must be single-line OpenSSH public keys (ssh-ed25519, ssh-rsa, or ecdsa-sha2-nistp*)."
   }
 }
+
+variable "managed_security_groups" {
+  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
+
+  type = map(object({
+    region      = string
+    vpc_id      = string
+    description = optional(string, "Managed by aws-terraform-framework")
+
+    ingress = optional(list(object({
+      description                  = optional(string)
+      ip_protocol                  = string
+      from_port                    = optional(number)
+      to_port                      = optional(number)
+      cidr_ipv4                    = optional(string)
+      cidr_ipv6                    = optional(string)
+      prefix_list_id               = optional(string)
+      referenced_security_group_id = optional(string)
+    })), [])
+
+    egress = optional(list(object({
+      description                  = optional(string)
+      ip_protocol                  = string
+      from_port                    = optional(number)
+      to_port                      = optional(number)
+      cidr_ipv4                    = optional(string)
+      cidr_ipv6                    = optional(string)
+      prefix_list_id               = optional(string)
+      referenced_security_group_id = optional(string)
+    })), [])
+
+    tags = optional(map(string), {})
+  }))
+
+  default  = {}
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups :
+      contains(var.aws_config.regions, replace(group.region, "-", "_"))
+    ])
+    error_message = "Each managed_security_groups entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups :
+      length(trimspace(group.vpc_id)) > 0
+    ])
+    error_message = "Each managed_security_groups entry must set a non-empty vpc_id."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups : alltrue([
+        for rule in concat(group.ingress, group.egress) :
+        length(compact([rule.cidr_ipv4, rule.cidr_ipv6, rule.prefix_list_id, rule.referenced_security_group_id])) == 1
+      ])
+    ])
+    error_message = "Every managed security-group rule must set exactly one destination: cidr_ipv4, cidr_ipv6, prefix_list_id, or referenced_security_group_id."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups : alltrue([
+        for rule in concat(group.ingress, group.egress) :
+        rule.ip_protocol == "-1" ? (rule.from_port == null && rule.to_port == null) : (rule.from_port == null) == (rule.to_port == null)
+      ])
+    ])
+    error_message = "Rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
+  }
+}
