@@ -21,6 +21,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
 
       tags = {
         Function = "West instance with state control"
@@ -64,6 +65,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
       set_state      = null
 
       tags = {
@@ -108,6 +110,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
       set_state      = null
 
       tags = {
@@ -153,6 +156,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
 
       tags = {
         Function = "East instance with state control"
@@ -252,6 +256,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -296,6 +301,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -467,6 +473,7 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
 
         tags = {
           Function = "West refresh instance with state control"
@@ -534,6 +541,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -578,6 +586,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -622,6 +631,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -779,6 +789,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -851,6 +862,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -905,6 +917,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -959,6 +972,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1182,6 +1196,7 @@ run "systems_reject_more_than_23_ebs_block_devices" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1249,6 +1264,7 @@ run "systems_reject_duplicate_hostnames" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1293,6 +1309,7 @@ run "systems_reject_duplicate_hostnames" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1350,6 +1367,7 @@ run "systems_reject_regions_outside_aws_config" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1437,6 +1455,7 @@ run "systems_reject_invalid_ami_identifiers" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1495,6 +1514,7 @@ run "systems_reject_invalid_set_state" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
 
         tags = {
           Function = "Invalid instance state"
@@ -1564,6 +1584,7 @@ run "systems_accept_windows_server_2025_base_ami" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1622,6 +1643,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1666,6 +1688,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1710,6 +1733,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1849,6 +1873,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1893,6 +1918,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -1998,6 +2024,7 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2055,6 +2082,7 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2112,6 +2140,7 @@ run "systems_reject_all_numeric_windows_hostnames" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2169,6 +2198,7 @@ run "systems_accept_valid_windows_hostnames" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2285,6 +2315,7 @@ run "readiness_gate_allows_empty_private_key_paths" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2356,6 +2387,7 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2422,6 +2454,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         refresh        = false
         instance_type  = "m6i.large"
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2466,6 +2499,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2510,6 +2544,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         refresh        = false
         instance_type  = "m6i.large"
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2554,6 +2589,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2641,6 +2677,7 @@ run "systems_render_readiness_user_data_per_os" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2685,6 +2722,7 @@ run "systems_render_readiness_user_data_per_os" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2810,6 +2848,7 @@ run "systems_reject_kms_alias_prefix" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2867,6 +2906,7 @@ run "systems_reject_empty_iam_instance_profile" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2924,6 +2964,7 @@ run "systems_reject_empty_network_interface_security_groups" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -2981,6 +3022,7 @@ run "systems_reject_empty_network_interfaces" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -3485,6 +3527,36 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   }
 
   assert {
+    condition     = aws_instance.us_east_1["west-state"].metadata_options[0].http_put_response_hop_limit == 1
+    error_message = "west-state should thread imds_hop_limit = 1 to the metadata options."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1_refresh["west-refresh"].metadata_options[0].http_put_response_hop_limit == 1
+    error_message = "west-refresh should thread imds_hop_limit = 1 to the metadata options."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["west-state"].metadata_options[0].http_protocol_ipv6 == "disabled"
+    error_message = "west-state should keep the IMDS IPv6 endpoint disabled."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1_refresh["west-refresh"].metadata_options[0].http_protocol_ipv6 == "disabled"
+    error_message = "west-refresh should keep the IMDS IPv6 endpoint disabled."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["west-state"].metadata_options[0].instance_metadata_tags == "disabled"
+    error_message = "west-state should never expose instance tags through the metadata service."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1_refresh["west-refresh"].metadata_options[0].instance_metadata_tags == "disabled"
+    error_message = "west-refresh should never expose instance tags through the metadata service."
+  }
+
+  assert {
     condition     = aws_instance.us_east_1["west-no-state"].get_password_data == false
     error_message = "Linux instances should compute get_password_data = false."
   }
@@ -3509,6 +3581,7 @@ run "readiness_gate_optout_creates_no_gate" {
         instance_type  = "m6i.large"
         readiness_user = null
         readiness_gate = true
+        imds_hop_limit = 1
         set_state      = null
 
         tags = {
@@ -3549,6 +3622,7 @@ run "readiness_gate_optout_creates_no_gate" {
         aws_kms_alias        = "west"
         ami                  = "test-linux"
         readiness_gate       = false
+        imds_hop_limit       = 1
 
         refresh        = false
         instance_type  = "m6i.large"
@@ -3615,6 +3689,7 @@ run "all_systems_rejects_null_root_block_device" {
         instance_type        = "m6i.large"
         readiness_user       = null
         readiness_gate       = true
+        imds_hop_limit       = 1
         set_state            = null
         tags = {
           Backup   = true
@@ -3657,6 +3732,7 @@ run "all_systems_rejects_null_instance_type" {
         instance_type        = null
         readiness_user       = null
         readiness_gate       = true
+        imds_hop_limit       = 1
         set_state            = null
         tags = {
           Backup   = true
@@ -3726,4 +3802,261 @@ run "all_databases_rejects_null_blue_green_update" {
   }
 
   expect_failures = [var.all_databases]
+}
+
+run "all_systems_threads_imds_hop_limit_two" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "hop-two"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 2
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Container host needs one extra IMDS hop"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "hop-two-refresh"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = true
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 2
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Refresh container host needs one extra IMDS hop"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["hop-two"].metadata_options[0].http_put_response_hop_limit == 2
+    error_message = "hop-two should thread imds_hop_limit = 2 to the metadata options."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["hop-two"].metadata_options[0].http_tokens == "required"
+    error_message = "Raising the hop limit must not weaken IMDSv2 token enforcement."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1_refresh["hop-two-refresh"].metadata_options[0].http_put_response_hop_limit == 2
+    error_message = "hop-two-refresh should thread imds_hop_limit = 2 to the metadata options."
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1_refresh["hop-two-refresh"].metadata_options[0].http_tokens == "required"
+    error_message = "Raising the hop limit must not weaken IMDSv2 token enforcement."
+  }
+}
+
+run "all_systems_rejects_imds_hop_limit_zero" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "hop-zero"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 0
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Zero hop limit validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_imds_hop_limit_three" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "hop-three"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 3
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Above-maximum hop limit validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_null_imds_hop_limit" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "hop-null"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = null
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Null hop limit validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
 }

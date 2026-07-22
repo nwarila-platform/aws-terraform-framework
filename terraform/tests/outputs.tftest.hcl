@@ -26,6 +26,7 @@ variables {
       instance_type  = "m6i.large"
       readiness_user = null
       readiness_gate = true
+      imds_hop_limit = 1
       set_state      = null
 
       tags = {
