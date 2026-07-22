@@ -790,3 +790,78 @@ variable "managed_security_groups" {
     error_message = "Rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
   }
 }
+
+variable "managed_networks" {
+  description = "Throwaway per-deploy networks this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].subnet_id references. Each entry creates a VPC (or attaches into a supplied vpc_id as the BYO escape hatch) plus one subnet; public = true additionally creates an internet gateway, a route table with a 0.0.0.0/0 default route, and the association - the plumbing an Elastic IP needs. The empty default preserves consume-pre-existing behavior exactly."
+
+  type = map(object({
+    region            = string
+    availability_zone = string
+    subnet_cidr       = string
+    # Exactly one of vpc_cidr (framework-managed VPC) or vpc_id (BYO routable VPC: the framework
+    # creates only the subnet and assumes the VPC already routes - no IGW or route table).
+    vpc_cidr = optional(string)
+    vpc_id   = optional(string)
+    public   = optional(bool, false)
+    tags     = optional(map(string), {})
+  }))
+
+  default  = {}
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks :
+      contains(var.aws_config.regions, replace(network.region, "-", "_"))
+    ])
+    error_message = "Each managed_networks entry region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks :
+      length(compact([network.vpc_cidr, network.vpc_id])) == 1
+    ])
+    error_message = "Each managed_networks entry must set exactly one of vpc_cidr (managed VPC) or vpc_id (BYO VPC)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks :
+      can(cidrhost(network.subnet_cidr, 0)) && (network.vpc_cidr == null ? true : can(cidrhost(network.vpc_cidr, 0)))
+    ])
+    error_message = "managed_networks subnet_cidr and vpc_cidr must be valid IPv4 CIDR blocks."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks :
+      network.public == false || network.vpc_cidr != null
+    ])
+    error_message = "managed_networks public = true requires a framework-managed VPC (vpc_cidr); a BYO vpc_id is assumed to bring its own routing."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !contains(keys(var.managed_networks), system.subnet_id) || system.availability_zone == var.managed_networks[system.subnet_id].availability_zone
+    ])
+    error_message = "Systems referencing a managed network must use that network's availability_zone; the managed subnet exists only there."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !contains(keys(var.managed_networks), system.subnet_id) || replace(system.region, "-", "_") == replace(var.managed_networks[system.subnet_id].region, "-", "_")
+    ])
+    error_message = "Systems referencing a managed network must be declared in the same region as that network."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public)
+    ])
+    error_message = "associate_public_ip = true requires subnet_id to reference a managed_networks entry with public = true (explicit-ENI systems cannot use subnet auto-assign, and BYO subnets manage their own public path)."
+  }
+}

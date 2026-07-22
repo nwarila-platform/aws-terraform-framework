@@ -228,6 +228,319 @@ resource "aws_vpc_security_group_egress_rule" "us_east_1" {
 #endregion --- [ Create Managed Security Groups ] ---------------------------------------------- #
 
 
+#region ------ [ Create Managed Networking ] --------------------------------------------------- #
+
+# Optional framework-managed throwaway networking (var.managed_networks): VPC (or BYO vpc_id),
+# one subnet, and for public networks an internet gateway + default route. Systems opt into a
+# public IPv4 with associate_public_ip = true, which allocates an EIP and binds it to the primary
+# ENI - the only public-IPv4 path that works with explicitly attached ENIs. Empty default map
+# creates nothing.
+
+resource "aws_vpc" "us_west_2" {
+
+  # Set the provider in which to deploy the VPC.
+  provider = aws.us_west_2
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_west_2 : name => network
+    if network.vpc_cidr != null
+  }
+
+  cidr_block           = each.value.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_internet_gateway" "us_west_2" {
+
+  # Set the provider in which to deploy the internet gateway.
+  provider = aws.us_west_2
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_west_2 : name => network
+    if network.public && network.vpc_cidr != null
+  }
+
+  vpc_id = aws_vpc.us_west_2[each.key].id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_subnet" "us_west_2" {
+
+  # Set the provider in which to deploy the subnet.
+  provider = aws.us_west_2
+
+  for_each = local.managed_networks_by_region.us_west_2
+
+  vpc_id            = local.managed_vpc_ids.us_west_2[each.key]
+  cidr_block        = each.value.subnet_cidr
+  availability_zone = each.value.availability_zone
+
+  # Inert for this framework's explicitly attached ENIs; kept false so nothing else launched into
+  # the subnet silently receives a public address either.
+  map_public_ip_on_launch = false
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_route_table" "us_west_2" {
+
+  # Set the provider in which to deploy the route table.
+  provider = aws.us_west_2
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_west_2 : name => network
+    if network.public && network.vpc_cidr != null
+  }
+
+  vpc_id = aws_vpc.us_west_2[each.key].id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_route" "us_west_2_default" {
+
+  # Set the provider in which to deploy the route.
+  provider = aws.us_west_2
+
+  for_each = aws_route_table.us_west_2
+
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.us_west_2[each.key].id
+
+}
+
+resource "aws_route_table_association" "us_west_2" {
+
+  # Set the provider in which to deploy the route table association.
+  provider = aws.us_west_2
+
+  for_each = aws_route_table.us_west_2
+
+  subnet_id      = aws_subnet.us_west_2[each.key].id
+  route_table_id = each.value.id
+
+}
+
+resource "aws_eip" "us_west_2" {
+
+  # Set the provider in which to allocate the Elastic IP.
+  provider = aws.us_west_2
+
+  for_each = local.eip_systems.us_west_2
+
+  domain = "vpc"
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+resource "aws_eip_association" "us_west_2" {
+
+  # Set the provider in which to associate the Elastic IP.
+  provider = aws.us_west_2
+
+  for_each = local.eip_systems.us_west_2
+
+  allocation_id        = aws_eip.us_west_2[each.key].id
+  network_interface_id = aws_network_interface.us_west_2["${each.key}-eni-0"].id
+
+}
+
+resource "aws_vpc" "us_east_1" {
+
+  # Set the provider in which to deploy the VPC.
+  provider = aws.us_east_1
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_east_1 : name => network
+    if network.vpc_cidr != null
+  }
+
+  cidr_block           = each.value.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_internet_gateway" "us_east_1" {
+
+  # Set the provider in which to deploy the internet gateway.
+  provider = aws.us_east_1
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_east_1 : name => network
+    if network.public && network.vpc_cidr != null
+  }
+
+  vpc_id = aws_vpc.us_east_1[each.key].id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_subnet" "us_east_1" {
+
+  # Set the provider in which to deploy the subnet.
+  provider = aws.us_east_1
+
+  for_each = local.managed_networks_by_region.us_east_1
+
+  vpc_id            = local.managed_vpc_ids.us_east_1[each.key]
+  cidr_block        = each.value.subnet_cidr
+  availability_zone = each.value.availability_zone
+
+  # Inert for this framework's explicitly attached ENIs; kept false so nothing else launched into
+  # the subnet silently receives a public address either.
+  map_public_ip_on_launch = false
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_route_table" "us_east_1" {
+
+  # Set the provider in which to deploy the route table.
+  provider = aws.us_east_1
+
+  for_each = {
+    for name, network in local.managed_networks_by_region.us_east_1 : name => network
+    if network.public && network.vpc_cidr != null
+  }
+
+  vpc_id = aws_vpc.us_east_1[each.key].id
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_route" "us_east_1_default" {
+
+  # Set the provider in which to deploy the route.
+  provider = aws.us_east_1
+
+  for_each = aws_route_table.us_east_1
+
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.us_east_1[each.key].id
+
+}
+
+resource "aws_route_table_association" "us_east_1" {
+
+  # Set the provider in which to deploy the route table association.
+  provider = aws.us_east_1
+
+  for_each = aws_route_table.us_east_1
+
+  subnet_id      = aws_subnet.us_east_1[each.key].id
+  route_table_id = each.value.id
+
+}
+
+resource "aws_eip" "us_east_1" {
+
+  # Set the provider in which to allocate the Elastic IP.
+  provider = aws.us_east_1
+
+  for_each = local.eip_systems.us_east_1
+
+  domain = "vpc"
+
+  tags = {
+    Name        = each.key
+    Environment = var.environment
+    Terraform   = "True"
+  }
+
+}
+
+resource "aws_eip_association" "us_east_1" {
+
+  # Set the provider in which to associate the Elastic IP.
+  provider = aws.us_east_1
+
+  for_each = local.eip_systems.us_east_1
+
+  allocation_id        = aws_eip.us_east_1[each.key].id
+  network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
+
+}
+
+#endregion --- [ Create Managed Networking ] --------------------------------------------------- #
+
+
 #region ------ [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #
 
 #region ------ [ Create All Elastic Network Interfaces (ENIs) - us-west-2 ] ------------- #

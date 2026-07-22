@@ -111,13 +111,21 @@ variable "all_systems" {
       object({
         #subnet_ip      = # Calculated automatically from parent object
         #region         = # Calculated automatically from parent object
-        description     = optional(string)
-        interface_type  = optional(string, null)
-        private_ip      = string
+        description    = optional(string)
+        interface_type = optional(string, null)
+        # Omit (null) to let AWS pick a free address from the subnet CIDR - the usual choice for
+        # managed_networks subnets whose CIDR the consumer does not want to hand-allocate.
+        private_ip      = optional(string)
         security_groups = list(string)
         tags            = optional(map(string), {})
       })
     )
+
+    # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
+    # Requires subnet_id to reference a managed_networks entry with public = true: with an
+    # explicitly attached ENI, subnet auto-assign public IPs are inert, so an EIP is the only
+    # public-IPv4 path this framework supports.
+    associate_public_ip = optional(bool, false)
 
     # lifecycle doesn't allow variable declaration.
     # ?Note: I may be able to get around this using conditional if deployments, but it will make

@@ -151,6 +151,40 @@ locals {
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
 
+  # Managed networks partitioned per region (same normalization rule the systems use).
+  managed_networks_by_region = {
+    for region in var.aws_config.regions : region => {
+      for name, network in var.managed_networks : name => network
+      if replace(network.region, "-", "_") == region
+    }
+  }
+
+  # Network key -> VPC id (framework-created VPC, or the BYO vpc_id passthrough).
+  managed_vpc_ids = {
+    us_west_2 = {
+      for name, network in local.managed_networks_by_region.us_west_2 :
+      name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_west_2[name].id
+    }
+    us_east_1 = {
+      for name, network in local.managed_networks_by_region.us_east_1 :
+      name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_east_1[name].id
+    }
+  }
+
+  # Network key -> created subnet id, used to resolve managed names in all_systems[*].subnet_id.
+  managed_subnet_ids = {
+    us_west_2 = { for name, subnet in aws_subnet.us_west_2 : name => subnet.id }
+    us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
+  }
+
+  # Systems that requested a public IPv4: an EIP is allocated and associated with the primary ENI.
+  eip_systems = {
+    for region in var.aws_config.regions : region => {
+      for system in var.all_systems : system.hostname => system
+      if replace(system.region, "-", "_") == region && system.associate_public_ip
+    }
+  }
+
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => {
@@ -250,12 +284,13 @@ locals {
           hostname       = system.hostname
           index          = index
           interface_type = system.network_interfaces[index].interface_type
-          private_ips    = [system.network_interfaces[index].private_ip]
+          # Null lets AWS pick a free address from the subnet CIDR.
+          private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
           security_groups = [
             for group in system.network_interfaces[index].security_groups :
             lookup(local.managed_security_group_ids[region], group, group)
           ]
-          subnet_id = system.subnet_id
+          subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
 
           # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
           # ?      calculated tags. The default tags cannot be overwritten, if the user provides
