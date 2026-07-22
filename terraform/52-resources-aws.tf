@@ -7,6 +7,57 @@
 #% =========================================================================================== %#
 
 
+#region ------ [ Create Managed EC2 Key Pairs ] ----------------------------------------------- #
+
+# Optional framework-managed key pairs (public half supplied via var.managed_keypairs). Created in
+# both supported regions so any system may reference the same key-pair name. Empty default map
+# creates nothing.
+
+resource "aws_key_pair" "us_west_2" {
+
+  # Set the provider in which to deploy the key pair.
+  provider = aws.us_west_2
+
+  for_each = var.managed_keypairs
+
+  key_name   = each.key
+  public_key = each.value.public_key
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+resource "aws_key_pair" "us_east_1" {
+
+  # Set the provider in which to deploy the key pair.
+  provider = aws.us_east_1
+
+  for_each = var.managed_keypairs
+
+  key_name   = each.key
+  public_key = each.value.public_key
+
+  tags = merge(
+    each.value.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Terraform   = "True"
+    }
+  )
+
+}
+
+#endregion --- [ Create Managed EC2 Key Pairs ] ------------------------------------------------ #
+
+
 #region ------ [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #
 
 #region ------ [ Create All Elastic Network Interfaces (ENIs) - us-west-2 ] ------------- #
@@ -892,7 +943,7 @@ resource "aws_instance" "us_west_2" {
   availability_zone           = each.value.availability_zone
   get_password_data           = false
   tags                        = each.value.tags
-  key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
+  key_name                    = local.key_pair_names.us_west_2[each.value.key_name]
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
@@ -959,7 +1010,7 @@ resource "aws_instance" "us_west_2_refresh" {
   availability_zone           = each.value.availability_zone
   get_password_data           = false
   tags                        = each.value.tags
-  key_name                    = data.aws_key_pair.us_west_2[each.value.key_name].key_name
+  key_name                    = local.key_pair_names.us_west_2[each.value.key_name]
   iam_instance_profile        = data.aws_iam_instance_profile.us_west_2[each.value.iam_instance_profile].name
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
@@ -1032,7 +1083,7 @@ resource "aws_instance" "us_east_1" {
   availability_zone           = each.value.availability_zone
   get_password_data           = false
   tags                        = each.value.tags
-  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
@@ -1099,7 +1150,7 @@ resource "aws_instance" "us_east_1_refresh" {
   availability_zone           = each.value.availability_zone
   get_password_data           = false
   tags                        = each.value.tags
-  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
+  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   user_data                   = each.value.user_data
   user_data_replace_on_change = true

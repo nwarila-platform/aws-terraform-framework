@@ -113,6 +113,20 @@ locals {
 # Dynamically Configured LOCALS
 locals {
 
+  # Resolve each referenced key-pair name to its source: the framework-managed aws_key_pair when
+  # the name matches a managed_keypairs entry, otherwise the pre-existing key-pair data lookup.
+  # Same keys the EC2 resources already use, so managed adoption never re-keys any resource.
+  key_pair_names = {
+    us_west_2 = merge(
+      { for name, keypair in data.aws_key_pair.us_west_2 : name => keypair.key_name },
+      { for name, keypair in aws_key_pair.us_west_2 : name => keypair.key_name },
+    )
+    us_east_1 = merge(
+      { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name },
+      { for name, keypair in aws_key_pair.us_east_1 : name => keypair.key_name },
+    )
+  }
+
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => {

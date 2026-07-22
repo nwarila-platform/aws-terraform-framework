@@ -544,7 +544,7 @@ data "aws_key_pair" "us_west_2" {
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
-      if contains(["us_west_2", "us-west-2"], system.region)
+      if contains(["us_west_2", "us-west-2"], system.region) && !contains(keys(var.managed_keypairs), system.key_name)
     ])
   )
 
@@ -565,7 +565,7 @@ data "aws_key_pair" "us_east_1" {
   for_each = toset(
     distinct([
       for system in var.all_systems : system.key_name
-      if contains(["us_east_1", "us-east-1"], system.region)
+      if contains(["us_east_1", "us-east-1"], system.region) && !contains(keys(var.managed_keypairs), system.key_name)
     ])
   )
 

@@ -697,3 +697,23 @@ variable "all_load_balancers" {
     error_message = "Each all_load_balancers listener additional_certificate_arns list must not contain duplicates."
   }
 }
+
+variable "managed_keypairs" {
+  description = "EC2 key pairs this framework creates instead of consuming pre-existing ones. Map key = the key-pair name that all_systems[*].key_name references; the value supplies the PUBLIC half only, so the private key stays wherever the deploy pipeline keeps its secrets and never enters Terraform state. Each managed key pair is created in both supported regions so any system may reference it. The empty default preserves the consume-pre-existing behavior exactly (zero plan change for existing consumers)."
+
+  type = map(object({
+    public_key = string
+    tags       = optional(map(string), {})
+  }))
+
+  default  = {}
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for name, keypair in var.managed_keypairs :
+      can(regex("^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521))\\s+\\S+", keypair.public_key))
+    ])
+    error_message = "managed_keypairs public_key values must be single-line OpenSSH public keys (ssh-ed25519, ssh-rsa, or ecdsa-sha2-nistp*)."
+  }
+}
