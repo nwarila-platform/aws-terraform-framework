@@ -1094,3 +1094,57 @@ run "managed_network_rejects_both_vpc_cidr_and_vpc_id" {
 
   expect_failures = [var.managed_networks]
 }
+
+run "managed_keypairs_rejects_null_tags" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "null-tags" = {
+        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly deploy@mock"
+        tags       = null
+      }
+    }
+  }
+
+  expect_failures = [var.managed_keypairs]
+}
+
+run "managed_security_groups_rejects_null_ingress" {
+  command = plan
+
+  variables {
+    managed_security_groups = {
+      "null-ingress" = {
+        region      = "us-east-1"
+        vpc_id      = "vpc-test"
+        description = "Managed by aws-terraform-framework"
+        ingress     = null
+        egress      = []
+        tags        = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_security_groups]
+}
+
+run "managed_networks_rejects_null_public" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "null-public" = {
+        region            = "us-east-1"
+        availability_zone = "us-east-1a"
+        subnet_cidr       = "10.60.0.0/28"
+        vpc_cidr          = "10.60.0.0/24"
+        vpc_id            = null
+        public            = null
+        tags              = {}
+      }
+    }
+  }
+
+  expect_failures = [var.managed_networks]
+}

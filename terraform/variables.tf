@@ -132,6 +132,36 @@ variable "all_systems" {
   default  = []
   nullable = false
 
+  # Former-default structural composites and collections.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      try(system.tags.Backup != null, false) &&
+      system.readiness_gate != null &&
+      system.root_block_device != null &&
+      system.ebs_block_devices != null
+    ])
+    error_message = "Each all_systems entry must set tags.Backup, readiness_gate, root_block_device, and ebs_block_devices explicitly; use tags.Backup = true, readiness_gate = true, root_block_device = { delete_on_termination = true, iops = null, tags = {}, throughput = null, volume_type = \"gp3\", volume_size = \"100\" }, and ebs_block_devices = [] to preserve the former defaults."
+  }
+
+  # Former-default boolean gates.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.refresh != null && system.associate_public_ip != null
+    ])
+    error_message = "Each all_systems entry must set refresh and associate_public_ip explicitly; use false for both to preserve the former defaults."
+  }
+
+  # Former-default provider-pass scalars.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.instance_type != null
+    ])
+    error_message = "Each all_systems entry must set instance_type explicitly; use \"m6i.large\" to preserve the former default."
+  }
+
   validation {
     condition     = length(distinct([for system in var.all_systems : system.hostname])) == length(var.all_systems)
     error_message = "Each all_systems entry must have a unique hostname."
@@ -154,7 +184,7 @@ variable "all_systems" {
   }
 
   validation {
-    condition     = alltrue([for system in var.all_systems : length(system.ebs_block_devices) <= 23])
+    condition     = alltrue([for system in var.all_systems : system.ebs_block_devices == null || length(system.ebs_block_devices) <= 23])
     error_message = "Each all_systems entry supports at most 23 ebs_block_devices (device names run /dev/sdd..sdz); split larger volume sets across instances."
   }
 
@@ -255,6 +285,32 @@ variable "all_databases" {
   nullable  = false
   sensitive = true
 
+  # Former-default structural composites and collections.
+  validation {
+    condition = nonsensitive(alltrue([
+      for database in var.all_databases :
+      try(database.tags.Backup != null, false) &&
+      database.blue_green_update != null &&
+      database.manage_master_user_password != null
+    ]))
+    error_message = "Each all_databases entry must set tags.Backup, blue_green_update, and manage_master_user_password explicitly; use true, false, and true respectively to preserve the former defaults."
+  }
+
+  # Former-default provider-pass scalars.
+  validation {
+    condition = nonsensitive(alltrue([
+      for database in var.all_databases :
+      database.allocated_storage != null &&
+      database.dedicated_log_volume != null &&
+      database.delete_automated_backups != null &&
+      database.deletion_protection != null &&
+      database.max_allocated_storage != null &&
+      database.skip_final_snapshot != null &&
+      database.storage_type != null
+    ]))
+    error_message = "Each all_databases entry must set allocated_storage, dedicated_log_volume, delete_automated_backups, deletion_protection, max_allocated_storage, skip_final_snapshot, and storage_type explicitly; use \"100\", true, true, true, \"1000\", false, and \"gp3\" respectively to preserve the former defaults."
+  }
+
   validation {
     condition     = nonsensitive(length(distinct([for database in var.all_databases : database.db_name])) == length(var.all_databases))
     error_message = "Each all_databases entry must have a unique db_name."
@@ -279,7 +335,7 @@ variable "all_databases" {
   validation {
     condition = nonsensitive(alltrue([
       for database in var.all_databases :
-      database.manage_master_user_password || (database.password != null && database.password != "")
+      database.manage_master_user_password == null || database.manage_master_user_password || (database.password != null && database.password != "")
     ]))
     error_message = "Each all_databases entry must set a non-empty password unless manage_master_user_password is true."
   }
@@ -336,14 +392,14 @@ variable "resource_metadata" {
   validation {
     condition = var.resource_metadata == null ? true : alltrue([
       for tags in concat(
-        [for system in var.all_systems : system.root_block_device.tags],
-        flatten([for system in var.all_systems : [for volume in system.ebs_block_devices : volume.tags]]),
-        flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags]]),
-        [for load_balancer in var.all_load_balancers : load_balancer.tags],
-        flatten([for load_balancer in var.all_load_balancers : [for target_group in load_balancer.target_groups : target_group.tags]]),
-        [for name, keypair in var.managed_keypairs : keypair.tags],
-        [for name, group in var.managed_security_groups : group.tags],
-        [for name, network in var.managed_networks : network.tags],
+        [for system in var.all_systems : try(system.root_block_device.tags == null ? {} : system.root_block_device.tags, {})],
+        flatten([for system in var.all_systems : system.ebs_block_devices == null ? [] : [for volume in system.ebs_block_devices : volume.tags == null ? {} : volume.tags]]),
+        flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags == null ? {} : nic.tags]]),
+        [for load_balancer in var.all_load_balancers : load_balancer.tags == null ? {} : load_balancer.tags],
+        flatten([for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [for target_group in load_balancer.target_groups : target_group.tags == null ? {} : target_group.tags]]),
+        [for name, keypair in var.managed_keypairs : keypair.tags == null ? {} : keypair.tags],
+        [for name, group in var.managed_security_groups : group.tags == null ? {} : group.tags],
+        [for name, network in var.managed_networks : network.tags == null ? {} : network.tags],
       ) : alltrue([for key in keys(tags) : !startswith(lower(key), "nwarila:")])
     ])
     error_message = "The nwarila: tag namespace is reserved for resource_metadata-derived tags; consumer-supplied tag maps must not use it."
@@ -550,6 +606,37 @@ variable "all_load_balancers" {
   default  = []
   nullable = false
 
+  # Former-default structural composites and collections.
+  validation {
+    condition = alltrue([
+      for load_balancer in var.all_load_balancers : try(
+        load_balancer.internal != null &&
+        load_balancer.ip_address_type != null &&
+        load_balancer.load_balancer_type != null &&
+        load_balancer.subnet_mapping != null &&
+        load_balancer.subnets != null &&
+        load_balancer.target_groups != null &&
+        alltrue([
+          for target_group in load_balancer.target_groups :
+          target_group.target_type != null
+        ]) &&
+        load_balancer.listeners != null &&
+        alltrue([
+          for listener in load_balancer.listeners :
+          listener.additional_certificate_arns != null &&
+          listener.default_action.type != null &&
+          listener.rules != null &&
+          alltrue([
+            for rule in listener.rules :
+            rule.action.type != null
+          ])
+        ]),
+        false
+      )
+    ])
+    error_message = "Each all_load_balancers entry must explicitly set internal = true, ip_address_type = \"ipv4\", load_balancer_type = \"application\", target_groups[*].target_type = \"instance\", listeners[*].default_action.type = \"forward\", listeners[*].rules[*].action.type = \"forward\", and the subnet_mapping, subnets, target_groups, listeners, listeners[*].rules, and listeners[*].additional_certificate_arns collections (use [] for unused collections) to preserve the former defaults."
+  }
+
   validation {
     condition = length(distinct([
       for load_balancer in var.all_load_balancers : load_balancer.resource_key
@@ -584,7 +671,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      (length(load_balancer.subnets) > 0 ? 1 : 0) + (length(load_balancer.subnet_mapping) > 0 ? 1 : 0) == 1
+      load_balancer.subnets == null || load_balancer.subnet_mapping == null || (length(load_balancer.subnets) > 0 ? 1 : 0) + (length(load_balancer.subnet_mapping) > 0 ? 1 : 0) == 1
     ])
     error_message = "Each all_load_balancers entry must set exactly one of subnets or subnet_mapping."
   }
@@ -600,7 +687,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      contains(["application", "gateway", "network"], load_balancer.load_balancer_type)
+      load_balancer.load_balancer_type == null || contains(["application", "gateway", "network"], load_balancer.load_balancer_type)
     ])
     error_message = "load_balancer_type must be application, gateway, or network."
   }
@@ -608,7 +695,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      contains(["dualstack", "dualstack-without-public-ipv4", "ipv4"], load_balancer.ip_address_type)
+      load_balancer.ip_address_type == null || contains(["dualstack", "dualstack-without-public-ipv4", "ipv4"], load_balancer.ip_address_type)
     ])
     error_message = "ip_address_type must be dualstack, dualstack-without-public-ipv4, or ipv4."
   }
@@ -616,7 +703,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.ip_address_type != "dualstack-without-public-ipv4" || load_balancer.load_balancer_type == "application"
+      load_balancer.ip_address_type == null || load_balancer.load_balancer_type == null || load_balancer.ip_address_type != "dualstack-without-public-ipv4" || load_balancer.load_balancer_type == "application"
     ])
     error_message = "ip_address_type dualstack-without-public-ipv4 is only valid for application load balancers."
   }
@@ -624,7 +711,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      !load_balancer.internal || load_balancer.ip_address_type == "ipv4"
+      load_balancer.internal == null || load_balancer.ip_address_type == null || !load_balancer.internal || load_balancer.ip_address_type == "ipv4"
     ])
     error_message = "Internal load balancers must use ip_address_type ipv4."
   }
@@ -632,7 +719,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.internal == true
+      load_balancer.internal == null || load_balancer.internal == true
     ])
     error_message = "Each all_load_balancers entry must be internal; public load balancers are not allowed."
   }
@@ -664,7 +751,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.dns_record_client_routing_policy == null || load_balancer.load_balancer_type == "network"
+      load_balancer.dns_record_client_routing_policy == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "network"
     ])
     error_message = "dns_record_client_routing_policy is only valid for network load balancers."
   }
@@ -672,7 +759,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.drop_invalid_header_fields == null || load_balancer.load_balancer_type == "application"
+      load_balancer.drop_invalid_header_fields == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "drop_invalid_header_fields is only valid for application load balancers."
   }
@@ -680,7 +767,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.enable_http2 == null || load_balancer.load_balancer_type == "application"
+      load_balancer.enable_http2 == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "enable_http2 is only valid for application load balancers."
   }
@@ -688,7 +775,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.enable_tls_version_and_cipher_suite_headers == null || load_balancer.load_balancer_type == "application"
+      load_balancer.enable_tls_version_and_cipher_suite_headers == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "enable_tls_version_and_cipher_suite_headers is only valid for application load balancers."
   }
@@ -696,7 +783,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.enable_xff_client_port == null || load_balancer.load_balancer_type == "application"
+      load_balancer.enable_xff_client_port == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "enable_xff_client_port is only valid for application load balancers."
   }
@@ -712,7 +799,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.enforce_security_group_inbound_rules_on_private_link_traffic == null || load_balancer.load_balancer_type == "network"
+      load_balancer.enforce_security_group_inbound_rules_on_private_link_traffic == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "network"
     ])
     error_message = "enforce_security_group_inbound_rules_on_private_link_traffic is only valid for network load balancers."
   }
@@ -720,7 +807,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.idle_timeout == null || load_balancer.load_balancer_type == "application"
+      load_balancer.idle_timeout == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "idle_timeout is only valid for application load balancers."
   }
@@ -728,7 +815,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.ipam_pools == null || load_balancer.load_balancer_type == "application"
+      load_balancer.ipam_pools == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "ipam_pools is only valid for application load balancers."
   }
@@ -736,7 +823,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.minimum_load_balancer_capacity == null || contains(["application", "network"], load_balancer.load_balancer_type)
+      load_balancer.minimum_load_balancer_capacity == null || load_balancer.load_balancer_type == null || contains(["application", "network"], load_balancer.load_balancer_type)
     ])
     error_message = "minimum_load_balancer_capacity is only valid for application or network load balancers."
   }
@@ -744,7 +831,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.preserve_host_header == null || load_balancer.load_balancer_type == "application"
+      load_balancer.preserve_host_header == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "preserve_host_header is only valid for application load balancers."
   }
@@ -760,7 +847,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.secondary_ips_auto_assigned_per_subnet == null || load_balancer.load_balancer_type == "network"
+      load_balancer.secondary_ips_auto_assigned_per_subnet == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "network"
     ])
     error_message = "secondary_ips_auto_assigned_per_subnet is only valid for network load balancers."
   }
@@ -768,7 +855,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.security_groups == null || load_balancer.load_balancer_type != "gateway"
+      load_balancer.security_groups == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type != "gateway"
     ])
     error_message = "security_groups is only valid for application or network load balancers."
   }
@@ -776,7 +863,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      !contains(["application", "network"], load_balancer.load_balancer_type) ||
+      load_balancer.load_balancer_type == null || !contains(["application", "network"], load_balancer.load_balancer_type) ||
       (load_balancer.security_groups != null && length(load_balancer.security_groups) > 0)
     ])
     error_message = "Application and network load balancers must specify at least one security group; omitting it attaches the VPC default (allow-all) security group."
@@ -785,7 +872,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.connection_logs == null || load_balancer.load_balancer_type == "application"
+      load_balancer.connection_logs == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "connection_logs is only valid for application load balancers."
   }
@@ -793,7 +880,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.health_check_logs == null || load_balancer.load_balancer_type == "application"
+      load_balancer.health_check_logs == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "health_check_logs is only valid for application load balancers."
   }
@@ -801,7 +888,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      load_balancer.xff_header_processing_mode == null || load_balancer.load_balancer_type == "application"
+      load_balancer.xff_header_processing_mode == null || load_balancer.load_balancer_type == null || load_balancer.load_balancer_type == "application"
     ])
     error_message = "xff_header_processing_mode is only valid for application load balancers."
   }
@@ -817,7 +904,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      length(distinct([
+      load_balancer.target_groups == null || length(distinct([
         for target_group in load_balancer.target_groups : target_group.resource_key
       ])) == length(load_balancer.target_groups)
     ])
@@ -826,7 +913,7 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
         for target_group in load_balancer.target_groups :
         can(regex("^[0-9A-Za-z][0-9A-Za-z_-]*$", target_group.resource_key))
       ]
@@ -837,7 +924,7 @@ variable "all_load_balancers" {
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
-      length(distinct([
+      load_balancer.listeners == null || length(distinct([
         for listener in load_balancer.listeners : listener.resource_key
       ])) == length(load_balancer.listeners)
     ])
@@ -846,9 +933,9 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
         for listener in load_balancer.listeners :
-        length(distinct([
+        listener.rules == null || length(distinct([
           for rule in listener.rules : rule.resource_key
         ])) == length(listener.rules)
       ]
@@ -858,9 +945,9 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
         for listener in load_balancer.listeners :
-        length(distinct([
+        listener.rules == null || length(distinct([
           for rule in listener.rules : rule.priority
         ])) == length(listener.rules)
       ]
@@ -870,8 +957,8 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules :
           rule.priority >= 1 && rule.priority <= 50000
         ]
@@ -882,7 +969,7 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null || load_balancer.target_groups == null ? [] : [
         for listener in load_balancer.listeners :
         listener.default_action.target_group_key == null ? true : contains([
           for target_group in load_balancer.target_groups : target_group.resource_key
@@ -894,8 +981,8 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null || load_balancer.target_groups == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules :
           rule.action.target_group_key == null ? true : contains([
             for target_group in load_balancer.target_groups : target_group.resource_key
@@ -908,9 +995,9 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
         for listener in load_balancer.listeners :
-        listener.default_action.type == "forward" ? (
+        listener.default_action.type == null ? true : listener.default_action.type == "forward" ? (
           listener.default_action.target_group_key != null &&
           listener.default_action.redirect == null &&
           listener.default_action.fixed_response == null
@@ -930,10 +1017,10 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules :
-          rule.action.type == "forward" ? (
+          rule.action.type == null ? true : rule.action.type == "forward" ? (
             rule.action.target_group_key != null &&
             rule.action.redirect == null &&
             rule.action.fixed_response == null
@@ -954,7 +1041,7 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
         for target_group in load_balancer.target_groups :
         trimspace(target_group.function) != ""
       ]
@@ -964,7 +1051,7 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
         for target_group in load_balancer.target_groups :
         trimspace(target_group.vpc_id) != ""
       ]
@@ -974,9 +1061,9 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
         for target_group in load_balancer.target_groups :
-        target_group.target_type == "instance"
+        target_group.target_type == null || target_group.target_type == "instance"
       ]
     ]))
     error_message = "Each all_load_balancers target_groups target_type must be instance."
@@ -984,8 +1071,8 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules :
           length(rule.conditions) >= 1
         ]
@@ -996,8 +1083,8 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules : [
             for condition in rule.conditions :
             length(compact([
@@ -1017,8 +1104,8 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
+        for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules : [
             for condition in rule.conditions :
             (condition.host_header == null ? true : length(condition.host_header) > 0) &&
@@ -1036,9 +1123,9 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
         for listener in load_balancer.listeners :
-        length(distinct(listener.additional_certificate_arns)) == length(listener.additional_certificate_arns)
+        listener.additional_certificate_arns == null || length(distinct(listener.additional_certificate_arns)) == length(listener.additional_certificate_arns)
       ]
     ]))
     error_message = "Each all_load_balancers listener additional_certificate_arns list must not contain duplicates."
@@ -1055,6 +1142,15 @@ variable "managed_keypairs" {
 
   default  = {}
   nullable = false
+
+  # Former-default structural composites and collections.
+  validation {
+    condition = alltrue([
+      for name, keypair in var.managed_keypairs :
+      keypair.tags != null
+    ])
+    error_message = "Each managed_keypairs entry must set tags explicitly; use {} to preserve the former default."
+  }
 
   validation {
     condition = alltrue([
@@ -1101,6 +1197,24 @@ variable "managed_security_groups" {
   default  = {}
   nullable = false
 
+  # Former-default structural composites and collections.
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups :
+      group.ingress != null && group.egress != null
+    ])
+    error_message = "Each managed_security_groups entry must set ingress and egress explicitly; use [] for either collection to preserve the former default of no rules."
+  }
+
+  # Former-default provider-pass scalars.
+  validation {
+    condition = alltrue([
+      for name, group in var.managed_security_groups :
+      group.description != null
+    ])
+    error_message = "Each managed_security_groups entry must set description explicitly; use \"Managed by aws-terraform-framework\" to preserve the former default."
+  }
+
   validation {
     condition = alltrue([
       for name, group in var.managed_security_groups :
@@ -1127,7 +1241,7 @@ variable "managed_security_groups" {
 
   validation {
     condition = alltrue([
-      for name, group in var.managed_security_groups : alltrue([
+      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
         for rule in concat(group.ingress, group.egress) :
         length(compact([rule.cidr_ipv4, rule.cidr_ipv6, rule.prefix_list_id, rule.referenced_security_group_id])) == 1
       ])
@@ -1137,7 +1251,7 @@ variable "managed_security_groups" {
 
   validation {
     condition = alltrue([
-      for name, group in var.managed_security_groups : alltrue([
+      for name, group in var.managed_security_groups : group.ingress == null || alltrue([
         for rule in group.ingress :
         (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
         (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
@@ -1148,7 +1262,7 @@ variable "managed_security_groups" {
 
   validation {
     condition = alltrue([
-      for name, group in var.managed_security_groups : alltrue([
+      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
         for rule in concat(group.ingress, group.egress) :
         rule.ip_protocol == "-1" ? (rule.from_port == null && rule.to_port == null) : (rule.from_port == null) == (rule.to_port == null)
       ])
@@ -1158,7 +1272,7 @@ variable "managed_security_groups" {
 
   validation {
     condition = alltrue([
-      for name, group in var.managed_security_groups : alltrue([
+      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
         for rule in concat(group.ingress, group.egress) :
         !contains(["tcp", "udp", "6", "17"], rule.ip_protocol) || (rule.from_port != null && rule.to_port != null)
       ])
@@ -1184,6 +1298,15 @@ variable "managed_networks" {
 
   default  = {}
   nullable = false
+
+  # Former-default boolean gates.
+  validation {
+    condition = alltrue([
+      for name, network in var.managed_networks :
+      network.public != null
+    ])
+    error_message = "Each managed_networks entry must set public explicitly; use false to preserve the former default."
+  }
 
   validation {
     condition = alltrue([
@@ -1224,7 +1347,7 @@ variable "managed_networks" {
   validation {
     condition = alltrue([
       for name, network in var.managed_networks :
-      network.public == false || network.vpc_cidr != null
+      network.public == null || network.public == false || network.vpc_cidr != null
     ])
     error_message = "managed_networks public = true requires a framework-managed VPC (vpc_cidr); a BYO vpc_id is assumed to bring its own routing."
   }
@@ -1248,7 +1371,7 @@ variable "managed_networks" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public)
+      system.associate_public_ip == null || system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public != null && var.managed_networks[system.subnet_id].public)
     ])
     error_message = "associate_public_ip = true requires subnet_id to reference a managed_networks entry with public = true (explicit-ENI systems cannot use subnet auto-assign, and BYO subnets manage their own public path)."
   }

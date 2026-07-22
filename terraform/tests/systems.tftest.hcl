@@ -3596,3 +3596,134 @@ run "readiness_gate_optout_creates_no_gate" {
     error_message = "readiness_gate = false must exclude the system from terraform_data.readiness_gate entirely."
   }
 }
+
+run "all_systems_rejects_null_root_block_device" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "null-root-device"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = true
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Null root block device validation"
+        }
+        root_block_device = null
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_null_instance_type" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "null-instance-type"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = null
+        readiness_user       = null
+        readiness_gate       = true
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Null instance type validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_databases_rejects_null_blue_green_update" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "nullbluegreen"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        instance_class              = "db.t3.micro"
+        password                    = null
+        username                    = "dbadmin"
+        aws_kms_alias               = "test"
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = null
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+        vpc_security_group_ids      = ["sg-database"]
+        tags = {
+          Backup   = true
+          Function = "Null blue-green update validation"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}

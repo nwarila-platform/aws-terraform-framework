@@ -1791,3 +1791,53 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
     ]
   }
 }
+
+run "all_load_balancers_rejects_null_target_groups" {
+  command = plan
+
+  variables {
+    all_load_balancers = [
+      {
+        region          = "us-east-1"
+        resource_key    = "null_target_groups"
+        name            = "null-target-groups"
+        security_groups = ["sg-test"]
+        subnets         = ["subnet-test"]
+
+        access_logs                                                  = null
+        client_keep_alive                                            = null
+        connection_logs                                              = null
+        customer_owned_ipv4_pool                                     = null
+        desync_mitigation_mode                                       = null
+        dns_record_client_routing_policy                             = null
+        drop_invalid_header_fields                                   = null
+        enable_cross_zone_load_balancing                             = null
+        enable_deletion_protection                                   = true
+        enable_http2                                                 = null
+        enable_tls_version_and_cipher_suite_headers                  = null
+        enable_waf_fail_open                                         = null
+        enable_xff_client_port                                       = null
+        enable_zonal_shift                                           = null
+        enforce_security_group_inbound_rules_on_private_link_traffic = null
+        health_check_logs                                            = null
+        idle_timeout                                                 = null
+        internal                                                     = true
+        ip_address_type                                              = "ipv4"
+        ipam_pools                                                   = null
+        load_balancer_type                                           = "application"
+        minimum_load_balancer_capacity                               = null
+        name_prefix                                                  = null
+        preserve_host_header                                         = null
+        secondary_ips_auto_assigned_per_subnet                       = null
+        subnet_mapping                                               = []
+        target_groups                                                = null
+        listeners                                                    = []
+        tags                                                         = {}
+        timeouts                                                     = null
+        xff_header_processing_mode                                   = null
+      }
+    ]
+  }
+
+  expect_failures = [var.all_load_balancers]
+}
