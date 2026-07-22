@@ -1046,7 +1046,7 @@ variable "all_load_balancers" {
 }
 
 variable "managed_keypairs" {
-  description = "EC2 key pairs this framework creates instead of consuming pre-existing ones. Map key = the key-pair name that all_systems[*].key_name references; the value supplies the PUBLIC half only, so the private key stays wherever the deploy pipeline keeps its secrets and never enters Terraform state. Each managed key pair is created in us-east-1, the supported region. The empty default preserves the consume-pre-existing behavior exactly (zero plan change for existing consumers)."
+  description = "EC2 key pairs this framework creates instead of consuming pre-existing ones. Map key = the key-pair name that all_systems[*].key_name references; the value supplies the PUBLIC half only, so the private key stays wherever the deploy pipeline keeps its secrets and never enters Terraform state. public_key is lexically validated (not cryptographically or by key length) as one otherwise-trimmed OpenSSH public-key line using the EC2-supported set: RSA for Linux or Windows, or ED25519 for Linux only; one terminal LF or CRLF is accepted for file-shaped input. Each managed key pair is created in us-east-1, the supported region. The empty default preserves the consume-pre-existing behavior exactly (zero plan change for existing consumers)."
 
   type = map(object({
     public_key = string
@@ -1059,9 +1059,9 @@ variable "managed_keypairs" {
   validation {
     condition = alltrue([
       for name, keypair in var.managed_keypairs :
-      can(regex("^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521))\\s+\\S+", keypair.public_key))
+      can(regex("^(ssh-ed25519|ssh-rsa)[ \\t]+([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)([ \\t]+[^\\r\\n]*)?(\\r?\\n)?$", keypair.public_key))
     ])
-    error_message = "managed_keypairs public_key values must be single-line OpenSSH public keys (ssh-ed25519, ssh-rsa, or ecdsa-sha2-nistp*)."
+    error_message = "managed_keypairs public_key values must be lexically valid, otherwise-trimmed OpenSSH public keys using the EC2-supported set: ssh-rsa (Linux/Windows) or ssh-ed25519 (Linux only); one terminal LF or CRLF is allowed."
   }
 }
 

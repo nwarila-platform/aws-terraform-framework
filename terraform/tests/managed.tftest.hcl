@@ -128,6 +128,82 @@ run "managed_key_pair_rejects_non_openssh_material" {
   expect_failures = [var.managed_keypairs]
 }
 
+run "managed_key_pair_accepts_rsa_public_key" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "rsa-key" = {
+        public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 rsa@mock"
+      }
+    }
+  }
+
+  assert {
+    condition     = aws_key_pair.us_east_1["rsa-key"].public_key != ""
+    error_message = "EC2-supported RSA public keys must pass managed_keypairs lexical validation."
+  }
+}
+
+run "managed_key_pair_accepts_terminal_lf" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "terminal-lf-key" = {
+        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly\n"
+      }
+    }
+  }
+
+  assert {
+    condition     = aws_key_pair.us_east_1["terminal-lf-key"].public_key != ""
+    error_message = "A file-shaped OpenSSH public key with one terminal LF must pass managed_keypairs lexical validation."
+  }
+}
+
+run "managed_key_pair_rejects_ecdsa" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "ecdsa-key" = {
+        public_key = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTY= ecdsa@mock"
+      }
+    }
+  }
+
+  expect_failures = [var.managed_keypairs]
+}
+
+run "managed_key_pair_rejects_embedded_lf" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "embedded-lf-key" = {
+        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly first@mock\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 injected@mock"
+      }
+    }
+  }
+
+  expect_failures = [var.managed_keypairs]
+}
+
+run "managed_key_pair_rejects_embedded_crlf" {
+  command = plan
+
+  variables {
+    managed_keypairs = {
+      "embedded-crlf-key" = {
+        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly first@mock\r\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7 injected@mock"
+      }
+    }
+  }
+
+  expect_failures = [var.managed_keypairs]
+}
+
 run "managed_sg_zero_inbound_with_ssm_egress" {
   command = plan
 
