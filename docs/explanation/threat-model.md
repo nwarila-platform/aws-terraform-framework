@@ -8,12 +8,11 @@ consumer-owned AWS account.
 
 What this module guarantees:
 
-- Terraform and the AWS provider are exact-pinned in `terraform/00-providers.tf`,
+- Terraform and the AWS provider are exact-pinned in `terraform/versions.tf`,
   with provider checksums recorded in `terraform/.terraform.lock.hcl`.
 - EC2 instances, network interfaces, EBS volumes and attachments, EC2 instance
   state resources, RDS database instances, load balancers, and refresh trigger
-  resources are derived from typed variables under `terraform/10-variables.tf`
-  and `terraform/12-variables-aws.tf`.
+  resources are derived from typed variables under `terraform/variables.tf`.
 - Region input accepts the configured commercial region keys (`us-east-1` and
   `us-west-2`) in either hyphenated or underscored form and normalizes them
   before resources are bucketed.

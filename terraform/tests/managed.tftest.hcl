@@ -73,7 +73,7 @@ run "managed_key_pair_created_from_public_key" {
   variables {
     managed_keypairs = {
       "managed-key" = {
-        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly deploy@e2e"
+        public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderPublicKeyMaterialForPlanOnly deploy@mock"
       }
     }
 

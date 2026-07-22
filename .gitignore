@@ -39,24 +39,6 @@
 !/terraform/tests/*.tftest.hcl
 !/terraform/tests/*.tftest.json
 
-# Reusable e2e live-proof harness sources
-!/test/
-!/test/e2e/
-!/test/e2e/README.md
-!/test/e2e/framework.auto.tfvars.tftpl
-!/test/e2e/harness/
-!/test/e2e/harness/.terraform.lock.hcl
-!/test/e2e/harness/*.tf
-!/test/e2e/scripts/
-!/test/e2e/scripts/*.sh
-/test/e2e/.generated/
-/test/e2e/**/.terraform/
-/test/e2e/**/*.tfstate
-/test/e2e/**/*.tfstate.*
-/test/e2e/**/*.pem
-/test/e2e/**/framework.auto.tfvars
-/test/e2e/**/harness.auto.tfvars
-
 # Documentation (Diátaxis)
 !/docs/
 !/docs/README.md

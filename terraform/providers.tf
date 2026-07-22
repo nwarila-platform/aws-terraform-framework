@@ -11,7 +11,7 @@ provider "aws" {
 
   // Stamp the deployment-identity tags (var.resource_metadata) onto every taggable resource this
   // provider manages. Resource-level tags win on key collision, and EC2 root_block_device tags
-  // cannot inherit these, so 32-locals-aws.tf merges them there directly. Empty map when
+  // cannot inherit these, so locals.tf merges them there directly. Empty map when
   // resource_metadata is null, keeping non-opted-in consumers byte-identical.
   default_tags {
     tags = local.deployment_tags

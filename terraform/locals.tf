@@ -97,7 +97,7 @@ locals {
   LINUX_USER_DATA
 
   # Deployment identity tags. Applied to every taggable AWS resource through provider default_tags
-  # (02-provider-aws.tf) and merged explicitly into EC2 root_block_device tags below, which
+  # (providers.tf) and merged explicitly into EC2 root_block_device tags below, which
   # provider default_tags cannot reach. Null resource_metadata (the default) emits zero tags so
   # consumers that have not opted in keep byte-identical plans.
   deployment_tags = var.resource_metadata == null ? {} : merge(
