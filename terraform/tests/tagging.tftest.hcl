@@ -183,3 +183,71 @@ run "rejects_reserved_prefix_in_consumer_tags" {
 
   expect_failures = [var.resource_metadata]
 }
+
+run "rejects_reserved_prefix_in_load_balancer_tags" {
+  command = plan
+
+  variables {
+    resource_metadata = {
+      repository    = "nwarila-platform/aws-terraform-framework"
+      repository_id = "123456789"
+      stack         = "s"
+      owner         = "o"
+    }
+
+    all_load_balancers = [
+      {
+        region          = "us-east-1"
+        resource_key    = "reserved_lb_tags"
+        name            = "reserved-lb-tags"
+        security_groups = ["sg-reserved"]
+        subnets         = ["subnet-reserved-a", "subnet-reserved-b"]
+
+        tags = {
+          "nwarila:management:owner-override" = "me"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.resource_metadata]
+}
+
+run "rejects_reserved_prefix_in_target_group_tags" {
+  command = plan
+
+  variables {
+    resource_metadata = {
+      repository    = "nwarila-platform/aws-terraform-framework"
+      repository_id = "123456789"
+      stack         = "s"
+      owner         = "o"
+    }
+
+    all_load_balancers = [
+      {
+        region          = "us-east-1"
+        resource_key    = "reserved_tg_tags"
+        name            = "reserved-tg-tags"
+        security_groups = ["sg-reserved"]
+        subnets         = ["subnet-reserved-a", "subnet-reserved-b"]
+
+        target_groups = [
+          {
+            resource_key = "reserved"
+            function     = "Reserved tag test"
+            vpc_id       = "vpc-reserved"
+            port         = 8080
+            protocol     = "HTTP"
+
+            tags = {
+              "nwarila:operations:owner-override" = "me"
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [var.resource_metadata]
+}

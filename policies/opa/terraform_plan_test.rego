@@ -169,3 +169,45 @@ test_partial_identity_tags_are_denied if {
 	}]}
 	count(result) == 1
 }
+
+test_partial_identity_tags_all_are_denied if {
+	result := deny with input as {"resources": [{
+		"address": "aws_ebs_volume.tags_all_half_tagged",
+		"type": "aws_ebs_volume",
+		"values": {
+			"encrypted": true,
+			"tags": {
+				"nwarila:management:managed-by": "terraform",
+				"nwarila:management:repository": "nwarila-platform/aws-terraform-framework",
+				"nwarila:management:repository-id": "123456789",
+				"nwarila:management:stack": "wsus-poc-us-east-1",
+				"nwarila:management:environment": "poc",
+				"nwarila:operations:owner": "platform-engineering",
+			},
+			"tags_all": {
+				"nwarila:management:managed-by": "terraform",
+				"nwarila:management:repository": "nwarila-platform/aws-terraform-framework",
+			},
+		},
+	}]}
+	count(result) == 1
+}
+
+test_partial_root_block_device_identity_tags_are_denied if {
+	result := deny with input as {"resources": [{
+		"address": "aws_instance.half_tagged_root",
+		"type": "aws_instance",
+		"values": {
+			"associate_public_ip_address": false,
+			"metadata_options": {"http_tokens": "required"},
+			"root_block_device": {
+				"encrypted": true,
+				"tags": {
+					"nwarila:management:managed-by": "terraform",
+					"nwarila:management:repository": "nwarila-platform/aws-terraform-framework",
+				},
+			},
+		},
+	}]}
+	count(result) == 1
+}

@@ -65,7 +65,7 @@ def normalize_root_block_device(values: dict[str, Any]) -> dict[str, Any]:
         return {}
     return {
         key: root_block_device[key]
-        for key in ("encrypted",)
+        for key in ("encrypted", "tags")
         if key in root_block_device
     }
 

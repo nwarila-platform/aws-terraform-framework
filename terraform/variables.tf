@@ -339,6 +339,8 @@ variable "resource_metadata" {
         [for system in var.all_systems : system.root_block_device.tags],
         flatten([for system in var.all_systems : [for volume in system.ebs_block_devices : volume.tags]]),
         flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags]]),
+        [for load_balancer in var.all_load_balancers : load_balancer.tags],
+        flatten([for load_balancer in var.all_load_balancers : [for target_group in load_balancer.target_groups : target_group.tags]]),
         [for name, keypair in var.managed_keypairs : keypair.tags],
         [for name, group in var.managed_security_groups : group.tags],
         [for name, network in var.managed_networks : network.tags],

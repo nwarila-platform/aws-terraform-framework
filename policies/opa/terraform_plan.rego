@@ -68,9 +68,10 @@ has_security_group(values) if {
 	count(sgs) > 0
 }
 
-# Deployment-identity tag consistency: any resource that carries the nwarila managed-by marker
-# (stamped when var.resource_metadata is supplied) must carry the complete stable identity set.
-# Resources without the marker are ignored, so plans from non-opted-in consumers are unaffected.
+# Deployment-identity tag consistency inspects values.tags_all when present, with values.tags as
+# a test-safe fallback. For aws_instance root volumes, build_plan_input.py projects the explicit
+# identity tags to values.root_block_device.tags because provider default_tags cannot reach them.
+# Resources without the managed-by marker are ignored, so non-opted-in plans remain unaffected.
 required_identity_tags := {
 	"nwarila:management:repository",
 	"nwarila:management:repository-id",
@@ -79,9 +80,32 @@ required_identity_tags := {
 	"nwarila:operations:owner",
 }
 
+effective_resource_tags(values) := tags if {
+	tags_all := object.get(values, "tags_all", null)
+	is_object(tags_all)
+	tags := tags_all
+}
+
+effective_resource_tags(values) := tags if {
+	tags_all := object.get(values, "tags_all", null)
+	not is_object(tags_all)
+	tags := object.get(values, "tags", {})
+}
+
 deny contains msg if {
 	resource := input.resources[_]
-	tags := object.get(resource.values, "tags", {})
+	tags := effective_resource_tags(resource.values)
+	tags["nwarila:management:managed-by"]
+	missing := [key | some key in required_identity_tags; not tags[key]]
+	count(missing) > 0
+	msg := sprintf("%s carries nwarila identity tags but is missing %v", [resource.address, missing])
+}
+
+deny contains msg if {
+	resource := input.resources[_]
+	resource.type == "aws_instance"
+	root_block_device := object.get(resource.values, "root_block_device", {})
+	tags := object.get(root_block_device, "tags", {})
 	tags["nwarila:management:managed-by"]
 	missing := [key | some key in required_identity_tags; not tags[key]]
 	count(missing) > 0
