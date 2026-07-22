@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v0.2.0...v0.3.0) (2026-07-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* v1.0 platform overhaul - single-region SSH-only framework, packer-compatible surfaces, hardcode-first doctrine ([#85](https://github.com/nwarila-platform/aws-terraform-framework/issues/85))
+
+### Features
+
+* v1.0 platform overhaul - single-region SSH-only framework, packer-compatible surfaces, hardcode-first doctrine ([#85](https://github.com/nwarila-platform/aws-terraform-framework/issues/85)) ([1066356](https://github.com/nwarila-platform/aws-terraform-framework/commit/10663560e0d2ec5cd2f4f37a552928575f6ed4dd))
+
 ## [0.2.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v0.1.0...v0.2.0) (2026-07-01)
 
 
