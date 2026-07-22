@@ -1,7 +1,7 @@
 # aws-terraform-framework
 
-Terraform framework for modeling AWS infrastructure in the configured
-`us_east_1` and `us_west_2` regions. The module currently manages EC2
+Terraform framework for modeling AWS infrastructure in the supported
+`us_east_1` region. Adding another region requires a code change. The module currently manages EC2
 instances, network interfaces, EBS volumes and attachments, EC2 instance state,
 RDS database instances, load balancers, and refresh trigger resources.
 
@@ -21,8 +21,7 @@ make ci
 ```
 
 The CI path runs Terraform formatting, init, validation, tests, TFLint,
-terraform-docs drift detection, documentation layout checks, and the repo's OPA
-policy target.
+terraform-docs drift detection, and documentation layout checks.
 
 ### Deploy from this framework
 
@@ -46,9 +45,11 @@ terraform -chdir=terraform output -json aws_instances
 ```
 
 A real apply must populate `readiness_private_key_paths` in
-`terraform.tfvars`. The readiness gate uses that map to find each launch key:
-Linux connects over SSH with the private key, and Windows decrypts the launch
-Administrator password for WinRM readiness.
+`terraform.tfvars` for gated systems. The readiness gate uses that map to find
+each launch key and connects over SSH on every platform: the Windows OpenSSH
+bootstrap installs the launch public key for Administrator, so the same private
+key logs in there too (WinRM is decommissioned). Zero-inbound systems reached
+only through SSM set `readiness_gate = false` and skip the gate.
 
 ## Documentation
 

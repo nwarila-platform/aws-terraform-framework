@@ -58,6 +58,53 @@ destinations outside the allowlist, missing sources, and symlinks.
 argument used by `terraform plan` and `terraform apply`. Absolute paths and
 `..` traversal segments are rejected.
 
+## Deployment Identity Tags
+
+The framework stamps deployment identity onto every taggable AWS resource
+through provider `default_tags`, and merges the same keys into EC2 root
+volume tags (which `default_tags` cannot reach). Stable keys answer who owns
+and manages a resource; `commit-sha` and `run-id` trace it to the exact
+commit and workflow run. Actor identity and timestamps deliberately stay OUT
+of tags (plaintext PII, churn); they live in the workflow-run record that
+`run-id` points to.
+
+Deploy workflows export `TF_VAR_resource_metadata` identically for plan and
+apply. Capture the checked-out commit, not `github.sha` (which can be a
+synthetic merge commit):
+
+```yaml
+- name: Capture deployment identity
+  shell: bash
+  env:
+    GH_REPOSITORY: ${{ github.repository }}
+    GH_REPOSITORY_ID: ${{ github.repository_id }}
+    GH_RUN_ID: ${{ github.run_id }}
+    STACK: ${{ vars.TERRAFORM_STACK }}
+    OWNER_TEAM: ${{ vars.OWNER_TEAM }}
+  run: |
+    commit_sha="$(git rev-parse HEAD)"
+    printf 'TF_VAR_resource_metadata=%s\n' "$(jq -cn \
+      --arg repository "$GH_REPOSITORY" \
+      --arg repository_id "$GH_REPOSITORY_ID" \
+      --arg stack "$STACK" \
+      --arg owner "$OWNER_TEAM" \
+      --arg commit_sha "$commit_sha" \
+      --arg run_id "$GH_RUN_ID" \
+      '{repository: $repository, repository_id: $repository_id, stack: $stack,
+        owner: $owner, commit_sha: $commit_sha, run_id: $run_id}')" >> "$GITHUB_ENV"
+```
+
+Resulting tag keys: `nwarila:management:managed-by` / `repository` /
+`repository-id` / `stack` / `environment` (from `var.environment`) and
+`nwarila:operations:owner`, plus `nwarila:provenance:commit-sha` and
+`nwarila:provenance:run-id` when supplied. The `nwarila:` namespace is
+reserved; consumer tag maps may not use it (validated). Because `commit-sha`
+and `run-id` change per deployment, standing estates see two in-place tag
+updates per deploy; ephemeral deploy-and-destroy stacks see none. Leaving
+`resource_metadata` unset emits zero tags and keeps plans byte-identical -
+native Terraform tests verify set-completeness on resources that carry the
+`managed-by` marker.
+
 ## Backend Selection
 
 `backend_mode` is `local` or `s3`. `local` keeps PR validation
@@ -96,7 +143,7 @@ Runner-shaped release evidence snapshots `terraform/repos/`, records
 `terraform plan` or `apply`.
 
 Framework repositories use `repo_type: framework`, which runs Terraform
-validation, OPA policy on the plan, docs-diff, and reference snapshots.
+validation, native framework tests, docs-diff, and reference snapshots.
 Runner-template repositories use `repo_type: template` until they are forked
 into real runner repositories.
 

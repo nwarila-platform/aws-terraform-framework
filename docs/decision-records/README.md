@@ -7,7 +7,7 @@ repository, split into three scopes per [ADR-0001](org/0001-use-architecture-dec
   master copies live in [`nwarila-platform/.github`](https://github.com/nwarila-platform/.github/tree/main/docs/decision-records).
 - [`template/`](template/) - byte-identical mirrors of Terraform framework
   template ADRs inherited from `NWarila/terraform-framework-template`.
-- `repo/` *(empty)* - repository-specific ADRs that apply only to this repo.
+- [`repo/`](repo/) - repository-specific ADRs that apply only to this repo.
 
 ## Index
 
@@ -32,8 +32,9 @@ repository, split into three scopes per [ADR-0001](org/0001-use-architecture-dec
 
 ### Repository-Specific
 
-None yet. The first repository-specific ADR will live at
-`repo/0001-short-kebab-title.md` and a row will be added here.
+| # | Title | Status | Date | Summary |
+| --- | --- | --- | --- | --- |
+| [repo/0001](repo/0001-hardcode-first-security-baseline.md) | Adopt a Hardcode-First Security Baseline | Accepted | 2026-07-22 | Hard-code module-owned security invariants and reserve Terraform validations for unhardcodeable footguns. |
 
 ## Authoring Rules
 

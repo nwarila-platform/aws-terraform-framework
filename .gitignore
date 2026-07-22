@@ -10,6 +10,7 @@
 !.pre-commit-config.yaml
 !.terraform-docs.yml
 !.tflint.hcl
+!AGENTS.md
 !CHANGELOG.md
 !LICENSE
 !Makefile
@@ -39,24 +40,6 @@
 !/terraform/tests/*.tftest.hcl
 !/terraform/tests/*.tftest.json
 
-# Reusable e2e live-proof harness sources
-!/test/
-!/test/e2e/
-!/test/e2e/README.md
-!/test/e2e/framework.auto.tfvars.tftpl
-!/test/e2e/harness/
-!/test/e2e/harness/.terraform.lock.hcl
-!/test/e2e/harness/*.tf
-!/test/e2e/scripts/
-!/test/e2e/scripts/*.sh
-/test/e2e/.generated/
-/test/e2e/**/.terraform/
-/test/e2e/**/*.tfstate
-/test/e2e/**/*.tfstate.*
-/test/e2e/**/*.pem
-/test/e2e/**/framework.auto.tfvars
-/test/e2e/**/harness.auto.tfvars
-
 # Documentation (Diátaxis)
 !/docs/
 !/docs/README.md
@@ -66,6 +49,7 @@
 !/docs/explanation/threat-model.md
 !/docs/reference/
 !/docs/reference/invariants.md
+!/docs/reference/style-guide.md
 !/docs/reference/mirroring.md
 !/docs/reference/release-gates.md
 !/docs/reference/runner-protocol.md
@@ -84,6 +68,7 @@
 !/docs/decision-records/org/0005-keep-github-control-planes-namespace-local.md
 !/docs/decision-records/repo/
 !/docs/decision-records/repo/.gitkeep
+!/docs/decision-records/repo/0001-hardcode-first-security-baseline.md
 !/docs/decision-records/template/
 !/docs/decision-records/template/.gitkeep
 !/docs/decision-records/template/README.md
@@ -95,11 +80,4 @@
 # Tools
 !/tools/
 !/tools/check_docs_layout.py
-!/tools/build_plan_input.py
 !/tools/install_ci_tools.sh
-
-# Policies
-!/policies/
-!/policies/opa/
-!/policies/opa/terraform_plan.rego
-!/policies/opa/terraform_plan_test.rego

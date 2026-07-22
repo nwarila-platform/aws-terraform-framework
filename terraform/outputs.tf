@@ -1,11 +1,10 @@
-#% =========================================================================================== %#
-#% Outputs: 62-outputs-aws.tf                                      | Category: Outputs (60-69) %#
-#% ----- [ Description ] --------------------------------------------------------------------- %#
-#% Output values make information about your infrastructure available on the command line, and %#
-#%   can expose information for other Terraform configurations to use. Output values are       %#
-#%   similar to return values in programming languages.                                        %#
-#% =========================================================================================== %#
+# Output values: deployment identity plus the non-secret inventory hand-off consumed
+# by configuration-management pipelines.
 
+output "deployment_tags" {
+  description = "Effective deployment-identity tag map derived from var.resource_metadata. Empty when metadata was not supplied (local plans, consumers that have not opted in). These keys are stamped onto every taggable AWS resource via provider default_tags and merged into EC2 root volume tags."
+  value       = local.deployment_tags
+}
 
 # #region ------ [ Local Variable(s) ] -------------------------------------------------------- #
 
@@ -13,11 +12,10 @@
 
 # ?region ------ [ Local Variable(s): elastic_compute_cloud: Sample ] --------------------- #
 # elastic_compute_cloud = {
-#   us_east_1 = {}
-#   us_west_2 = {
+#   us_east_1 = {
 #    FirstSystem = {
 #      ami               = "ami-000a0a0000a00a000"
-#      availability_zone = "us-west-2a"
+#      availability_zone = "us-east-1a"
 #      hostname          = "FirstSystem"
 #      instance_type     = "m6i.large"
 #      key_name          = "my-key-pair"
@@ -55,8 +53,7 @@
 
 # ?region ------ [ Local Variable(s): elastic_network_interfaces: Sample ] ---------------- #
 # elastic_network_interfaces = {
-#   us_east_1 = {}
-#   us_west_2 = {
+#   us_east_1 = {
 #    FirstSystem-eni-0 = {
 #      description     = "Primary Network Interface"
 #      interface_type  = null
@@ -85,10 +82,9 @@
 
 # ?region ------ [ Local Variable(s): ebs_block_devices: Sample ] ------------------------- #
 # elastic_network_interfaces = {
-#   us_east_1 = {}
-#   us_west_2 = {
+#   us_east_1 = {
 #    FirstSystem-ebs-0 = {
-#      availability_zone     = "us-west-2a"
+#      availability_zone     = "us-east-1a"
 #      delete_on_termination = false
 #      encrypted             = true
 #      iops                  = null
@@ -121,7 +117,7 @@
 
 # ?region ------ [ Resource(s): aws_network_interface: Sample ] --------------------------- #
 # FirstSystem-eni-0 = {
-#   arn = "arn:aws:ec2:us-west-2:000000000000:network-interface/eni-00000000"
+#   arn = "arn:aws:ec2:us-east-1:000000000000:network-interface/eni-00000000"
 #   attachment                = [
 #       {
 #           attachment_id = "eni-attach-00000aa0a00aa0a0a"
@@ -173,7 +169,7 @@
 # ?endregion --- [ Resource(s): aws_network_interface: Sample ] --------------------------- #
 
 # output "__RESOURCE__aws_network_interface" {
-#   value = merge(aws_network_interface.us_west_2, aws_network_interface.us_east_1)
+#   value = aws_network_interface.us_east_1
 # }
 
 # #endregion --- [ Resource(s): aws_network_interface ] ------------------------------------- #
@@ -183,14 +179,14 @@
 # ?region ------ [ Resource(s): aws_ebs_volume: Sample ] ---------------------------------- #
 # aws_ebs_volume = {
 #   FirstSystem-ebs-0 = {
-#     arn                  = "arn:aws:ec2:us-west-2:000000000000:volume/vol-00a00a00a0a0a00aa"
-#     availability_zone    = "us-west-2a"
+#     arn                  = "arn:aws:ec2:us-east-1:000000000000:volume/vol-00a00a00a0a0a00aa"
+#     availability_zone    = "us-east-1a"
 #     create_time          = "2025-07-15T11:32:23Z"
 #     encrypted            = true
 #     final_snapshot       = false
 #     id                   = "vol-00a00a00a0a0a00aa"
 #     iops                 = 3000
-#     kms_key_id           = "arn:aws:kms:us-west-2:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#     kms_key_id           = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #     multi_attach_enabled = false
 #     outpost_arn          = ""
 #     size                 = 100
@@ -215,7 +211,7 @@
 # ?endregion --- [ Resource(s): aws_ebs_volume: Sample ] ---------------------------------- #
 
 # output "__RESOURCE__aws_ebs_volume" {
-#   value = merge(aws_ebs_volume.us_west_2, aws_ebs_volume.us_east_1)
+#   value = aws_ebs_volume.us_east_1
 # }
 
 # #endregion --- [ Resource(s): aws_ebs_volume ] -------------------------------------------- #
@@ -226,9 +222,9 @@
 # aws_instance = {
 #   rhel8-ami-builder-01 = {
 #     ami                                  = "ami-000a0a0000a00a000"
-#     arn                                  = "arn:aws:ec2:us-west-2:000000000000:instance/i-0a0a00aa00aa00000"
+#     arn                                  = "arn:aws:ec2:us-east-1:000000000000:instance/i-0a0a00aa00aa00000"
 #     associate_public_ip_address          = false
-#     availability_zone                    = "us-west-2a"
+#     availability_zone                    = "us-east-1a"
 #     capacity_reservation_specification   = [
 #       {
 #         capacity_reservation_preference = "open"
@@ -253,7 +249,7 @@
 #         device_name           = "/dev/sdd"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-west-2:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         snapshot_id           = ""
 #         tags                  = {
 #           DeviceName  = "/dev/sdd"
@@ -277,7 +273,7 @@
 #         device_name           = "/dev/sde"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-west-2:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         snapshot_id           = ""
 #         tags                  = {
 #           DeviceName  = "/dev/sde"
@@ -365,7 +361,7 @@
 #         device_name           = "/dev/sda1"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-west-2:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         tags                  = {
 #           Environment = "PROD"
 #           Name        = "FirstSystem"
@@ -417,7 +413,7 @@
 # ?endregion --- [ Resource(s): aws_instance: Sample ] ------------------------------------ #
 
 # output "__RESOURCE__aws_instance" {
-#   value = merge(aws_instance.us_west_2, aws_instance.us_east_1)
+#   value = aws_instance.us_east_1
 # }
 
 # #endregion --- [ Resource(s): aws_instance ] ---------------------------------------------- #
@@ -434,7 +430,7 @@ output "aws_instances" {
       hostname    = hostname
       instance_id = inst.id
       region      = local.systems_by_hostname[hostname].region
-      private_ip  = merge(aws_network_interface.us_west_2, aws_network_interface.us_east_1)["${hostname}-eni-0"].private_ip
+      private_ip  = aws_network_interface.us_east_1["${hostname}-eni-0"].private_ip
       private_dns = inst.private_dns
       function    = local.systems_by_hostname[hostname].tags["Function"]
       os_family   = local.systems_by_hostname[hostname].is_windows ? "windows" : "linux"
@@ -450,64 +446,38 @@ output "aws_instances" {
 
 output "aws_load_balancers" {
   description = "Stable Elastic Load Balancer attributes keyed by all_load_balancers resource_key."
-  value = merge(
-    {
-      for key, load_balancer in aws_lb.us_west_2 : key => {
-        arn            = load_balancer.arn
-        arn_suffix     = load_balancer.arn_suffix
-        dns_name       = load_balancer.dns_name
-        id             = load_balancer.id
-        name           = load_balancer.name
-        subnet_mapping = load_balancer.subnet_mapping
-        tags_all       = load_balancer.tags_all
-        zone_id        = load_balancer.zone_id
-      }
-    },
-    {
-      for key, load_balancer in aws_lb.us_east_1 : key => {
-        arn            = load_balancer.arn
-        arn_suffix     = load_balancer.arn_suffix
-        dns_name       = load_balancer.dns_name
-        id             = load_balancer.id
-        name           = load_balancer.name
-        subnet_mapping = load_balancer.subnet_mapping
-        tags_all       = load_balancer.tags_all
-        zone_id        = load_balancer.zone_id
-      }
+  value = {
+    for key, load_balancer in aws_lb.us_east_1 : key => {
+      arn            = load_balancer.arn
+      arn_suffix     = load_balancer.arn_suffix
+      dns_name       = load_balancer.dns_name
+      id             = load_balancer.id
+      name           = load_balancer.name
+      subnet_mapping = load_balancer.subnet_mapping
+      tags_all       = load_balancer.tags_all
+      zone_id        = load_balancer.zone_id
     }
-  )
+  }
 }
 
 output "aws_load_balancer_arn_suffixes" {
   description = "Elastic Load Balancer ARN suffixes keyed by all_load_balancers resource_key."
-  value = merge(
-    { for key, load_balancer in aws_lb.us_west_2 : key => load_balancer.arn_suffix },
-    { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.arn_suffix }
-  )
+  value       = { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.arn_suffix }
 }
 
 output "aws_load_balancer_arns" {
   description = "Elastic Load Balancer ARNs keyed by all_load_balancers resource_key."
-  value = merge(
-    { for key, load_balancer in aws_lb.us_west_2 : key => load_balancer.arn },
-    { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.arn }
-  )
+  value       = { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.arn }
 }
 
 output "aws_load_balancer_dns_names" {
   description = "Elastic Load Balancer DNS names keyed by all_load_balancers resource_key."
-  value = merge(
-    { for key, load_balancer in aws_lb.us_west_2 : key => load_balancer.dns_name },
-    { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.dns_name }
-  )
+  value       = { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.dns_name }
 }
 
 output "aws_load_balancer_zone_ids" {
   description = "Elastic Load Balancer Route 53 zone IDs keyed by all_load_balancers resource_key."
-  value = merge(
-    { for key, load_balancer in aws_lb.us_west_2 : key => load_balancer.zone_id },
-    { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.zone_id }
-  )
+  value       = { for key, load_balancer in aws_lb.us_east_1 : key => load_balancer.zone_id }
 }
 
 #endregion --- [ Resource(s): aws_lb ] -------------------------------------------------------- #
@@ -517,30 +487,18 @@ output "aws_load_balancer_zone_ids" {
 
 output "aws_target_groups" {
   description = "Stable Elastic Load Balancer Target Group attributes keyed by all_load_balancers and target_groups resource_key."
-  value = merge(
-    {
-      for key, target_group in aws_lb_target_group.us_west_2 : key => {
-        arn        = target_group.arn
-        arn_suffix = target_group.arn_suffix
-        name       = target_group.name
-      }
-    },
-    {
-      for key, target_group in aws_lb_target_group.us_east_1 : key => {
-        arn        = target_group.arn
-        arn_suffix = target_group.arn_suffix
-        name       = target_group.name
-      }
+  value = {
+    for key, target_group in aws_lb_target_group.us_east_1 : key => {
+      arn        = target_group.arn
+      arn_suffix = target_group.arn_suffix
+      name       = target_group.name
     }
-  )
+  }
 }
 
 output "aws_target_group_arns" {
   description = "Elastic Load Balancer Target Group ARNs keyed by all_load_balancers and target_groups resource_key."
-  value = merge(
-    { for key, target_group in aws_lb_target_group.us_west_2 : key => target_group.arn },
-    { for key, target_group in aws_lb_target_group.us_east_1 : key => target_group.arn }
-  )
+  value       = { for key, target_group in aws_lb_target_group.us_east_1 : key => target_group.arn }
 }
 
 #endregion --- [ Resource(s): aws_lb_target_group ] ------------------------------------------ #
@@ -550,26 +508,36 @@ output "aws_target_group_arns" {
 
 output "aws_listeners" {
   description = "Stable Elastic Load Balancer Listener attributes keyed by all_load_balancers and listeners resource_key."
-  value = merge(
-    {
-      for key, listener in aws_lb_listener.us_west_2 : key => {
-        arn = listener.arn
-      }
-    },
-    {
-      for key, listener in aws_lb_listener.us_east_1 : key => {
-        arn = listener.arn
-      }
+  value = {
+    for key, listener in aws_lb_listener.us_east_1 : key => {
+      arn = listener.arn
     }
-  )
+  }
 }
 
 output "aws_listener_arns" {
   description = "Elastic Load Balancer Listener ARNs keyed by all_load_balancers and listeners resource_key."
-  value = merge(
-    { for key, listener in aws_lb_listener.us_west_2 : key => listener.arn },
-    { for key, listener in aws_lb_listener.us_east_1 : key => listener.arn }
-  )
+  value       = { for key, listener in aws_lb_listener.us_east_1 : key => listener.arn }
 }
 
 #endregion --- [ Resource(s): aws_lb_listener ] ---------------------------------------------- #
+
+
+#region ------ [ Resource(s): aws_ebs_volume ] ------------------------------------------------ #
+
+output "ebs_volumes" {
+  description = "Data-volume identity map for consumer-side disk resolution, keyed like the aws_ebs_volume resources (<hostname>-ebs-<index>). Exposes the real volume-id (on Nitro the NVMe serial equals the volume-id, so on-box tooling can match disks with zero AWS API calls) alongside the authored Function/DeviceName/Name tags. function is null for volumes that declare no Function tag."
+  value = {
+    for key, volume in merge(
+      aws_ebs_volume.us_east_1,
+      aws_ebs_volume.us_east_1_refresh,
+      ) : key => {
+      volume_id   = volume.id
+      function    = try(volume.tags["Function"], null)
+      device_name = try(volume.tags["DeviceName"], null)
+      hostname    = try(volume.tags["Name"], null)
+    }
+  }
+}
+
+#endregion --- [ Resource(s): aws_ebs_volume ] ------------------------------------------------ #

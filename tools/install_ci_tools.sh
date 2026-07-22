@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install pinned CI tools (actionlint, tflint, terraform-docs, opa) on a Linux x86_64 runner.
+# Install pinned CI tools (actionlint, tflint, terraform-docs) on a Linux x86_64 runner.
 #
 # Versions are passed via env vars so Renovate can update them in one place.
 # Each downloaded binary archive is verified against the upstream-published
@@ -71,26 +71,6 @@ install_terraform_docs() {
   "${bindir}/terraform-docs" version
 }
 
-install_opa() {
-  local v="$OPA_VERSION"
-  local bin="opa_linux_amd64_static"
-  local base="https://github.com/open-policy-agent/opa/releases/download/v${v}"
-
-  curl --fail --silent --show-error --location -o "${workdir}/${bin}" "${base}/${bin}"
-  curl --fail --silent --show-error --location -o "${workdir}/${bin}.sha256" "${base}/${bin}.sha256"
-
-  local expected
-  expected="$(awk '{print $1}' "${workdir}/${bin}.sha256")"
-  if [ -z "$expected" ]; then
-    echo "error: OPA sha256 file is empty" >&2
-    exit 1
-  fi
-
-  verify_sha256 "${workdir}/${bin}" "$expected"
-  install -m 0755 "${workdir}/${bin}" "${bindir}/opa"
-  "${bindir}/opa" version
-}
-
 install_actionlint() {
   local v="$ACTIONLINT_VERSION"
   local tar="actionlint_${v}_linux_amd64.tar.gz"
@@ -130,7 +110,6 @@ require_var ACTIONLINT_VERSION
 require_var MARKDOWNLINT_CLI2_VERSION
 require_var TFLINT_VERSION
 require_var TERRAFORM_DOCS_VERSION
-require_var OPA_VERSION
 
 bindir="${HOME}/.local/bin"
 mkdir -p "$bindir"
@@ -147,4 +126,3 @@ install_actionlint
 install_markdownlint_cli2
 install_tflint
 install_terraform_docs
-install_opa

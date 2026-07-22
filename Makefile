@@ -1,7 +1,7 @@
 PYTHON ?= python3
 TFLINT ?= tflint
 
-.PHONY: fmt fmt-check init validate test docs docs-diff docs-check tflint opa-test opa-plan e2e-up e2e-verify e2e-down ci
+.PHONY: fmt fmt-check init validate test docs docs-diff docs-check tflint ci
 
 # Mutating: rewrites HCL in place. Use locally before committing.
 fmt:
@@ -34,28 +34,6 @@ docs-check:
 tflint:
 	$(TFLINT) --config "$(CURDIR)/.tflint.hcl" --chdir terraform
 
-opa-test:
-	@if find policies/opa -name '*.rego' -print -quit | grep -q .; then \
-		opa test policies/opa; \
-	else \
-		echo "no OPA policies to test"; \
-	fi
-
-opa-plan:
-	mkdir -p .tmp/opa-plan
-	terraform -chdir=terraform test -json -verbose > .tmp/opa-plan/terraform-test.jsonl
-	$(PYTHON) tools/build_plan_input.py < .tmp/opa-plan/terraform-test.jsonl > .tmp/opa-plan/input.json
-	opa eval --fail-defined --format pretty --input .tmp/opa-plan/input.json --data policies/opa 'data.terraform_plan.deny[_]'
-
-e2e-up:
-	test/e2e/scripts/e2e-up.sh
-
-e2e-verify:
-	test/e2e/scripts/verify.sh
-
-e2e-down:
-	test/e2e/scripts/e2e-down.sh
-
 ci:
 	$(MAKE) fmt-check
 	$(MAKE) init
@@ -64,5 +42,3 @@ ci:
 	$(MAKE) tflint
 	$(MAKE) docs-diff
 	$(MAKE) docs-check
-	$(MAKE) opa-test
-	$(MAKE) opa-plan

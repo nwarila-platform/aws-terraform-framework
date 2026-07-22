@@ -1,8 +1,4 @@
 mock_provider "aws" {
-  alias = "us_west_2"
-}
-
-mock_provider "aws" {
   alias = "us_east_1"
 }
 
@@ -11,9 +7,9 @@ variables {
 
   all_systems = [
     {
-      region               = "us-west-2"
+      region               = "us-east-1"
       hostname             = "west-state"
-      availability_zone    = "us-west-2a"
+      availability_zone    = "us-east-1a"
       subnet_id            = "subnet-west-a"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
@@ -21,42 +17,87 @@ variables {
       ami                  = "test-linux"
       set_state            = "stopped"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+
       tags = {
         Function = "West instance with state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
-      region               = "us_west_2"
+      region               = "us_east_1"
       hostname             = "west-no-state"
-      availability_zone    = "us-west-2a"
+      availability_zone    = "us-east-1a"
       subnet_id            = "subnet-west-b"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
       aws_kms_alias        = "west"
       ami                  = "test-linux"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "West instance without state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.11"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
-      region               = "us-west-2"
+      region               = "us-east-1"
       hostname             = "west-refresh"
-      availability_zone    = "us-west-2b"
+      availability_zone    = "us-east-1b"
       subnet_id            = "subnet-west-c"
       key_name             = "west-key"
       iam_instance_profile = "example-instance-profile"
@@ -64,16 +105,38 @@ variables {
       ami                  = "test-linux"
       refresh              = true
 
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+      set_state      = null
+
       tags = {
         Function = "West refresh instance"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.0.0.12"
           security_groups = ["sg-west"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     },
     {
       region               = "us-east-1"
@@ -86,16 +149,38 @@ variables {
       ami                  = "test-linux"
       set_state            = "running"
 
+      refresh        = false
+      instance_type  = "m6i.large"
+      readiness_user = null
+      readiness_gate = true
+
       tags = {
         Function = "East instance with state control"
+        Backup   = true
       }
+
+      root_block_device = {
+        delete_on_termination = true
+        iops                  = null
+        tags                  = {}
+        throughput            = null
+        volume_type           = "gp3"
+        volume_size           = "100"
+      }
+
+      ebs_block_devices = []
 
       network_interfaces = [
         {
           private_ip      = "10.1.0.10"
           security_groups = ["sg-east"]
+          description     = null
+          interface_type  = null
+          tags            = {}
         }
       ]
+
+      associate_public_ip = false
     }
   ]
 }
@@ -104,28 +189,23 @@ run "instance_state_created_only_when_set_state_is_not_null" {
   command = plan
 
   assert {
-    condition     = length(aws_ec2_instance_state.us_west_2) == 1
-    error_message = "west region should create state control for only the instance with set_state."
+    condition     = length(aws_ec2_instance_state.us_east_1) == 2
+    error_message = "The supported region should create state controls only for instances with set_state."
   }
 
   assert {
-    condition     = contains(keys(aws_ec2_instance_state.us_west_2), "west-state")
+    condition     = contains(keys(aws_ec2_instance_state.us_east_1), "west-state")
     error_message = "west-state should have an aws_ec2_instance_state resource."
   }
 
   assert {
-    condition     = !contains(keys(aws_ec2_instance_state.us_west_2), "west-no-state")
+    condition     = !contains(keys(aws_ec2_instance_state.us_east_1), "west-no-state")
     error_message = "west-no-state must not create aws_ec2_instance_state with a null state."
   }
 
   assert {
-    condition     = aws_ec2_instance_state.us_west_2["west-state"].state == "stopped"
+    condition     = aws_ec2_instance_state.us_east_1["west-state"].state == "stopped"
     error_message = "west-state should preserve the requested stopped state."
-  }
-
-  assert {
-    condition     = length(aws_ec2_instance_state.us_east_1) == 1
-    error_message = "east region should create state control for only the instance with set_state."
   }
 
   assert {
@@ -134,19 +214,17 @@ run "instance_state_created_only_when_set_state_is_not_null" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["west-state"].iam_instance_profile != null
+    condition     = aws_instance.us_east_1["west-state"].iam_instance_profile != null
     error_message = "west-state should attach an IAM instance profile."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["west-state"].tags["ManagedBy"] == "Terraform" && aws_instance.us_west_2_refresh["west-refresh"].tags["ManagedBy"] == "Terraform" && aws_instance.us_east_1["east-state"].tags["ManagedBy"] == "Terraform"
+    condition     = aws_instance.us_east_1["west-state"].tags["ManagedBy"] == "Terraform" && aws_instance.us_east_1_refresh["west-refresh"].tags["ManagedBy"] == "Terraform" && aws_instance.us_east_1["east-state"].tags["ManagedBy"] == "Terraform"
     error_message = "EC2 instances should carry a non-overwritable ManagedBy=Terraform discovery tag."
   }
 
   assert {
     condition = alltrue(concat(
-      [for _, instance in aws_instance.us_west_2 : instance.root_block_device[0].encrypted == true],
-      [for _, instance in aws_instance.us_west_2_refresh : instance.root_block_device[0].encrypted == true],
       [for _, instance in aws_instance.us_east_1 : instance.root_block_device[0].encrypted == true],
       [for _, instance in aws_instance.us_east_1_refresh : instance.root_block_device[0].encrypted == true],
     ))
@@ -161,87 +239,161 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "backup-default"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-backup-default"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Backup default EC2"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.12.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "backup-disabled"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-backup-disabled"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Backup   = false
           Function = "Backup disabled EC2"
         }
 
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.12.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
 
     all_databases = [
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "backupdefaultdb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "backupdefaultdb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Backup default database"
+          Backup   = true
         }
+        password                    = null
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       },
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "backupdisableddb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "backupdisableddb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Backup   = false
           Function = "Backup disabled database"
         }
+        password                    = null
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000012"
       platform         = ""
@@ -250,43 +402,48 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
   }
 
   override_data {
-    target = data.aws_kms_alias.us_west_2["west"]
+    target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
     }
   }
 
   assert {
-    condition     = local.elastic_compute_cloud.us_west_2["backup-default"].tags["Backup"] == "True" && aws_instance.us_west_2["backup-default"].tags["Backup"] == "True"
+    condition     = local.elastic_compute_cloud.us_east_1["backup-default"].tags["Backup"] == "True" && aws_instance.us_east_1["backup-default"].tags["Backup"] == "True"
     error_message = "EC2 Backup should default to the normalized string True."
   }
 
   assert {
-    condition     = local.elastic_compute_cloud.us_west_2["backup-disabled"].tags["Backup"] == "False" && aws_instance.us_west_2["backup-disabled"].tags["Backup"] == "False"
+    condition     = local.elastic_compute_cloud.us_east_1["backup-disabled"].tags["Backup"] == "False" && aws_instance.us_east_1["backup-disabled"].tags["Backup"] == "False"
     error_message = "EC2 Backup=false should normalize to the string False."
   }
 
   assert {
-    condition     = local.relational_database_service.us_west_2["backupdefaultdb"].tags["Backup"] == "True" && aws_db_instance.us_west_2["backupdefaultdb"].tags["Backup"] == "True"
+    condition     = local.relational_database_service.us_east_1["backupdefaultdb"].tags["Backup"] == "True" && aws_db_instance.us_east_1["backupdefaultdb"].tags["Backup"] == "True"
     error_message = "RDS Backup should default to the normalized string True."
   }
 
   assert {
-    condition     = local.relational_database_service.us_west_2["backupdisableddb"].tags["Backup"] == "False" && aws_db_instance.us_west_2["backupdisableddb"].tags["Backup"] == "False"
+    condition     = local.relational_database_service.us_east_1["backupdisableddb"].tags["Backup"] == "False" && aws_db_instance.us_east_1["backupdisableddb"].tags["Backup"] == "False"
     error_message = "RDS Backup=false should normalize to the string False."
   }
 
   assert {
     condition = alltrue([
-      local.elastic_compute_cloud.us_west_2["backup-default"].tags["Backup"] == local.relational_database_service.us_west_2["backupdefaultdb"].tags["Backup"],
-      local.elastic_compute_cloud.us_west_2["backup-disabled"].tags["Backup"] == local.relational_database_service.us_west_2["backupdisableddb"].tags["Backup"],
+      local.elastic_compute_cloud.us_east_1["backup-default"].tags["Backup"] == local.relational_database_service.us_east_1["backupdefaultdb"].tags["Backup"],
+      local.elastic_compute_cloud.us_east_1["backup-disabled"].tags["Backup"] == local.relational_database_service.us_east_1["backupdisableddb"].tags["Backup"],
     ])
     error_message = "EC2 and RDS Backup tags should emit identical True/False casing."
   }
 
   assert {
-    condition     = local.relational_database_service.us_west_2["backupdefaultdb"].storage_type == "gp3" && aws_db_instance.us_west_2["backupdefaultdb"].storage_type == "gp3"
+    condition     = local.relational_database_service.us_east_1["backupdefaultdb"].storage_type == "gp3" && aws_db_instance.us_east_1["backupdefaultdb"].storage_type == "gp3"
     error_message = "RDS storage_type should default to gp3 when omitted."
+  }
+
+  assert {
+    condition     = alltrue([for _, database in aws_db_instance.us_east_1 : database.storage_encrypted == true])
+    error_message = "Every planned RDS database should set storage_encrypted = true."
   }
 }
 
@@ -296,9 +453,9 @@ run "instance_state_includes_refresh_instances_after_readiness" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "west-refresh-state"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-refresh-state"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -307,32 +464,53 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         refresh              = true
         set_state            = "stopped"
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+
         tags = {
           Function = "West refresh instance with state control"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   assert {
-    condition     = contains(keys(aws_instance.us_west_2_refresh), "west-refresh-state")
+    condition     = contains(keys(aws_instance.us_east_1_refresh), "west-refresh-state")
     error_message = "west-refresh-state should plan as a refresh instance."
   }
 
   assert {
-    condition     = contains(keys(aws_ec2_instance_state.us_west_2), "west-refresh-state")
+    condition     = contains(keys(aws_ec2_instance_state.us_east_1), "west-refresh-state")
     error_message = "west-refresh-state should have an aws_ec2_instance_state resource even though it is refresh=true."
   }
 
   assert {
-    condition     = aws_ec2_instance_state.us_west_2["west-refresh-state"].state == "stopped"
+    condition     = aws_ec2_instance_state.us_east_1["west-refresh-state"].state == "stopped"
     error_message = "west-refresh-state should preserve the requested stopped state."
   }
 }
@@ -343,25 +521,48 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "inv-linux-west"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-inventory-linux"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Linux"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -373,21 +574,44 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         aws_kms_alias        = "east"
         ami                  = "windows_server_2025_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Windows"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.9.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "inv-refresh"
-        availability_zone    = "us-west-2b"
+        availability_zone    = "us-east-1b"
         subnet_id            = "subnet-west-inventory-refresh"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -395,22 +619,44 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         ami                  = "test-linux"
         refresh              = true
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Inventory Refresh"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.9.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000001"
       platform         = ""
@@ -445,7 +691,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   assert {
     condition = alltrue([
       output.aws_instances["inv-linux-west"].hostname == "inv-linux-west",
-      output.aws_instances["inv-linux-west"].region == "us_west_2",
+      output.aws_instances["inv-linux-west"].region == "us_east_1",
       output.aws_instances["inv-linux-west"].function == "Inventory Linux",
       output.aws_instances["inv-linux-west"].os_family == "linux",
       output.aws_instances["inv-linux-west"].environment == "TEST",
@@ -483,7 +729,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   assert {
     condition = alltrue([
       output.aws_instances["inv-refresh"].hostname == "inv-refresh",
-      output.aws_instances["inv-refresh"].region == "us_west_2",
+      output.aws_instances["inv-refresh"].region == "us_east_1",
       output.aws_instances["inv-refresh"].function == "Inventory Refresh",
       output.aws_instances["inv-refresh"].os_family == "linux",
       output.aws_instances["inv-refresh"].environment == "TEST",
@@ -520,43 +766,81 @@ run "ebs_volume_attachments_use_structured_wiring" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "west-ebs"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-ebs"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "125"
+            volume_size  = "125"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           },
           {
-            volume_size = "250"
+            volume_size  = "250"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           },
           {
             skip_destroy = true
             volume_size  = "500"
+            iops         = null
+            snapshot_id  = null
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "west-ebs-refresh"
-        availability_zone    = "us-west-2b"
+        availability_zone    = "us-east-1b"
         subnet_id            = "subnet-west-ebs-refresh"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -564,22 +848,48 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ami                  = "test-linux"
         refresh              = true
 
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS refresh"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "64"
+            volume_size  = "64"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -591,55 +901,109 @@ run "ebs_volume_attachments_use_structured_wiring" {
         aws_kms_alias        = "east"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "East EBS"
+          Backup   = true
         }
 
         ebs_block_devices = [
           {
-            volume_size = "32"
+            volume_size  = "32"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.1.5.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "west-ebs-max"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-ebs-max"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "West EBS max"
+          Backup   = true
         }
 
         ebs_block_devices = [
           for index in range(23) : {
-            volume_size = "10"
+            volume_size  = "10"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000003"
       platform         = ""
@@ -647,17 +1011,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
     }
   }
 
-  override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
-    values = {
-      id               = "ami-00000000000000004"
-      platform         = ""
-      platform_details = "Red Hat Enterprise Linux"
-    }
-  }
-
   override_resource {
-    target          = aws_instance.us_west_2["west-ebs"]
+    target          = aws_instance.us_east_1["west-ebs"]
     override_during = plan
     values = {
       id = "i-west-ebs"
@@ -665,9 +1020,9 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_kms_alias.us_west_2["west"]
+    target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
     }
   }
 
@@ -679,7 +1034,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
-    target          = aws_instance.us_west_2_refresh["west-ebs-refresh"]
+    target          = aws_instance.us_east_1_refresh["west-ebs-refresh"]
     override_during = plan
     values = {
       id = "i-west-ebs-refresh"
@@ -695,7 +1050,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
-    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-0"]
+    target          = aws_ebs_volume.us_east_1["west-ebs-ebs-0"]
     override_during = plan
     values = {
       id = "vol-west-ebs-0"
@@ -703,7 +1058,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
-    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-1"]
+    target          = aws_ebs_volume.us_east_1["west-ebs-ebs-1"]
     override_during = plan
     values = {
       id = "vol-west-ebs-1"
@@ -711,7 +1066,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
-    target          = aws_ebs_volume.us_west_2["west-ebs-ebs-2"]
+    target          = aws_ebs_volume.us_east_1["west-ebs-ebs-2"]
     override_during = plan
     values = {
       id = "vol-west-ebs-2"
@@ -719,7 +1074,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_resource {
-    target          = aws_ebs_volume.us_west_2_refresh["west-ebs-refresh-ebs-0"]
+    target          = aws_ebs_volume.us_east_1_refresh["west-ebs-refresh-ebs-0"]
     override_during = plan
     values = {
       id = "vol-west-ebs-refresh-0"
@@ -735,27 +1090,27 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-0"].hostname == "west-ebs"
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-ebs-0"].hostname == "west-ebs"
     error_message = "The west normal EBS local should carry its owning hostname explicitly."
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-1"].index == 1
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-ebs-1"].index == 1
     error_message = "The second west normal EBS local should carry its source index explicitly."
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde"
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-ebs-1"].device_name == "/dev/sde"
     error_message = "The second west normal EBS local should carry its planned device name explicitly."
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-ebs-2"].skip_destroy == true
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-ebs-2"].skip_destroy == true
     error_message = "The third west normal EBS local should preserve explicit skip_destroy."
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-refresh-ebs-0"].hostname == "west-ebs-refresh"
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-refresh-ebs-0"].hostname == "west-ebs-refresh"
     error_message = "The west refresh EBS local should carry its owning hostname explicitly."
   }
 
@@ -765,38 +1120,46 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_west_2["west-ebs-max-ebs-22"].device_name == "/dev/sdz"
+    condition     = local.ebs_block_devices.us_east_1["west-ebs-max-ebs-22"].device_name == "/dev/sdz"
     error_message = "The twenty-third west EBS local should stay inside the d..z device-name range."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].device_name == "/dev/sdd"
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-0"].volume_id == "vol-west-ebs-0" && aws_volume_attachment.us_east_1["west-ebs-ebs-0"].instance_id == "i-west-ebs" && aws_volume_attachment.us_east_1["west-ebs-ebs-0"].device_name == "/dev/sdd"
     error_message = "The first west normal EBS attachment should preserve address -> volume -> instance -> device wiring."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-0"].skip_destroy == false && aws_volume_attachment.us_west_2["west-ebs-ebs-0"].stop_instance_before_detaching == true
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-0"].skip_destroy == false && aws_volume_attachment.us_east_1["west-ebs-ebs-0"].stop_instance_before_detaching == true
     error_message = "The first west normal EBS attachment should default skip_destroy to false and stop the instance before detaching."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-1"].volume_id == "vol-west-ebs-1" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].device_name == "/dev/sde" && aws_volume_attachment.us_west_2["west-ebs-ebs-1"].skip_destroy == false
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-1"].volume_id == "vol-west-ebs-1" && aws_volume_attachment.us_east_1["west-ebs-ebs-1"].instance_id == "i-west-ebs" && aws_volume_attachment.us_east_1["west-ebs-ebs-1"].device_name == "/dev/sde" && aws_volume_attachment.us_east_1["west-ebs-ebs-1"].skip_destroy == false
     error_message = "The second west normal EBS attachment should preserve address -> volume -> instance -> device wiring and skip_destroy."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2["west-ebs-ebs-2"].volume_id == "vol-west-ebs-2" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].instance_id == "i-west-ebs" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].device_name == "/dev/sdf" && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].skip_destroy == true && aws_volume_attachment.us_west_2["west-ebs-ebs-2"].stop_instance_before_detaching == true
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-2"].volume_id == "vol-west-ebs-2" && aws_volume_attachment.us_east_1["west-ebs-ebs-2"].instance_id == "i-west-ebs" && aws_volume_attachment.us_east_1["west-ebs-ebs-2"].device_name == "/dev/sdf" && aws_volume_attachment.us_east_1["west-ebs-ebs-2"].skip_destroy == true && aws_volume_attachment.us_east_1["west-ebs-ebs-2"].stop_instance_before_detaching == true
     error_message = "The third west normal EBS attachment should preserve address -> volume -> instance -> device wiring, explicit skip_destroy, and safe detach."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_west_2_refresh["west-ebs-refresh-ebs-0"].device_name == "/dev/sdd"
+    condition     = aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-0"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-0"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-0"].device_name == "/dev/sdd"
     error_message = "The west refresh EBS attachment should preserve address -> volume -> instance -> device wiring."
   }
 
   assert {
     condition     = aws_volume_attachment.us_east_1["east-ebs-ebs-0"].volume_id == "vol-east-ebs-0" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].instance_id == "i-east-ebs" && aws_volume_attachment.us_east_1["east-ebs-ebs-0"].device_name == "/dev/sdd"
     error_message = "The east EBS attachment should preserve address -> volume -> instance -> device wiring."
+  }
+
+  assert {
+    condition = alltrue(concat(
+      [for _, volume in aws_ebs_volume.us_east_1 : volume.encrypted == true],
+      [for _, volume in aws_ebs_volume.us_east_1_refresh : volume.encrypted == true],
+    ))
+    error_message = "Every planned normal and refresh EBS data volume should set encrypted = true."
   }
 }
 
@@ -806,31 +1169,58 @@ run "systems_reject_more_than_23_ebs_block_devices" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "too-many-ebs"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-ebs-too-many"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Too many EBS devices"
+          Backup   = true
         }
 
         ebs_block_devices = [
           for index in range(24) : {
-            volume_size = "10"
+            volume_size  = "10"
+            iops         = null
+            snapshot_id  = null
+            skip_destroy = false
+            tags         = {}
+            throughput   = null
+            volume_type  = "gp3"
           }
         ]
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
 
         network_interfaces = [
           {
             private_ip      = "10.0.5.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -846,46 +1236,92 @@ run "systems_reject_duplicate_hostnames" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "duplicate-host"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Duplicate host A"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.2.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "duplicate-host"
-        availability_zone    = "us-west-2b"
+        availability_zone    = "us-east-1b"
         subnet_id            = "subnet-west-b"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Duplicate host B"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.2.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -910,16 +1346,39 @@ run "systems_reject_regions_outside_aws_config" {
         aws_kms_alias        = "eu"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Unsupported region"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.2.0.10"
             security_groups = ["sg-eu"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -949,7 +1408,7 @@ run "aws_config_rejects_duplicate_region_entries" {
 
   variables {
     aws_config = {
-      regions = ["us_east_1", "us_west_2", "us_east_1"]
+      regions = ["us_east_1", "us_east_1"]
     }
     all_systems = []
   }
@@ -965,25 +1424,48 @@ run "systems_reject_invalid_ami_identifiers" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "invalid-ami"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "amazon_linux_2023:latest"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Invalid AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -999,9 +1481,9 @@ run "systems_reject_invalid_set_state" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "bad-state"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -1009,16 +1491,38 @@ run "systems_reject_invalid_set_state" {
         ami                  = "test-linux"
         set_state            = "terminated"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+
         tags = {
           Function = "Invalid instance state"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1047,31 +1551,54 @@ run "systems_accept_windows_server_2025_base_ami" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win2025-01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2025_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows Server 2025"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   assert {
-    condition     = contains(keys(aws_instance.us_west_2), "win2025-01")
+    condition     = contains(keys(aws_instance.us_east_1), "win2025-01")
     error_message = "Windows Server 2025 AMI should plan a west-region instance."
   }
 }
@@ -1082,25 +1609,48 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "default-rhel"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-selfbuilt-default"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Family self-built Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.11.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1112,43 +1662,89 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         aws_kms_alias        = "east"
         ami                  = "prod-rhel8"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Named self-built Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.11.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "selfwin01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-selfbuilt-version"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "ttc-win22-sql19:1.2"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Versioned self-built Windows AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.11.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000009"
       platform         = ""
@@ -1166,7 +1762,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["ttc-win22-sql19:1.2"]
+    target = data.aws_ami.us_east_1_selfbuilt["ttc-win22-sql19:1.2"]
     values = {
       id               = "ami-00000000000000011"
       platform         = "windows"
@@ -1175,7 +1771,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   assert {
-    condition     = contains(keys(data.aws_ami.us_west_2_selfbuilt), "test-linux") && contains(keys(data.aws_ami.us_west_2_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
+    condition     = contains(keys(data.aws_ami.us_east_1_selfbuilt), "test-linux") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
     error_message = "Self-built name and name:version inputs should instantiate regional self-owned AMI data lookups."
   }
 
@@ -1206,17 +1802,17 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["default-rhel"].ami == "ami-00000000000000009" && aws_instance.us_east_1["prod-rhel"].ami == "ami-00000000000000010" && aws_instance.us_west_2["selfwin01"].ami == "ami-00000000000000011"
+    condition     = aws_instance.us_east_1["default-rhel"].ami == "ami-00000000000000009" && aws_instance.us_east_1["prod-rhel"].ami == "ami-00000000000000010" && aws_instance.us_east_1["selfwin01"].ami == "ami-00000000000000011"
     error_message = "Instances should launch from the resolved self-built AMI IDs."
   }
 
   assert {
     condition = alltrue([
-      local.elastic_compute_cloud.us_west_2["default-rhel"].is_windows == false,
+      local.elastic_compute_cloud.us_east_1["default-rhel"].is_windows == false,
       local.elastic_compute_cloud.us_east_1["prod-rhel"].is_windows == false,
       output.aws_instances["default-rhel"].os_family == "linux",
       output.aws_instances["prod-rhel"].os_family == "linux",
-      strcontains(local.elastic_compute_cloud.us_west_2["default-rhel"].user_data, "systemctl enable --now sshd"),
+      strcontains(local.elastic_compute_cloud.us_east_1["default-rhel"].user_data, "systemctl enable --now sshd"),
       strcontains(local.elastic_compute_cloud.us_east_1["prod-rhel"].user_data, "systemctl enable --now sshd"),
     ])
     error_message = "Self-built AMIs with empty platform should classify as Linux even if platform_details is misleading."
@@ -1224,11 +1820,11 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
   assert {
     condition = alltrue([
-      local.elastic_compute_cloud.us_west_2["selfwin01"].is_windows == true,
-      aws_instance.us_west_2["selfwin01"].get_password_data == true,
+      local.elastic_compute_cloud.us_east_1["selfwin01"].is_windows == true,
+      aws_instance.us_east_1["selfwin01"].get_password_data == false,
       local.readiness_targets["selfwin01"].is_windows == true,
       output.aws_instances["selfwin01"].os_family == "windows",
-      strcontains(local.elastic_compute_cloud.us_west_2["selfwin01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
+      strcontains(local.elastic_compute_cloud.us_east_1["selfwin01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
     ])
     error_message = "Self-built AMIs with platform=windows should classify as Windows even if platform_details is misleading."
   }
@@ -1240,25 +1836,48 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "direct-win01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-direct-windows"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "ami-0123456789abcdef0"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Direct Windows AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.10.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
         region               = "us-east-1"
@@ -1270,22 +1889,45 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         aws_kms_alias        = "east"
         ami                  = "ami-0fedcba9876543210"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Direct Linux AMI"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.1.10.10"
             security_groups = ["sg-east"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_direct["ami-0123456789abcdef0"]
+    target = data.aws_ami.us_east_1_direct["ami-0123456789abcdef0"]
     values = {
       id               = "ami-0123456789abcdef0"
       platform         = "windows"
@@ -1303,24 +1945,24 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   }
 
   assert {
-    condition     = contains(keys(data.aws_ami.us_west_2_direct), "ami-0123456789abcdef0") && contains(keys(data.aws_ami.us_east_1_direct), "ami-0fedcba9876543210")
+    condition     = contains(keys(data.aws_ami.us_east_1_direct), "ami-0123456789abcdef0") && contains(keys(data.aws_ami.us_east_1_direct), "ami-0fedcba9876543210")
     error_message = "Raw AMI IDs should instantiate exact image-id data lookups in their target regions."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["direct-win01"].ami == "ami-0123456789abcdef0" && aws_instance.us_east_1["direct-linux"].ami == "ami-0fedcba9876543210"
+    condition     = aws_instance.us_east_1["direct-win01"].ami == "ami-0123456789abcdef0" && aws_instance.us_east_1["direct-linux"].ami == "ami-0fedcba9876543210"
     error_message = "Instances launched from raw AMI IDs should use the resolved direct AMI IDs."
   }
 
   assert {
     condition = alltrue([
-      local.elastic_compute_cloud.us_west_2["direct-win01"].is_windows == true,
-      aws_instance.us_west_2["direct-win01"].get_password_data == true,
+      local.elastic_compute_cloud.us_east_1["direct-win01"].is_windows == true,
+      aws_instance.us_east_1["direct-win01"].get_password_data == false,
       local.readiness_targets["direct-win01"].is_windows == true,
       output.aws_instances["direct-win01"].os_family == "windows",
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "Transport HTTPS"),
-      strcontains(local.elastic_compute_cloud.us_west_2["direct-win01"].user_data, "LocalPort 5986"),
+      strcontains(local.elastic_compute_cloud.us_east_1["direct-win01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.elastic_compute_cloud.us_east_1["direct-win01"].user_data, "administrators_authorized_keys"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["direct-win01"].user_data, "5986"),
     ])
     error_message = "A raw Windows AMI should classify as Windows exclusively from platform metadata."
   }
@@ -1343,25 +1985,48 @@ run "systems_reject_windows_hostnames_over_15_characters" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win-server-01234"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname too long"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1377,25 +2042,48 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win_app_01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname invalid characters"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1411,25 +2099,48 @@ run "systems_reject_all_numeric_windows_hostnames" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "123456789012345"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows hostname all numeric"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1445,31 +2156,54 @@ run "systems_accept_valid_windows_hostnames" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win-app-01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Valid Windows hostname"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.7.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   assert {
-    condition     = contains(keys(aws_instance.us_west_2), "win-app-01")
+    condition     = contains(keys(aws_instance.us_east_1), "win-app-01")
     error_message = "Valid Windows hostname should plan a west-region instance."
   }
 }
@@ -1538,31 +2272,54 @@ run "readiness_gate_allows_empty_private_key_paths" {
 
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "readiness-empty-map"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-readiness-empty-map"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Readiness empty key map"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.13.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000013"
       platform         = ""
@@ -1586,31 +2343,54 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
 
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "readiness-missing-key"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-readiness-missing-key"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Readiness missing key"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.13.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000014"
       platform         = ""
@@ -1629,9 +2409,9 @@ run "readiness_targets_thread_per_system_readiness_user" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "linux-override"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-linux-override"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -1639,42 +2419,87 @@ run "readiness_targets_thread_per_system_readiness_user" {
         ami                  = "test-linux"
         readiness_user       = "ubuntu"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux readiness override"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "linux-default"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-linux-default"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux readiness default"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win-override"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-win-override"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
@@ -1682,43 +2507,88 @@ run "readiness_targets_thread_per_system_readiness_user" {
         ami                  = "windows_server_2022_base"
         readiness_user       = "ReadinessAdmin"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows readiness override"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.12"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win-default"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-win-default"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Windows readiness default"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.14.13"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000015"
       platform         = ""
@@ -1727,7 +2597,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_windows_server_2022_base[0]
+    target = data.aws_ami.us_east_1_windows_server_2022_base[0]
     values = {
       id               = "ami-00000000000000016"
       platform         = "windows"
@@ -1758,52 +2628,98 @@ run "systems_render_readiness_user_data_per_os" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "linux-ssh"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-linux"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Linux SSH user data"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.8.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       },
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "win-ssh-01"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-windows"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "windows_server_2022_base"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
-          Function = "Windows WinRM user data"
+          Function = "Windows SSH user data"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.8.11"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000005"
       platform         = ""
@@ -1812,7 +2728,7 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   override_data {
-    target = data.aws_ami.us_west_2_windows_server_2022_base[0]
+    target = data.aws_ami.us_east_1_windows_server_2022_base[0]
     values = {
       id               = "ami-00000000000000006"
       platform         = "windows"
@@ -1821,12 +2737,12 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["linux-ssh"].user_data != null
+    condition     = aws_instance.us_east_1["linux-ssh"].user_data != null
     error_message = "Linux instances should receive rendered SSH user_data."
   }
 
   assert {
-    condition     = strcontains(local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data, "systemctl enable --now sshd")
+    condition     = strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "systemctl enable --now sshd")
     error_message = "Linux user_data should enable and start sshd."
   }
 
@@ -1836,41 +2752,41 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["win-ssh-01"].user_data != null
-    error_message = "Windows instances should receive rendered WinRM user_data."
+    condition     = aws_instance.us_east_1["win-ssh-01"].user_data != null
+    error_message = "Windows instances should receive rendered SSH user_data."
   }
 
   assert {
     condition = alltrue([
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Enable-PSRemoting -Force -SkipNetworkProfileCheck"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Negotiate"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\Auth\\Basic"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "WSMan:\\localhost\\Service\\AllowUnencrypted"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "New-SelfSignedCertificate"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Transport HTTPS"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "CertificateThumbprint"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5986"),
-      !strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "LocalPort 5985"),
-      strcontains(local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data, "Set-Service -Name WinRM -StartupType Automatic"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "administrators_authorized_keys"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "X-aws-ec2-metadata-token"),
     ])
-    error_message = "Windows user_data should enable WinRM over HTTPS 5986, require encrypted Negotiate auth, and avoid exposing TCP 5985."
+    error_message = "Windows user_data should bootstrap OpenSSH Server and install the launch public key for administrator SSH."
   }
 
   assert {
     condition = alltrue([
-      strcontains(local.windows_ssh_user_data, "Add-WindowsCapability -Online -Name OpenSSH.Server"),
-      strcontains(local.windows_ssh_user_data, "administrators_authorized_keys"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "WinRM"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "WSMan"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "5986"),
     ])
-    error_message = "Dormant Windows OpenSSH user_data should remain available for owner-managed AMIs."
+    error_message = "WinRM is decommissioned; Windows user_data must not configure WSMan/WinRM listeners."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["win-ssh-01"].get_password_data == true
-    error_message = "Windows instances should compute get_password_data = true for WinRM readiness."
+    condition     = local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data == trimspace(local.windows_ssh_user_data)
+    error_message = "Windows systems must render exactly the promoted OpenSSH bootstrap user_data."
   }
 
   assert {
-    condition     = local.elastic_compute_cloud.us_west_2["linux-ssh"].user_data != local.elastic_compute_cloud.us_west_2["win-ssh-01"].user_data
+    condition     = aws_instance.us_east_1["win-ssh-01"].get_password_data == false
+    error_message = "WinRM is decommissioned; Windows instances must not fetch launch password data."
+  }
+
+  assert {
+    condition     = local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data != local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data
     error_message = "Linux and Windows user_data should differ so platform-based OS selection is covered."
   }
 }
@@ -1881,25 +2797,48 @@ run "systems_reject_kms_alias_prefix" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "prefixed-kms"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "alias/west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Prefixed KMS alias"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.4.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1915,25 +2854,48 @@ run "systems_reject_empty_iam_instance_profile" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "empty-profile"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = ""
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty IAM instance profile"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.6.10"
             security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1949,25 +2911,48 @@ run "systems_reject_empty_network_interface_security_groups" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "empty-sg"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty ENI security groups"
+          Backup   = true
         }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
 
         network_interfaces = [
           {
             private_ip      = "10.0.6.11"
             security_groups = []
+            description     = null
+            interface_type  = null
+            tags            = {}
           }
         ]
+
+        associate_public_ip = false
       }
     ]
   }
@@ -1983,20 +2968,40 @@ run "systems_reject_empty_network_interfaces" {
   variables {
     all_systems = [
       {
-        region               = "us-west-2"
+        region               = "us-east-1"
         hostname             = "empty-eni"
-        availability_zone    = "us-west-2a"
+        availability_zone    = "us-east-1a"
         subnet_id            = "subnet-west-a"
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
         ami                  = "test-linux"
 
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
         tags = {
           Function = "Empty network interfaces"
+          Backup   = true
         }
 
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
         network_interfaces = []
+
+        associate_public_ip = false
       }
     ]
   }
@@ -2006,42 +3011,152 @@ run "systems_reject_empty_network_interfaces" {
   ]
 }
 
+run "databases_reject_null_vpc_security_group_ids" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "null_security_groups_db"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        password                    = "test-password"
+        aws_kms_alias               = "west"
+        vpc_security_group_ids      = null
+        manage_master_user_password = false
+
+        tags = {
+          Function = "Database with null security groups"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
+run "databases_reject_empty_vpc_security_group_ids" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "empty_security_groups_db"
+        instance_class              = "db.t3.micro"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        username                    = "dbadmin"
+        password                    = "test-password"
+        aws_kms_alias               = "west"
+        vpc_security_group_ids      = []
+        manage_master_user_password = false
+
+        tags = {
+          Function = "Database with empty security groups"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
 run "databases_reject_duplicate_db_names" {
   command = plan
 
   variables {
     all_databases = [
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "duplicate_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "duplicate_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Duplicate database A"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       },
       {
-        region               = "us-east-1"
-        availability_zone    = "us-east-1a"
-        db_name              = "duplicate_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "east"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "duplicate_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "east"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Duplicate database B"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2057,20 +3172,34 @@ run "databases_reject_regions_outside_aws_config" {
   variables {
     all_databases = [
       {
-        region               = "eu-west-1"
-        availability_zone    = "eu-west-1a"
-        db_name              = "bad_region_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "eu"
+        region                 = "eu-west-1"
+        availability_zone      = "eu-west-1a"
+        db_name                = "bad_region_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "eu"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Unsupported database region"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2086,20 +3215,34 @@ run "databases_reject_kms_alias_prefix" {
   variables {
     all_databases = [
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "prefixed_kms_db"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "alias/west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "prefixed_kms_db"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "alias/west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Prefixed database KMS alias"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
@@ -2115,8 +3258,8 @@ run "databases_reject_empty_password_when_not_managed" {
   variables {
     all_databases = [
       {
-        region                      = "us-west-2"
-        availability_zone           = "us-west-2a"
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
         db_name                     = "empty_password_db"
         instance_class              = "db.t3.micro"
         db_subnet_group_name        = "db-subnets"
@@ -2126,10 +3269,23 @@ run "databases_reject_empty_password_when_not_managed" {
         password                    = ""
         manage_master_user_password = false
         aws_kms_alias               = "west"
+        vpc_security_group_ids      = ["sg-database"]
 
         tags = {
           Function = "Empty password database"
+          Backup   = true
         }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
@@ -2145,63 +3301,77 @@ run "databases_keep_credentials_sensitive" {
   variables {
     all_databases = [
       {
-        region               = "us-west-2"
-        availability_zone    = "us-west-2a"
-        db_name              = "sensitivedb"
-        instance_class       = "db.t3.micro"
-        db_subnet_group_name = "db-subnets"
-        engine               = "postgres"
-        engine_version       = "16.3"
-        username             = "dbadmin"
-        password             = "test-password"
-        aws_kms_alias        = "west"
+        region                 = "us-east-1"
+        availability_zone      = "us-east-1a"
+        db_name                = "sensitivedb"
+        instance_class         = "db.t3.micro"
+        db_subnet_group_name   = "db-subnets"
+        engine                 = "postgres"
+        engine_version         = "16.3"
+        username               = "dbadmin"
+        password               = "test-password"
+        aws_kms_alias          = "west"
+        vpc_security_group_ids = ["sg-database"]
 
         tags = {
           Function = "Sensitive database"
+          Backup   = true
         }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
       }
     ]
   }
 
   override_data {
-    target = data.aws_kms_alias.us_west_2["west"]
+    target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
     }
   }
 
   assert {
-    condition     = !issensitive(local.relational_database_service.us_west_2["sensitivedb"].db_name)
+    condition     = !issensitive(local.relational_database_service.us_east_1["sensitivedb"].db_name)
     error_message = "Database db_name must be non-sensitive so it can be used as a stable resource key."
   }
 
   assert {
-    condition     = !issensitive(local.relational_database_service.us_west_2["sensitivedb"].kms_key_id)
+    condition     = !issensitive(local.relational_database_service.us_east_1["sensitivedb"].kms_key_id)
     error_message = "Database KMS alias metadata must be non-sensitive so it can key the KMS data source."
   }
 
   assert {
-    condition     = contains(keys(data.aws_kms_alias.us_west_2), "west")
+    condition     = contains(keys(data.aws_kms_alias.us_east_1), "west")
     error_message = "Database KMS alias metadata must be usable as a KMS data source key."
   }
 
   assert {
-    condition     = issensitive(local.relational_database_service_credentials.us_west_2["sensitivedb"].username)
+    condition     = issensitive(local.relational_database_service_credentials.us_east_1["sensitivedb"].username)
     error_message = "Database username must stay sensitive in the RDS credentials local."
   }
 
   assert {
-    condition     = issensitive(local.relational_database_service_credentials.us_west_2["sensitivedb"].password)
+    condition     = issensitive(local.relational_database_service_credentials.us_east_1["sensitivedb"].password)
     error_message = "Database password must stay sensitive in the RDS credentials local."
   }
 
   assert {
-    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].username)
+    condition     = issensitive(aws_db_instance.us_east_1["sensitivedb"].username)
     error_message = "Database username must stay sensitive on the planned RDS resource."
   }
 
   assert {
-    condition     = issensitive(aws_db_instance.us_west_2["sensitivedb"].password)
+    condition     = issensitive(aws_db_instance.us_east_1["sensitivedb"].password)
     error_message = "Database password must stay sensitive on the planned RDS resource."
   }
 }
@@ -2212,8 +3382,8 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
   variables {
     all_databases = [
       {
-        region                      = "us-west-2"
-        availability_zone           = "us-west-2a"
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
         db_name                     = "manageddb"
         instance_class              = "db.t3.micro"
         db_subnet_group_name        = "db-subnets"
@@ -2222,38 +3392,52 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
         username                    = "dbadmin"
         manage_master_user_password = true
         aws_kms_alias               = "west"
+        vpc_security_group_ids      = ["sg-database"]
 
         tags = {
           Function = "Managed password database"
+          Backup   = true
         }
+        password                 = null
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
       }
     ]
   }
 
   override_data {
-    target = data.aws_kms_alias.us_west_2["west"]
+    target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-west-2:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
     }
   }
 
   assert {
-    condition     = local.relational_database_service.us_west_2["manageddb"].manage_master_user_password == true
+    condition     = local.relational_database_service.us_east_1["manageddb"].manage_master_user_password == true
     error_message = "Managed-password database local should carry manage_master_user_password = true."
   }
 
   assert {
-    condition     = aws_db_instance.us_west_2["manageddb"].manage_master_user_password == true
+    condition     = aws_db_instance.us_east_1["manageddb"].manage_master_user_password == true
     error_message = "Managed-password database resource should set manage_master_user_password = true."
   }
 
   assert {
-    condition     = aws_db_instance.us_west_2["manageddb"].password == null
+    condition     = aws_db_instance.us_east_1["manageddb"].password == null
     error_message = "Managed-password database resource must not set a plaintext password."
   }
 
   assert {
-    condition     = issensitive(aws_db_instance.us_west_2["manageddb"].username)
+    condition     = issensitive(aws_db_instance.us_east_1["manageddb"].username)
     error_message = "Managed-password database username must stay sensitive on the planned RDS resource."
   }
 }
@@ -2262,7 +3446,7 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 
   override_data {
-    target = data.aws_ami.us_west_2_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
     values = {
       id               = "ami-00000000000000007"
       platform         = ""
@@ -2270,32 +3454,23 @@ run "instances_enforce_imdsv2_and_password_data_default" {
     }
   }
 
-  override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
-    values = {
-      id               = "ami-00000000000000008"
-      platform         = ""
-      platform_details = "Red Hat Enterprise Linux"
-    }
-  }
-
   assert {
-    condition     = aws_instance.us_west_2["west-state"].metadata_options[0].http_tokens == "required"
+    condition     = aws_instance.us_east_1["west-state"].metadata_options[0].http_tokens == "required"
     error_message = "west-state should require IMDSv2 tokens."
   }
 
   assert {
-    condition     = aws_instance.us_west_2["west-state"].metadata_options[0].http_endpoint == "enabled"
+    condition     = aws_instance.us_east_1["west-state"].metadata_options[0].http_endpoint == "enabled"
     error_message = "west-state should keep the instance metadata endpoint enabled."
   }
 
   assert {
-    condition     = aws_instance.us_west_2_refresh["west-refresh"].metadata_options[0].http_tokens == "required"
+    condition     = aws_instance.us_east_1_refresh["west-refresh"].metadata_options[0].http_tokens == "required"
     error_message = "west-refresh should require IMDSv2 tokens."
   }
 
   assert {
-    condition     = aws_instance.us_west_2_refresh["west-refresh"].metadata_options[0].http_endpoint == "enabled"
+    condition     = aws_instance.us_east_1_refresh["west-refresh"].metadata_options[0].http_endpoint == "enabled"
     error_message = "west-refresh should keep the instance metadata endpoint enabled."
   }
 
@@ -2310,7 +3485,245 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   }
 
   assert {
-    condition     = aws_instance.us_west_2["west-no-state"].get_password_data == false
+    condition     = aws_instance.us_east_1["west-no-state"].get_password_data == false
     error_message = "Linux instances should compute get_password_data = false."
   }
+}
+
+run "readiness_gate_optout_creates_no_gate" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "west-gated"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-west-a"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        set_state      = null
+
+        tags = {
+          Function = "Gated system keeps its readiness gate"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.9.10"
+            security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        associate_public_ip = false
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "west-ssm"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-west-b"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "test-linux"
+        readiness_gate       = false
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
+        tags = {
+          Function = "Zero-inbound SSM system skips the readiness gate"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.9.11"
+            security_groups = ["sg-west"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition     = length(terraform_data.readiness_gate) == 1 && contains(keys(terraform_data.readiness_gate), "west-gated")
+    error_message = "Systems with the default readiness_gate = true must create exactly their own gate."
+  }
+
+  assert {
+    condition     = !contains(keys(terraform_data.readiness_gate), "west-ssm")
+    error_message = "readiness_gate = false must exclude the system from terraform_data.readiness_gate entirely."
+  }
+}
+
+run "all_systems_rejects_null_root_block_device" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "null-root-device"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = true
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Null root block device validation"
+        }
+        root_block_device = null
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_null_instance_type" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "null-instance-type"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = null
+        readiness_user       = null
+        readiness_gate       = true
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Null instance type validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            private_ip      = null
+            security_groups = ["sg-test"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_databases_rejects_null_blue_green_update" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                      = "us-east-1"
+        availability_zone           = "us-east-1a"
+        db_name                     = "nullbluegreen"
+        db_subnet_group_name        = "db-subnets"
+        engine                      = "postgres"
+        engine_version              = "16.3"
+        instance_class              = "db.t3.micro"
+        password                    = null
+        username                    = "dbadmin"
+        aws_kms_alias               = "test"
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = null
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+        vpc_security_group_ids      = ["sg-database"]
+        tags = {
+          Backup   = true
+          Function = "Null blue-green update validation"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
 }
