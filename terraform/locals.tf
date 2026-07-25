@@ -52,7 +52,11 @@ locals {
   #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs. The OpenSSH
   #   default shell is intentionally left as cmd; setting it to PowerShell breaks Terraform
   #   remote-exec SCP upload when this dormant SSH bootstrap is re-activated.
-  # Linux: cloud-init enables sshd.
+  # Linux: cloud-init enables sshd, then best-effort ensures the SSM agent — enabled in place if the
+  #   AMI already ships it, else the region's RPM is fetched from S3 (reachable via an S3 gateway
+  #   endpoint on private subnets, or the IGW/NAT otherwise) and installed. This makes non-Amazon
+  #   AMIs that omit the agent (CIS/STIG RHEL) SSM-reachable without a public IP. The __AWS_REGION__
+  #   sentinel is substituted with the hyphenated region per-system in local.elastic_compute_cloud.
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
@@ -90,6 +94,8 @@ locals {
     #cloud-config
     runcmd:
       - systemctl enable --now sshd || systemctl enable --now ssh
+      - systemctl enable --now amazon-ssm-agent 2>/dev/null || curl -sSL -o /root/amazon-ssm-agent.rpm https://s3.__AWS_REGION__.amazonaws.com/amazon-ssm-__AWS_REGION__/latest/linux_amd64/amazon-ssm-agent.rpm
+      - test -f /root/amazon-ssm-agent.rpm && rpm -Uvh --replacepkgs /root/amazon-ssm-agent.rpm && systemctl enable --now amazon-ssm-agent
   LINUX_USER_DATA
 
   # Deployment identity tags. Applied to every taggable AWS resource through provider default_tags
@@ -192,7 +198,7 @@ locals {
         is_windows           = local.amazon_machine_images[system.ami][region].platform == "windows"
         key_name             = system.key_name
         iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_ssh_user_data : local.linux_ssh_user_data)
+        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_ssh_user_data : replace(local.linux_ssh_user_data, "__AWS_REGION__", replace(region, "_", "-")))
         hostname             = system.hostname
         instance_type        = system.instance_type
         readiness_user       = system.readiness_user
