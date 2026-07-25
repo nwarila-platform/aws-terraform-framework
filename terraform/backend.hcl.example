@@ -1,6 +1,8 @@
 # Copy this file to backend.hcl, fill in real values, and pass it with
 # terraform -chdir=terraform init -backend-config=backend.hcl.
-bucket       = "REPLACE_ME-terraform-state-bucket"
-key          = "aws-terraform-framework/terraform.tfstate"
-region       = "us-east-1"
-use_lockfile = true
+#
+# Only deployment-specific values belong here. `encrypt` and `use_lockfile` are set in
+# backend.tf because they are invariants for every consumer, not per-deployment choices.
+bucket = "REPLACE_ME-terraform-state-bucket"
+key    = "aws-terraform-framework/terraform.tfstate"
+region = "us-east-1"

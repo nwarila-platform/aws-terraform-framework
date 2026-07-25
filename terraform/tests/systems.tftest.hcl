@@ -2790,6 +2790,15 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   assert {
+    condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "systemctl enable --now amazon-ssm-agent"),
+      strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "__AWS_REGION__"),
+    ])
+    error_message = "Linux user_data should best-effort install/enable the SSM agent with the __AWS_REGION__ sentinel substituted to the hyphenated region, so non-Amazon AMIs (e.g. CIS/STIG RHEL) are SSM-reachable without a public IP."
+  }
+
+  assert {
     condition     = aws_instance.us_east_1["win-ssh-01"].user_data != null
     error_message = "Windows instances should receive rendered SSH user_data."
   }
