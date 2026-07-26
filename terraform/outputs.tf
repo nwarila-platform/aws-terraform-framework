@@ -117,7 +117,7 @@ output "deployment_tags" {
 
 # ?region ------ [ Resource(s): aws_network_interface: Sample ] --------------------------- #
 # FirstSystem-eni-0 = {
-#   arn = "arn:aws:ec2:us-east-1:000000000000:network-interface/eni-00000000"
+#   arn = "arn:aws:ec2:us-east-1:<account-id>:network-interface/eni-00000000"
 #   attachment                = [
 #       {
 #           attachment_id = "eni-attach-00000aa0a00aa0a0a"
@@ -139,7 +139,7 @@ output "deployment_tags" {
 #   ipv6_prefixes             = []
 #   mac_address               = "0a:0a:0a:0a:aa:a0"
 #   outpost_arn               = ""
-#   owner_id                  = "000000000000"
+#   owner_id                  = "<account-id>"
 #   private_dns_name          = ""
 #   private_ip                = "127.0.0.1"
 #   private_ip_list           = [
@@ -179,14 +179,14 @@ output "deployment_tags" {
 # ?region ------ [ Resource(s): aws_ebs_volume: Sample ] ---------------------------------- #
 # aws_ebs_volume = {
 #   FirstSystem-ebs-0 = {
-#     arn                  = "arn:aws:ec2:us-east-1:000000000000:volume/vol-00a00a00a0a0a00aa"
+#     arn                  = "arn:aws:ec2:us-east-1:<account-id>:volume/vol-00a00a00a0a0a00aa"
 #     availability_zone    = "us-east-1a"
 #     create_time          = "2025-07-15T11:32:23Z"
 #     encrypted            = true
 #     final_snapshot       = false
 #     id                   = "vol-00a00a00a0a0a00aa"
 #     iops                 = 3000
-#     kms_key_id           = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#     kms_key_id           = "arn:aws:kms:us-east-1:<account-id>:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #     multi_attach_enabled = false
 #     outpost_arn          = ""
 #     size                 = 100
@@ -222,7 +222,7 @@ output "deployment_tags" {
 # aws_instance = {
 #   rhel8-ami-builder-01 = {
 #     ami                                  = "ami-000a0a0000a00a000"
-#     arn                                  = "arn:aws:ec2:us-east-1:000000000000:instance/i-0a0a00aa00aa00000"
+#     arn                                  = "arn:aws:ec2:us-east-1:<account-id>:instance/i-0a0a00aa00aa00000"
 #     associate_public_ip_address          = false
 #     availability_zone                    = "us-east-1a"
 #     capacity_reservation_specification   = [
@@ -249,7 +249,7 @@ output "deployment_tags" {
 #         device_name           = "/dev/sdd"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:<account-id>:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         snapshot_id           = ""
 #         tags                  = {
 #           DeviceName  = "/dev/sdd"
@@ -273,7 +273,7 @@ output "deployment_tags" {
 #         device_name           = "/dev/sde"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:<account-id>:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         snapshot_id           = ""
 #         tags                  = {
 #           DeviceName  = "/dev/sde"
@@ -361,7 +361,7 @@ output "deployment_tags" {
 #         device_name           = "/dev/sda1"
 #         encrypted             = true
 #         iops                  = 3000
-#         kms_key_id            = "arn:aws:kms:us-east-1:000000000000:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
+#         kms_key_id            = "arn:aws:kms:us-east-1:<account-id>:key/0a0000a0-aa00-0000-0aaa-000aa0000a00"
 #         tags                  = {
 #           Environment = "PROD"
 #           Name        = "FirstSystem"

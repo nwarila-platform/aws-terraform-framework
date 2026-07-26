@@ -54,6 +54,44 @@ all_systems = [
       }
     ]
 
+    # This system's own firewall. The framework creates it as "app01-sg", derives its region and
+    # VPC from the system above, and attaches it to every network_interface listed there - it is
+    # never named in a security_groups list. List only foreign or standing groups there. Use
+    # managed_security_groups instead for a group SHARED by several systems.
+    # Migrating a map-declared group whose key is not already exactly "app01-sg" replaces it; only
+    # make that change where the environment can tolerate security-group recreation.
+    managed_security_group = {
+      description = "app01 inbound firewall."
+
+      ingress = [
+        {
+          description                  = "HTTPS from the internal load-balancer subnet"
+          ip_protocol                  = "tcp"
+          from_port                    = 443
+          to_port                      = 443
+          cidr_ipv4                    = "10.0.0.0/16"
+          cidr_ipv6                    = null
+          prefix_list_id               = null
+          referenced_security_group_id = null
+        }
+      ]
+
+      egress = [
+        {
+          description                  = "All outbound"
+          ip_protocol                  = "-1"
+          from_port                    = null
+          to_port                      = null
+          cidr_ipv4                    = "0.0.0.0/0"
+          cidr_ipv6                    = null
+          prefix_list_id               = null
+          referenced_security_group_id = null
+        }
+      ]
+
+      tags = {}
+    }
+
     associate_public_ip = false
   },
   {
@@ -97,6 +135,11 @@ all_systems = [
         tags            = {}
       }
     ]
+
+    # No system-owned firewall: this system relies entirely on the groups listed above. null is the
+    # off switch and the pre-inline behavior; write it explicitly so one value file stays fully
+    # explicit for both parsers (docs/decision-records/repo/0002).
+    managed_security_group = null
 
     associate_public_ip = false
   }

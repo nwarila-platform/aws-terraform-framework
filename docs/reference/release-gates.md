@@ -3,7 +3,8 @@
 PRs to `main` must pass:
 
 - `CI` (`make ci`: Terraform fmt/init/validate/test, TFLint,
-  terraform-docs diff, and Diataxis docs layout)
+  terraform-docs diff, Diataxis docs layout, and the bidirectional deny-all
+  `.gitignore` allowlist guard)
 - `Security` (the local `security.yaml` caller, which delegates to the
   namespace-local `nwarila-platform/.github` CodeQL, IaC/security, and
   Scorecard reusables per org ADR-0005)

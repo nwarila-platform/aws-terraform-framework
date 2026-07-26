@@ -38,10 +38,18 @@ whose suffix preserves its format: `*.pkrvars.hcl` for HCL or `*.pkrvars.json` f
 JSON. Supply it explicitly to Packer unless it uses an auto-loaded name, and provide
 matching Packer variable declarations for every top-level variable it assigns.
 
-- **No `optional()` type modifiers, anywhere.** This explicitness policy makes one
-  fully explicit value file satisfiable by both parsers: every object attribute is
-  required, and consumers express optionality with a value (`null`, `[]`, or `{}`),
-  never with a type modifier.
+- **No `optional()` type modifiers**, with one bounded exception. This explicitness
+  policy makes one fully explicit value file satisfiable by both parsers: every object
+  attribute is required, and consumers express optionality with a value (`null`, `[]`,
+  or `{}`), never with a type modifier. The exception, recorded in
+  [repository ADR-0002](../decision-records/repo/0002-allow-optional-for-additive-object-attributes.md),
+  covers only an attribute *added* to an object type that pinned consumers already
+  populate, where requiring it would break their value files: it takes bare
+  `optional(T)` with no second argument, so Terraform supplies a typed `null` when an
+  existing value file omits the attribute and no value-file edit is required. `null`
+  reproduces the pre-existing behavior; new and updated value files still write it
+  explicitly. `optional(T, <non-null default>)`, a behavioral default hidden in a type
+  constraint, remains banned outright.
 - In Terraform declarations, declare `nullable = false` on every variable except
   those whose documented "off switch" is the value `null`.
 - Terraform variables carrying a genuine feature switch default to their empty value

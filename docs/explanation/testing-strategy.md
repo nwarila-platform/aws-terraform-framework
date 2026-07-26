@@ -15,7 +15,8 @@ configuration behavior without making AWS API calls.
 - `terraform/tests/managed.tftest.hcl` verifies default-off managed capabilities,
   security-group rule validation, and network composition without live AWS calls.
 - `make ci` also runs formatting, `terraform init`, validation, TFLint,
-  terraform-docs drift detection, and documentation layout checks.
+  terraform-docs drift detection, documentation layout checks, and the
+  bidirectional deny-all `.gitignore` allowlist guard.
 
 ## What The Tests Do Not Cover
 
