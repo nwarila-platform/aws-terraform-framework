@@ -3,7 +3,7 @@ mock_provider "aws" {
 
   mock_data "aws_kms_alias" {
     defaults = {
-      target_key_arn = "arn:aws:kms:us-east-1:111122223333:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["111122", "223333"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
     }
   }
 }

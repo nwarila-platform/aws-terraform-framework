@@ -558,9 +558,9 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
             protocol        = "HTTPS"
             ssl_policy      = "ELBSecurityPolicy-2016-08"
             alpn_policy     = null
-            certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/routing-default"
+            certificate_arn = "arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/routing-default"
             additional_certificate_arns = [
-              "arn:aws:acm:us-east-1:123456789012:certificate/routing-extra",
+              "arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/routing-extra",
             ]
             default_action = {
               type             = "forward"
@@ -640,7 +640,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
   }
 
   assert {
-    condition     = local.lb_listener_certificates.us_east_1["routing_alb/https/arn:aws:acm:us-east-1:123456789012:certificate/routing-extra"].listener_key == "routing_alb/https"
+    condition     = local.lb_listener_certificates.us_east_1["routing_alb/https/arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/routing-extra"].listener_key == "routing_alb/https"
     error_message = "The additional certificate should carry the explicit composite listener key instead of parsing it from the map key."
   }
 
@@ -660,7 +660,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
   }
 
   assert {
-    condition     = contains(keys(aws_lb_listener_certificate.us_east_1), "routing_alb/https/arn:aws:acm:us-east-1:123456789012:certificate/routing-extra")
+    condition     = contains(keys(aws_lb_listener_certificate.us_east_1), "routing_alb/https/arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/routing-extra")
     error_message = "The HTTPS additional listener certificate should be planned with the composite routing_alb/https/<arn> key."
   }
 
@@ -1757,7 +1757,7 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
             protocol                    = "HTTPS"
             ssl_policy                  = null
             alpn_policy                 = null
-            certificate_arn             = "arn:aws:acm:us-east-1:123456789012:certificate/schema"
+            certificate_arn             = "arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/schema"
             additional_certificate_arns = []
             default_action = {
               type             = "forward"

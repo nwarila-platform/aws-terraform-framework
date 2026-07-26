@@ -1,7 +1,11 @@
 PYTHON ?= python3
 TFLINT ?= tflint
 
-.PHONY: fmt fmt-check init validate test docs docs-diff docs-check tflint ci
+# The deny-all guard scans the whole repository. Only rooted, known runtime/scratch artifacts are
+# excluded: Terraform's local cache/state, Python bytecode caches, and the handoff workspace.
+GUARD_EXCLUDE := ^(_handoff/|terraform/\.terraform/|terraform/terraform\.tfstate(\.backup)?$$|terraform/\.terraform\.tfstate\.lock\.info$$|([^/]+/)*__pycache__/|([^/]+/)*[^/]+\.py[co]$$)
+
+.PHONY: fmt fmt-check init validate test docs docs-diff docs-check allowlist-check tflint ci
 
 # Mutating: rewrites HCL in place. Use locally before committing.
 fmt:
@@ -31,6 +35,37 @@ docs-diff:
 docs-check:
 	$(PYTHON) tools/check_docs_layout.py
 
+# Bidirectional deny-all allowlist guard. The forward half catches deliverable files that exist on
+# disk but git would silently omit; the reverse half catches stale unignore entries after a path is
+# renamed or deleted.
+allowlist-check:
+	@ignored=$$(git ls-files --others --ignored --exclude-standard -- . 2>/dev/null \
+	  | grep -vE '$(GUARD_EXCLUDE)' || true); \
+	if [ -n "$$ignored" ]; then \
+	  printf 'ERROR: repository files are NOT allowlisted in .gitignore:\n'; \
+	  printf '%s\n' "$$ignored" | sed 's/^/  /'; \
+	  printf 'Add an explicit "!/<path>" line to .gitignore, or remove the non-deliverable artifact.\n'; \
+	  exit 1; \
+	else \
+	  printf 'allowlist-check: OK — every repository file is explicitly allowlisted\n'; \
+	fi
+	@# Root-level core-file rules intentionally use !name syntax; this reverse check polices rooted
+	@# !/ entries only.
+	@orphans=$$(grep '^!/' .gitignore | sed 's|^!/||; s|/\*\*$$||' | while read -r p; do \
+	  case "$$p" in \
+	    */) git ls-files --cached --others --exclude-standard -- "$${p%/}" | grep -q . \
+	          || echo "$$p" ;; \
+	    *)  git ls-files --error-unmatch "$$p" >/dev/null 2>&1 || echo "$$p" ;; \
+	  esac; \
+	done); \
+	if [ -n "$$orphans" ]; then \
+	  printf 'ERROR: .gitignore allowlists paths not in the tracked set:\n'; \
+	  printf '%s\n' "$$orphans" | sed 's|^|  !/|'; \
+	  exit 1; \
+	else \
+	  printf 'allowlist-check: OK — every rooted allowlist entry resolves\n'; \
+	fi
+
 tflint:
 	$(TFLINT) --config "$(CURDIR)/.tflint.hcl" --chdir terraform
 
@@ -42,3 +77,4 @@ ci:
 	$(MAKE) tflint
 	$(MAKE) docs-diff
 	$(MAKE) docs-check
+	$(MAKE) allowlist-check

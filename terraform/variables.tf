@@ -39,7 +39,7 @@ variable "readiness_private_key_paths" {
 }
 
 variable "all_systems" {
-  description = "Define all EC2 systems managed by this framework."
+  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg and attached to every interface of that system. Migration warning: moving an existing managed_security_groups entry inline replaces the live group when its map key is not already exactly <hostname>-sg, because both the Terraform for_each address and immutable AWS name change; terraform state mv cannot prevent that name-driven replacement. Only perform such a migration where security-group recreation is tolerable. An entry already keyed exactly <hostname>-sg retains the same address and name when its other settings are unchanged."
 
   type = list(object({
     /* Required Parameters */
@@ -116,6 +116,51 @@ variable "all_systems" {
         tags            = map(string)
       })
     )
+
+    # This system's OWN firewall, created by the framework and attached to EVERY network interface
+    # above without being named in any security_groups list. The name is derived deterministically
+    # as "<hostname>-sg"; the region comes from system.region and the VPC from the subnet this
+    # system already declares, so neither is restated and neither reference can dangle. Omitting it
+    # (null) is the pre-inline behavior and changes nothing. A group SHARED by several systems
+    # cannot be expressed here: declare it once in var.managed_security_groups and reference it by
+    # key from each security_groups list. Both mechanisms may land on the same interface.
+    #
+    # MIGRATION WARNING: moving a map-declared group here is a replacement when its old map key is
+    # not already exactly "<hostname>-sg": both its for_each address and immutable AWS name change,
+    # and terraform state mv cannot bridge the name change. Only do that where recreation is safe.
+    #
+    # optional() appears here under a single recorded exception to this repository's no-optional()
+    # style rule (docs/decision-records/repo/0002): it is the only way to add an attribute to this
+    # object type without forcing every pinned consumer to restate it. When omitted, Terraform
+    # supplies a typed null; new and updated value files still write managed_security_group = null
+    # explicitly.
+    managed_security_group = optional(object({
+      description = string
+
+      ingress = list(object({
+        description                  = string
+        ip_protocol                  = string
+        from_port                    = number
+        to_port                      = number
+        cidr_ipv4                    = string
+        cidr_ipv6                    = string
+        prefix_list_id               = string
+        referenced_security_group_id = string
+      }))
+
+      egress = list(object({
+        description                  = string
+        ip_protocol                  = string
+        from_port                    = number
+        to_port                      = number
+        cidr_ipv4                    = string
+        cidr_ipv6                    = string
+        prefix_list_id               = string
+        referenced_security_group_id = string
+      }))
+
+      tags = map(string)
+    }))
 
     # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
     # Requires subnet_id to reference a managed_networks entry with public = true: with an
@@ -243,13 +288,132 @@ variable "all_systems" {
     error_message = "Each all_systems entry must define at least one network_interface (the primary <hostname>-eni-0)."
   }
 
+  # A network interface is covered when it names at least one group, OR when its system declares an
+  # inline managed_security_group. The inline clause is sound ONLY because locals.tf attaches that
+  # group to EVERY one of the system's interfaces (see elastic_network_interfaces); narrowing the
+  # attach scope without narrowing this condition in the same edit leaves an uncovered interface
+  # that AWS silently gives the VPC default allow-all group. The inline term is per-SYSTEM, so a
+  # second system with neither an inline group nor a listed one still fails.
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
-        for nic in system.network_interfaces : length(nic.security_groups) > 0
+        for nic in system.network_interfaces :
+        nic.security_groups != null && (system.managed_security_group != null || length(nic.security_groups) > 0)
       ])
     ])
-    error_message = "Each all_systems network_interfaces entry must specify at least one security group; an empty or omitted list makes AWS attach the VPC default (allow-all) security group."
+    error_message = "Each all_systems network_interfaces security_groups attribute must be a non-null list. Use [] only when the system declares an inline managed_security_group; without an inline group, the list must contain at least one entry or AWS attaches the VPC default (allow-all) security group."
+  }
+
+  # Former-default structural composites on the inline group. Also closes a gap the top-level map
+  # still has: a null tags map dies inside merge() at plan time with a generic error instead of a
+  # named validation failure.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || (
+        system.managed_security_group.description != null &&
+        system.managed_security_group.ingress != null &&
+        system.managed_security_group.egress != null &&
+        system.managed_security_group.tags != null
+      )
+    ])
+    error_message = "Each all_systems inline managed_security_group must set description, ingress, egress, and tags explicitly; use [] for either rule collection and {} for tags to declare a zero-inbound group with no extra tags."
+  }
+
+  # The derived name is "<hostname>-sg", so the hostname must produce a legal EC2 security-group
+  # name. Gated on the inline group being present, so it can never affect an existing consumer.
+  # EC2 rejects group names beginning with "sg-" (reserved for group IDs), and non-default-VPC
+  # group names are limited to 255 characters.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || (
+        length(system.hostname) <= 252 &&
+        !startswith(lower(system.hostname), "sg-") &&
+        can(regex("^[0-9A-Za-z][0-9A-Za-z._-]*$", system.hostname))
+      )
+    ])
+    error_message = "A system declaring an inline managed_security_group is named \"<hostname>-sg\", so its hostname must be at most 252 characters, must not start with \"sg-\" in any letter case (reserved by EC2 for group IDs), and must contain only letters, numbers, dots, underscores, and hyphens after a leading alphanumeric."
+  }
+
+  # EC2 security-group names are case-insensitive within a VPC. Hostname uniqueness above is
+  # deliberately unchanged for backward compatibility, so apply the stricter comparison only to
+  # systems opting into an inline group and scope it to the normalized region known here. VPC
+  # identity is not resolvable during variable validation, so this remains conservative within one
+  # region: case-variant names in two different VPCs are rejected even though EC2 would accept them.
+  validation {
+    condition = length(distinct([
+      for system in var.all_systems :
+      jsonencode([replace(system.region, "-", "_"), lower("${system.hostname}-sg")])
+      if system.managed_security_group != null
+      ])) == length([
+      for system in var.all_systems : system.hostname
+      if system.managed_security_group != null
+    ])
+    error_message = "Inline managed_security_group names derived as \"<hostname>-sg\" must be unique without regard to letter case within each region because EC2 security-group names are case-insensitive within a VPC. Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction."
+  }
+
+  # An inline group is private to its system and attached automatically; naming it in a
+  # security_groups list is the half-finished migration that leaves a stale reference behind.
+  # Sharing one group across systems is what var.managed_security_groups is for.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems : alltrue([
+        for nic in system.network_interfaces :
+        nic.security_groups == null || length(setintersection(
+          toset(nic.security_groups),
+          toset([for peer in var.all_systems : "${peer.hostname}-sg" if peer.managed_security_group != null]),
+        )) == 0
+      ])
+    ])
+    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg\"); that group is attached to its own system automatically, and sharing one group across systems requires a managed_security_groups entry referenced by key."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
+        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
+        length(compact([rule.cidr_ipv4, rule.cidr_ipv6, rule.prefix_list_id, rule.referenced_security_group_id])) == 1
+      ])
+    ])
+    error_message = "Every inline managed_security_group rule must set exactly one destination: cidr_ipv4, cidr_ipv6, prefix_list_id, or referenced_security_group_id."
+  }
+
+  # The world-open ingress ban (docs/reference/invariants.md) extended to the inline path, which
+  # would otherwise be a bypass for it. Ingress-only by design; unrestricted egress stays supported.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || system.managed_security_group.ingress == null || alltrue([
+        for rule in system.managed_security_group.ingress :
+        (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
+        (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
+      ])
+    ])
+    error_message = "An inline managed_security_group ingress rule CIDR prefix must be a positive decimal."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
+        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
+        rule.ip_protocol == "-1" ? (rule.from_port == null && rule.to_port == null) : (rule.from_port == null) == (rule.to_port == null)
+      ])
+    ])
+    error_message = "Inline managed_security_group rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
+        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
+        !contains(["tcp", "udp", "6", "17"], lower(rule.ip_protocol)) || (rule.from_port != null && rule.to_port != null)
+      ])
+    ])
+    error_message = "Inline managed_security_group rules using ip_protocol tcp or udp in any letter case, or \"6\" or \"17\", must set both from_port and to_port."
   }
 
 }
@@ -409,6 +573,7 @@ variable "resource_metadata" {
         [for system in var.all_systems : try(system.root_block_device.tags == null ? {} : system.root_block_device.tags, {})],
         flatten([for system in var.all_systems : system.ebs_block_devices == null ? [] : [for volume in system.ebs_block_devices : volume.tags == null ? {} : volume.tags]]),
         flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags == null ? {} : nic.tags]]),
+        [for system in var.all_systems : try(system.managed_security_group.tags == null ? {} : system.managed_security_group.tags, {})],
         [for load_balancer in var.all_load_balancers : load_balancer.tags == null ? {} : load_balancer.tags],
         flatten([for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [for target_group in load_balancer.target_groups : target_group.tags == null ? {} : target_group.tags]]),
         [for name, keypair in var.managed_keypairs : keypair.tags == null ? {} : keypair.tags],
@@ -1288,10 +1453,48 @@ variable "managed_security_groups" {
     condition = alltrue([
       for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
         for rule in concat(group.ingress, group.egress) :
-        !contains(["tcp", "udp", "6", "17"], rule.ip_protocol) || (rule.from_port != null && rule.to_port != null)
+        !contains(["tcp", "udp", "6", "17"], lower(rule.ip_protocol)) || (rule.from_port != null && rule.to_port != null)
       ])
     ])
-    error_message = "Rules using ip_protocol tcp, udp, \"6\", or \"17\" must set both from_port and to_port."
+    error_message = "Rules using ip_protocol tcp or udp in any letter case, or \"6\" or \"17\", must set both from_port and to_port."
+  }
+
+  # The next two rules constrain var.all_systems but are declared here deliberately. Validations on
+  # all_systems must not reference this variable: managed_security_groups already reads
+  # managed_networks, and managed_networks already reads all_systems, so a back-reference closes
+  # that chain into a cycle and terraform validate fails outright.
+
+  # An inline managed_security_group is created as "<hostname>-sg" in the same per-region bucket
+  # these map entries feed (locals.tf). A same-named key in that region would be silently
+  # overwritten by merge(), creating one group where the consumer declared two and re-pointing the
+  # loser's rules. VPC identity is not resolvable during variable validation, so this remains
+  # conservative within one region: case-variant names in two different VPCs are still rejected.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.managed_security_group == null || !anytrue([
+        for name, group in var.managed_security_groups :
+        replace(group.region, "-", "_") == replace(system.region, "-", "_") &&
+        lower(name) == lower("${system.hostname}-sg")
+      ])
+    ])
+    error_message = "A managed_security_groups key must not collide, without regard to letter case within the same region, with the name derived for an inline per-system group (\"<hostname>-sg\"). Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction; rename the shared group, or drop that system's managed_security_group and reference the shared group by key instead."
+  }
+
+  # Dangling references: a name in a security_groups list that is neither a pre-existing sg- ID nor
+  # a key of this map resolves to itself and is handed to EC2 verbatim, failing at apply rather than
+  # at plan. No configuration that applies successfully today is rejected by this rule.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces :
+        nic.security_groups == null ? [] : [
+          for group in nic.security_groups :
+          startswith(group, "sg-") || contains(keys(var.managed_security_groups), group)
+        ]
+      ]
+    ]))
+    error_message = "Each all_systems network_interfaces security_groups entry must be a pre-existing security-group ID (sg-...) or a managed_security_groups key; anything else is a dangling reference that only fails at apply."
   }
 }
 

@@ -37,7 +37,6 @@
 !/terraform/backend.hcl.example
 !/terraform/tests/
 !/terraform/tests/*.tftest.hcl
-!/terraform/tests/*.tftest.json
 
 # Documentation (Diátaxis)
 !/docs/
@@ -67,7 +66,7 @@
 !/docs/decision-records/org/0005-keep-github-control-planes-namespace-local.md
 !/docs/decision-records/repo/
 !/docs/decision-records/repo/.gitkeep
-!/docs/decision-records/repo/0001-hardcode-first-security-baseline.md
+!/docs/decision-records/repo/*.md
 !/docs/decision-records/template/
 !/docs/decision-records/template/.gitkeep
 !/docs/decision-records/template/README.md

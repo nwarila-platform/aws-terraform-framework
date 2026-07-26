@@ -136,12 +136,45 @@ locals {
     )
   }
 
-  # Managed security groups partitioned per region (same normalization rule the systems use).
-  managed_security_groups_by_region = {
-    for region in var.aws_config.regions : region => {
-      for name, group in var.managed_security_groups : name => group
-      if replace(group.region, "-", "_") == region
+  # Inline per-system security groups (all_systems[*].managed_security_group) normalized into the
+  # managed_security_groups SHAPE, so creation, rule flattening, name-to-id resolution, and tagging
+  # are the one existing code path rather than a parallel one. The name is derived deterministically
+  # as "<hostname>-sg" (hostnames are validated unique, and collision with a managed_security_groups
+  # key is rejected in variables.tf). The region comes from the system; vpc_id is the system's own
+  # subnet_id when that names a managed_networks entry, which the same lookup the map entries use
+  # then resolves to the VPC id, and otherwise the VPC of the literal subnet the system sits in.
+  inline_security_groups = {
+    for system in var.all_systems : "${system.hostname}-sg" => {
+      region = replace(system.region, "-", "_")
+      vpc_id = (
+        contains(keys(var.managed_networks), system.subnet_id)
+        ? system.subnet_id
+        : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
+      )
+      description = system.managed_security_group.description
+      ingress     = system.managed_security_group.ingress
+      egress      = system.managed_security_group.egress
+      tags        = system.managed_security_group.tags
     }
+    if system.managed_security_group != null
+  }
+
+  # Managed security groups partitioned per region (same normalization rule the systems use).
+  # Map-declared groups (the way to express a group SHARED by several systems) and inline
+  # per-system groups land in the same bucket, so both are created by one resource with one set of
+  # name, VPC, and tag semantics. With no inline group the merge is merge(<map entries>, {}), which
+  # leaves every existing for_each key untouched.
+  managed_security_groups_by_region = {
+    for region in var.aws_config.regions : region => merge(
+      {
+        for name, group in var.managed_security_groups : name => group
+        if replace(group.region, "-", "_") == region
+      },
+      {
+        for name, group in local.inline_security_groups : name => group
+        if group.region == region
+      },
+    )
   }
 
   # Managed SG rules flattened to stable per-rule addresses: "<sg>/<direction>-<index>".
@@ -289,10 +322,26 @@ locals {
           interface_type = system.network_interfaces[index].interface_type
           # Null lets AWS pick a free address from the subnet CIDR.
           private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
-          security_groups = [
-            for group in system.network_interfaces[index].security_groups :
-            lookup(local.managed_security_group_ids[region], group, group)
-          ]
+          # The groups the consumer listed (managed names resolved to ids, pre-existing sg- ids
+          # passed through) plus, appended, this system's own inline group. The append is strictly
+          # additive: with no inline group the expression is concat(<original list>, []), which is
+          # the original list, so consumers that declare none plan byte-identically. The inline
+          # group goes on EVERY interface of the system, which is what makes the empty-list
+          # validation in variables.tf sound; narrowing this to the primary ENI would leave a
+          # secondary interface with the VPC default allow-all group.
+          security_groups = concat(
+            [
+              for group in system.network_interfaces[index].security_groups :
+              lookup(local.managed_security_group_ids[region], group, group)
+            ],
+            # Validation rejects naming an inline group in a security_groups list, so this guard is
+            # defense in depth. It tests the consumer's NAME list, which is known at plan time,
+            # rather than distinct() over ids, which are unknown until the group is created and
+            # would degrade the whole list to unknown on first create.
+            system.managed_security_group == null || contains(system.network_interfaces[index].security_groups, "${system.hostname}-sg")
+            ? []
+            : [local.managed_security_group_ids[region]["${system.hostname}-sg"]],
+          )
           subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
 
           # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically

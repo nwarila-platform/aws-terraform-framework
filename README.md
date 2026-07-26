@@ -21,7 +21,8 @@ make ci
 ```
 
 The CI path runs Terraform formatting, init, validation, tests, TFLint,
-terraform-docs drift detection, and documentation layout checks.
+terraform-docs drift detection, documentation layout checks, and the
+bidirectional deny-all `.gitignore` allowlist guard.
 
 ### Deploy from this framework
 

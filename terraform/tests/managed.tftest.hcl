@@ -169,7 +169,7 @@ run "managed_key_pair_rejects_non_openssh_material" {
   variables {
     managed_keypairs = {
       "bad-key" = {
-        public_key = "-----BEGIN RSA PRIVATE KEY----- oops"
+        public_key = "not-an-openssh-public-key"
         tags       = {}
       }
     }

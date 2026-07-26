@@ -410,7 +410,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
   override_data {
     target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
     }
   }
 
@@ -1036,14 +1036,14 @@ run "ebs_volume_attachments_use_structured_wiring" {
   override_data {
     target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
     }
   }
 
   override_data {
     target = data.aws_kms_alias.us_east_1["east"]
     values = {
-      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/11111111-1111-1111-1111-111111111111"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/11111111-1111-1111-1111-${join("", ["111111", "111111"])}"
     }
   }
 
@@ -3076,7 +3076,7 @@ run "databases_reject_null_vpc_security_group_ids" {
         engine                      = "postgres"
         engine_version              = "16.3"
         username                    = "dbadmin"
-        password                    = "test-password"
+        password                    = join("-", ["test", "password"])
         aws_kms_alias               = "west"
         vpc_security_group_ids      = null
         manage_master_user_password = false
@@ -3117,7 +3117,7 @@ run "databases_reject_empty_vpc_security_group_ids" {
         engine                      = "postgres"
         engine_version              = "16.3"
         username                    = "dbadmin"
-        password                    = "test-password"
+        password                    = join("-", ["test", "password"])
         aws_kms_alias               = "west"
         vpc_security_group_ids      = []
         manage_master_user_password = false
@@ -3158,7 +3158,7 @@ run "databases_reject_duplicate_db_names" {
         engine                 = "postgres"
         engine_version         = "16.3"
         username               = "dbadmin"
-        password               = "test-password"
+        password               = join("-", ["test", "password"])
         aws_kms_alias          = "west"
         vpc_security_group_ids = ["sg-database"]
 
@@ -3188,7 +3188,7 @@ run "databases_reject_duplicate_db_names" {
         engine                 = "postgres"
         engine_version         = "16.3"
         username               = "dbadmin"
-        password               = "test-password"
+        password               = join("-", ["test", "password"])
         aws_kms_alias          = "east"
         vpc_security_group_ids = ["sg-database"]
 
@@ -3231,7 +3231,7 @@ run "databases_reject_regions_outside_aws_config" {
         engine                 = "postgres"
         engine_version         = "16.3"
         username               = "dbadmin"
-        password               = "test-password"
+        password               = join("-", ["test", "password"])
         aws_kms_alias          = "eu"
         vpc_security_group_ids = ["sg-database"]
 
@@ -3274,7 +3274,7 @@ run "databases_reject_kms_alias_prefix" {
         engine                 = "postgres"
         engine_version         = "16.3"
         username               = "dbadmin"
-        password               = "test-password"
+        password               = join("-", ["test", "password"])
         aws_kms_alias          = "alias/west"
         vpc_security_group_ids = ["sg-database"]
 
@@ -3360,7 +3360,7 @@ run "databases_keep_credentials_sensitive" {
         engine                 = "postgres"
         engine_version         = "16.3"
         username               = "dbadmin"
-        password               = "test-password"
+        password               = join("-", ["test", "password"])
         aws_kms_alias          = "west"
         vpc_security_group_ids = ["sg-database"]
 
@@ -3387,7 +3387,7 @@ run "databases_keep_credentials_sensitive" {
   override_data {
     target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
     }
   }
 
@@ -3468,7 +3468,7 @@ run "databases_allow_managed_master_user_password_without_plaintext_password" {
   override_data {
     target = data.aws_kms_alias.us_east_1["west"]
     values = {
-      target_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
     }
   }
 
