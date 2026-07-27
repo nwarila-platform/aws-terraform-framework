@@ -69,16 +69,18 @@ had no group name available for collision validation. EC2 compares
 security-group names case-insensitively within a VPC, and the attempted inline
 group creation would therefore have failed as a duplicate.
 
-Inline names now use `<hostname>-sg-<index>`, with the raw zero-based index
+Inline names now use `<hostname>-eni-<index>-sg`, with the raw zero-based index
 derived from the group's position. The current nullable object normalizes to a
 zero-or-one-element sequence and therefore produces `0`; retaining the position
 in the derivation lets a future list produce additional stable names without
 replacing the naming rule. This is the module's native convention: other
 position-derived resource keys in the same local use
 `<hostname>-eni-<index>`, `<hostname>-ebs-<index>`, and
-`<name>/ingress-<index>`, all with raw zero-based indices. This change is
-deliberately confined to inline groups. Keys supplied through
-`managed_security_groups` remain explicit consumer names and are not rewritten.
+other indexed resources, all with raw zero-based indices. Security-group rule
+resources are the exception because insertions into a rule list must not replace
+unrelated rules. This change is deliberately confined to inline groups. Keys
+supplied through the now-removed top-level `managed_security_groups` map were
+explicit consumer names and were not rewritten.
 
 ## Decision Drivers
 
@@ -138,11 +140,11 @@ Chosen option: **Option 1, a bounded exception for additive object attributes.**
 required field convenient to omit, or in any newly introduced object type, where
 every attribute can simply be required from the start.
 
-The inline security-group name MUST be rendered as `<hostname>-sg-<index>`,
+The inline security-group name MUST be rendered as `<hostname>-eni-<index>-sg`,
 where `index` is the raw zero-based position in the normalized per-system
 sequence. The 255-character EC2 group-name limit is checked against each
-rendered name. The current `-sg-0` suffix leaves 250 characters for the hostname;
-a future `-sg-10` suffix would leave 249, and the rendered-name validation
+rendered name. The current `-eni-0-sg` suffix leaves 246 characters for the hostname;
+a future `-eni-10-sg` suffix would leave 245, and the rendered-name validation
 adjusts with the index rather than enforcing a permanently conservative bound.
 Top-level `managed_security_groups` map keys are outside this derivation and
 MUST retain their consumer-supplied bytes.
@@ -191,14 +193,14 @@ MUST retain their consumer-supplied bytes.
 
 Moving an existing `managed_security_groups` entry to the inline attribute is
 not generally a rename. If its map key is not already exactly
-`<hostname>-sg-0`, the move changes both the `for_each` resource address and the
+`<hostname>-eni-0-sg`, the move changes both the `for_each` resource address and the
 immutable AWS security-group name. Terraform therefore replaces the live group;
 `terraform state mv` can move the state address but cannot prevent replacement
 for the changed name. Perform such a migration only in an environment that can
 tolerate the group being recreated and its attachments being rewired.
 
 There is one narrow no-replacement case: an existing map entry already keyed
-exactly `<hostname>-sg-0` has the same resource address and AWS name after it moves
+exactly `<hostname>-eni-0-sg` has the same resource address and AWS name after it moves
 inline. If its region, VPC, rules, description, and tags also remain equivalent,
 Terraform can retain it without a state move. This exception is why the broader
 claim that every map-to-inline migration replaces a group would be inaccurate.
@@ -257,6 +259,15 @@ only this decision's map-coexistence, explicit-map-key, and map-to-inline
 migration statements. The decision establishing the inline attribute, its
 bounded `optional()` use, and its derived naming remains current.
 
+The later 2026-07-27 relocation of framework-created groups from
+`all_systems[*].managed_security_group` to flat
+`all_systems[*].network_interfaces[*].ingress` and `.egress` attributes
+supersedes the system-level declaration, its `optional()` use, and its nullable
+object off switch. The general bounded `optional()` exception remains available,
+but this repository has no current use. The derived name remains
+`<hostname>-eni-<index>-sg`; the raw index now comes from the declaring network
+interface.
+
 ## Implementing PRs
 
 None yet. The inline per-system security group introduces this ADR and its
@@ -272,6 +283,8 @@ implementation together; the merged PR may be added here later.
 
 | Date       | Change                                                        | Reason                                                                              | Author/Role          | Body-diff? |
 | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 2026-07-27 | Renamed interface-owned groups to `<hostname>-eni-<index>-sg`. | Pair every group visibly with the ENI it protects. | Portfolio maintainer | Yes        |
+| 2026-07-27 | Moved created security-group declaration to each network interface. | Model the AWS attachment boundary directly. | Portfolio maintainer | Yes        |
 | 2026-07-27 | Removed the top-level managed security-group path.             | Keep security-group creation system-specific; map coexistence and migration contracts no longer apply. | Portfolio maintainer | Yes        |
-| 2026-07-26 | Changed inline names to position-derived `<hostname>-sg-<index>`. | Avoid the verified standing-group collision and follow the module's native raw zero-based key style. | Portfolio maintainer | Yes        |
+| 2026-07-26 | Changed inline names to position-derived `<hostname>-eni-<index>-sg`. | Avoid the verified standing-group collision and follow the module's native raw zero-based key style. | Portfolio maintainer | Yes        |
 | 2026-07-25 | Accepted the bounded `optional()` exception for additive attributes. | Adding `all_systems[*].managed_security_group` had to be backward compatible. | Portfolio maintainer | Yes        |

@@ -70,6 +70,8 @@ variables {
           security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]

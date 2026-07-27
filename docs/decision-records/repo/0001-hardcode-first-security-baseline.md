@@ -227,6 +227,11 @@ Confirmation item 3 only as to its declaration path. The world-open ingress ban
 remains current and is enforced on
 `all_systems[*].managed_security_group.ingress`.
 
+The later 2026-07-27 relocation from the system-level inline object to flat
+network-interface rule attributes supersedes that declaration path again. The
+ban remains current and is now enforced on
+`all_systems[*].network_interfaces[*].ingress`.
+
 ## Implementing PRs
 
 None yet. T19 introduces this ADR and its implementation together; the merged PR

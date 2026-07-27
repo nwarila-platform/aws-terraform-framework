@@ -136,66 +136,121 @@ locals {
     )
   }
 
-  # Inline per-system security groups (all_systems[*].managed_security_group) normalized into an
-  # indexed sequence per system. A nullable object splats to zero or one elements today; if the
-  # attribute later becomes a list, the position-derived "<hostname>-sg-<index>" naming rule remains
-  # unchanged. The region comes from the system; vpc_id is the system's own subnet_id when that
-  # names a managed_networks entry, which local.managed_vpc_ids resolves to the VPC id, and
-  # otherwise the VPC of the literal subnet the system sits in.
-  inline_security_groups_by_system = {
-    for system in var.all_systems : system.hostname => [
-      for inline_security_group_index, inline_security_group in system.managed_security_group[*] : {
-        name   = "${system.hostname}-sg-${inline_security_group_index}"
+  # Each interface with non-null rule collections declares one group at its raw interface index.
+  # Its "<hostname>-eni-<index>-sg" name pairs it visibly with the corresponding ENI. The region
+  # and VPC come from the parent system because every interface already uses that system's subnet.
+  # Description and tags come from the interface itself; a null description uses a stable framework
+  # string.
+  network_interface_security_groups = merge(concat([{}], [
+    for system in var.all_systems : {
+      for interface_index, network_interface in system.network_interfaces :
+      "${system.hostname}-eni-${interface_index}-sg" => {
+        name   = "${system.hostname}-eni-${interface_index}-sg"
         region = replace(system.region, "-", "_")
         vpc_id = (
           contains(keys(var.managed_networks), system.subnet_id)
           ? system.subnet_id
           : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
         )
-        description = inline_security_group.description
-        ingress     = inline_security_group.ingress
-        egress      = inline_security_group.egress
-        tags        = inline_security_group.tags
+        description = network_interface.description != null ? network_interface.description : "Managed by aws-terraform-framework."
+        ingress     = network_interface.ingress
+        egress      = network_interface.egress
+        tags        = network_interface.tags
       }
-    ]
-  }
-
-  # Flatten the per-system sequences into the resource input shape, so creation, rule flattening,
-  # name-to-id resolution, and tagging stay on one code path.
-  inline_security_groups = merge(concat([{}], [
-    for hostname, inline_security_groups in local.inline_security_groups_by_system : {
-      for inline_security_group in inline_security_groups : inline_security_group.name => {
-        region      = inline_security_group.region
-        vpc_id      = inline_security_group.vpc_id
-        description = inline_security_group.description
-        ingress     = inline_security_group.ingress
-        egress      = inline_security_group.egress
-        tags        = inline_security_group.tags
-      }
+      if network_interface.ingress != null && network_interface.egress != null
     }
   ])...)
 
-  # Inline per-system security groups partitioned per region (same normalization rule the systems
+  # Interface-owned security groups partitioned per region (same normalization rule the systems
   # use).
-  inline_security_groups_by_region = {
+  network_interface_security_groups_by_region = {
     for region in var.aws_config.regions : region => {
-      for name, group in local.inline_security_groups : name => group
+      for name, group in local.network_interface_security_groups : name => group
       if group.region == region
     }
   }
 
-  # Managed SG rules flattened to stable per-rule addresses: "<sg>/<direction>-<index>".
-  managed_security_group_rules = {
-    for region in var.aws_config.regions : region => merge(concat([{}], [
-      for name, group in local.inline_security_groups_by_region[region] : merge(
-        { for index, rule in group.ingress : "${name}/ingress-${index}" => merge(rule, { sg_key = name, direction = "ingress" }) },
-        { for index, rule in group.egress : "${name}/egress-${index}" => merge(rule, { sg_key = name, direction = "egress" }) },
+  # Normalize every interface-owned rule into its AWS identity. Description is deliberately absent:
+  # AWS duplicate detection and resource replacement are determined by direction, protocol, ports,
+  # and destination. Field values in the readable prefix are lowercased, sanitized to alphanumerics
+  # and hyphens, and bounded; the digest preserves the full normalized identity when sanitization or
+  # truncation makes two readable prefixes alike.
+  network_interface_security_group_rule_entries = {
+    for region in var.aws_config.regions : region => flatten([
+      for name, group in local.network_interface_security_groups_by_region[region] : concat(
+        [
+          for rule in group.ingress : {
+            direction = "ingress"
+            identity = jsonencode([
+              "ingress",
+              lower(rule.ip_protocol),
+              rule.from_port,
+              rule.to_port,
+              rule.cidr_ipv4 != null ? "cidr_ipv4" : rule.cidr_ipv6 != null ? "cidr_ipv6" : rule.prefix_list_id != null ? "prefix_list_id" : rule.referenced_security_group_id != null ? "referenced_security_group_id" : "missing",
+              lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"),
+            ])
+            readable_identity = join("-", [
+              "ingress",
+              "protocol",
+              substr(replace(lower(rule.ip_protocol), "/[^0-9a-z]+/", "-"), 0, 32),
+              "ports",
+              rule.from_port == null ? "none" : tostring(rule.from_port),
+              rule.to_port == null ? "none" : tostring(rule.to_port),
+              rule.cidr_ipv4 != null ? "cidr-ipv4" : rule.cidr_ipv6 != null ? "cidr-ipv6" : rule.prefix_list_id != null ? "prefix-list-id" : rule.referenced_security_group_id != null ? "referenced-security-group-id" : "missing",
+              substr(replace(lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"), "/[^0-9a-z]+/", "-"), 0, 64),
+            ])
+            rule   = rule
+            sg_key = name
+          }
+        ],
+        [
+          for rule in group.egress : {
+            direction = "egress"
+            identity = jsonencode([
+              "egress",
+              lower(rule.ip_protocol),
+              rule.from_port,
+              rule.to_port,
+              rule.cidr_ipv4 != null ? "cidr_ipv4" : rule.cidr_ipv6 != null ? "cidr_ipv6" : rule.prefix_list_id != null ? "prefix_list_id" : rule.referenced_security_group_id != null ? "referenced_security_group_id" : "missing",
+              lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"),
+            ])
+            readable_identity = join("-", [
+              "egress",
+              "protocol",
+              substr(replace(lower(rule.ip_protocol), "/[^0-9a-z]+/", "-"), 0, 32),
+              "ports",
+              rule.from_port == null ? "none" : tostring(rule.from_port),
+              rule.to_port == null ? "none" : tostring(rule.to_port),
+              rule.cidr_ipv4 != null ? "cidr-ipv4" : rule.cidr_ipv6 != null ? "cidr-ipv6" : rule.prefix_list_id != null ? "prefix-list-id" : rule.referenced_security_group_id != null ? "referenced-security-group-id" : "missing",
+              substr(replace(lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"), "/[^0-9a-z]+/", "-"), 0, 64),
+            ])
+            rule   = rule
+            sg_key = name
+          }
+        ],
       )
-    ])...)
+    ])
   }
 
-  # Name -> inline-created SG id, used to auto-attach each system's group to its interfaces.
-  managed_security_group_ids = {
+  # Stable rule address:
+  # "<sg>/<direction>-protocol-<protocol>-ports-<from>-<to>-<destination kind>-<destination>-<digest>".
+  # An exact identity collision raises Terraform's duplicate-object-key error at plan time rather
+  # than silently losing a rule.
+  network_interface_security_group_rules = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.network_interface_security_group_rule_entries[region] :
+      "${entry.sg_key}/${entry.readable_identity}-${substr(sha256(entry.identity), 0, 12)}" => merge(
+        entry.rule,
+        {
+          direction = entry.direction
+          sg_key    = entry.sg_key
+        },
+      )
+    }
+  }
+
+  # Name -> interface-owned SG id, used to attach each group only to its declaring interface.
+  network_interface_security_group_ids = {
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
 
@@ -329,26 +384,17 @@ locals {
           interface_type = system.network_interfaces[index].interface_type
           # Null lets AWS pick a free address from the subnet CIDR.
           private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
-          # The pre-existing security-group ids the consumer listed plus, appended, this system's
-          # own inline group. The append is strictly additive: with no inline group the expression
-          # is concat(<original list>, []), which is the original list, so consumers that declare
-          # none plan byte-identically. The inline group goes on EVERY interface of the system,
-          # which is what makes the empty-list validation in variables.tf sound; narrowing this to
-          # the primary ENI would leave a secondary interface with the VPC default allow-all group.
+          # The pre-existing security-group ids the consumer listed plus this interface's own group
+          # when its rule collections are non-null. The same per-interface predicate guards both
+          # validation and attachment, so an interface can never silently receive the VPC default
+          # allow-all group.
           security_groups = concat(
-            [
-              for group in system.network_interfaces[index].security_groups :
-              lookup(local.managed_security_group_ids[region], group, group)
-            ],
-            # Validation rejects naming an inline group in a security_groups list, so this guard is
-            # defense in depth. It tests the consumer's NAME list, which is known at plan time,
-            # rather than distinct() over ids, which are unknown until the group is created and
-            # would degrade the whole list to unknown on first create.
-            [
-              for inline_security_group in local.inline_security_groups_by_system[system.hostname] :
-              local.managed_security_group_ids[region][inline_security_group.name]
-              if !contains(system.network_interfaces[index].security_groups, inline_security_group.name)
-            ],
+            system.network_interfaces[index].security_groups,
+            (
+              system.network_interfaces[index].ingress != null &&
+              system.network_interfaces[index].egress != null
+            ) ? [local.network_interface_security_group_ids[region]["${system.hostname}-eni-${index}-sg"]]
+            : [],
           )
           subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
 

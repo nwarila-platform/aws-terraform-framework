@@ -38,10 +38,10 @@ resource "aws_key_pair" "us_east_1" {
 
 #region ------ [ Create Managed Security Groups ] ---------------------------------------------- #
 
-# Optional inline per-system security groups. A group with no ingress entries is zero-inbound
-# (the SSM posture). Rules are granular
-# aws_vpc_security_group_*_rule resources with stable "<sg>/<direction>-<index>" addresses.
-# Systems without an inline group create nothing.
+# Optional interface-owned security groups. An interface with no ingress entries is zero-inbound
+# (the SSM posture). Rules are granular aws_vpc_security_group_*_rule resources with stable
+# content-derived addresses under their "<sg>/" prefix.
+# Interfaces with null ingress and egress create nothing.
 
 
 resource "aws_security_group" "us_east_1" {
@@ -49,11 +49,13 @@ resource "aws_security_group" "us_east_1" {
   # Set the provider in which to deploy the security group.
   provider = aws.us_east_1
 
-  for_each = local.inline_security_groups_by_region.us_east_1
+  for_each = local.network_interface_security_groups_by_region.us_east_1
 
   name        = each.key
   description = each.value.description
   vpc_id      = lookup(local.managed_vpc_ids.us_east_1, each.value.vpc_id, each.value.vpc_id)
+
+  lifecycle { ignore_changes = [description] }
 
   tags = merge(
     each.value.tags,
@@ -73,7 +75,7 @@ resource "aws_vpc_security_group_ingress_rule" "us_east_1" {
   provider = aws.us_east_1
 
   for_each = {
-    for key, rule in local.managed_security_group_rules.us_east_1 : key => rule
+    for key, rule in local.network_interface_security_group_rules.us_east_1 : key => rule
     if rule.direction == "ingress"
   }
 
@@ -89,7 +91,6 @@ resource "aws_vpc_security_group_ingress_rule" "us_east_1" {
   referenced_security_group_id = each.value.referenced_security_group_id
 
   tags = {
-    Name        = each.key
     Environment = var.environment
     Terraform   = "True"
   }
@@ -103,7 +104,7 @@ resource "aws_vpc_security_group_egress_rule" "us_east_1" {
   provider = aws.us_east_1
 
   for_each = {
-    for key, rule in local.managed_security_group_rules.us_east_1 : key => rule
+    for key, rule in local.network_interface_security_group_rules.us_east_1 : key => rule
     if rule.direction == "egress"
   }
 
@@ -119,7 +120,6 @@ resource "aws_vpc_security_group_egress_rule" "us_east_1" {
   referenced_security_group_id = each.value.referenced_security_group_id
 
   tags = {
-    Name        = each.key
     Environment = var.environment
     Terraform   = "True"
   }
@@ -814,7 +814,7 @@ resource "aws_instance" "us_east_1" {
     content {
       delete_on_termination = false
       device_index          = network_interface.value.index
-      network_card_index    = network_interface.value.index
+      network_card_index    = 0
       network_interface_id  = network_interface.value.id
     }
   }
@@ -887,7 +887,7 @@ resource "aws_instance" "us_east_1_refresh" {
     content {
       delete_on_termination = false
       device_index          = network_interface.value.index
-      network_card_index    = network_interface.value.index
+      network_card_index    = 0
       network_interface_id  = network_interface.value.id
     }
   }

@@ -45,6 +45,8 @@ variables {
           security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -90,6 +92,8 @@ variables {
           security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -135,6 +139,8 @@ variables {
           security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -180,6 +186,8 @@ variables {
           security_groups = ["sg-22222222"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -281,6 +289,8 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -326,6 +336,8 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -497,6 +509,8 @@ run "instance_state_includes_refresh_instances_after_readiness" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -566,6 +580,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -611,6 +627,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
             security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -656,6 +674,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -842,6 +862,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -897,6 +919,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -952,6 +976,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
             security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1007,6 +1033,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1231,6 +1259,8 @@ run "systems_reject_more_than_23_ebs_block_devices" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1289,6 +1319,8 @@ run "systems_reject_duplicate_hostnames" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1334,6 +1366,8 @@ run "systems_reject_duplicate_hostnames" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1392,6 +1426,8 @@ run "systems_reject_regions_outside_aws_config" {
             security_groups = ["sg-33333333"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1480,6 +1516,8 @@ run "systems_reject_invalid_ami_identifiers" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1538,6 +1576,8 @@ run "systems_reject_invalid_set_state" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1609,6 +1649,8 @@ run "systems_accept_windows_server_2025_base_ami" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1668,6 +1710,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1713,6 +1757,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
             security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1758,6 +1804,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1898,6 +1946,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -1943,6 +1993,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
             security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2049,6 +2101,8 @@ run "systems_reject_windows_hostnames_over_15_characters" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2107,6 +2161,8 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2165,6 +2221,8 @@ run "systems_reject_all_numeric_windows_hostnames" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2223,6 +2281,8 @@ run "systems_accept_valid_windows_hostnames" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2340,6 +2400,8 @@ run "readiness_gate_allows_empty_private_key_paths" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2412,6 +2474,8 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2479,6 +2543,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2524,6 +2590,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2569,6 +2637,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2614,6 +2684,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2702,6 +2774,8 @@ run "systems_render_readiness_user_data_per_os" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2747,6 +2821,8 @@ run "systems_render_readiness_user_data_per_os" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2882,6 +2958,8 @@ run "systems_reject_kms_alias_prefix" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2940,6 +3018,8 @@ run "systems_reject_empty_iam_instance_profile" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -2998,6 +3078,8 @@ run "systems_reject_empty_network_interface_security_groups" {
             security_groups = []
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -3615,6 +3697,8 @@ run "readiness_gate_optout_creates_no_gate" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -3660,6 +3744,8 @@ run "readiness_gate_optout_creates_no_gate" {
             security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -3710,6 +3796,8 @@ run "all_systems_rejects_null_root_block_device" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -3760,6 +3848,8 @@ run "all_systems_rejects_null_instance_type" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -3850,6 +3940,8 @@ run "all_systems_threads_imds_hop_limit_two" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -3889,6 +3981,8 @@ run "all_systems_threads_imds_hop_limit_two" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -3957,6 +4051,8 @@ run "all_systems_rejects_imds_hop_limit_zero" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -4007,6 +4103,8 @@ run "all_systems_rejects_imds_hop_limit_three" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}
@@ -4057,6 +4155,8 @@ run "all_systems_rejects_null_imds_hop_limit" {
           {
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             security_groups = ["sg-eeeeeeee"]
             tags            = {}

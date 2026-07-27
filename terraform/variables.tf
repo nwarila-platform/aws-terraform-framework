@@ -7,8 +7,8 @@ variable "environment" {
   nullable    = false
 
   validation {
-    condition     = length(trimspace(var.environment)) > 0
-    error_message = "environment must not be empty."
+    condition     = length(trimspace(var.environment)) > 0 && length(var.environment) <= 256
+    error_message = "environment must not be empty and must be at most 256 characters so its framework-generated tag values fit the EC2 tag-value limit."
   }
 }
 
@@ -39,7 +39,7 @@ variable "readiness_private_key_paths" {
 }
 
 variable "all_systems" {
-  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg-0 and attached to every interface of that system."
+  description = "Define all EC2 systems managed by this framework. Each network interface with non-null ingress and egress creates and attaches its own <hostname>-eni-<interface index>-sg security group."
 
   type = list(object({
     /* Required Parameters */
@@ -113,50 +113,36 @@ variable "all_systems" {
         # managed_networks subnets whose CIDR the consumer does not want to hand-allocate.
         private_ip      = string
         security_groups = list(string)
-        tags            = map(string)
+        # Non-null ingress and egress declare this interface's own group, named
+        # "<hostname>-eni-<interface index>-sg" and attached only to this interface. Both null
+        # means attach only the pre-created groups listed above. The group description uses this
+        # interface's description when non-null, otherwise a fixed framework string; its tags use
+        # this interface's tags.
+        ingress = list(object({
+          description                  = string
+          ip_protocol                  = string
+          from_port                    = number
+          to_port                      = number
+          cidr_ipv4                    = string
+          cidr_ipv6                    = string
+          prefix_list_id               = string
+          referenced_security_group_id = string
+        }))
+
+        egress = list(object({
+          description                  = string
+          ip_protocol                  = string
+          from_port                    = number
+          to_port                      = number
+          cidr_ipv4                    = string
+          cidr_ipv6                    = string
+          prefix_list_id               = string
+          referenced_security_group_id = string
+        }))
+
+        tags = map(string)
       })
     )
-
-    # This system's OWN firewall, created by the framework and attached to EVERY network interface
-    # above without being named in any security_groups list. The name is derived deterministically
-    # as "<hostname>-sg-0"; the region comes from system.region and the VPC from the subnet this
-    # system already declares, so neither is restated and neither reference can dangle. Omitting it
-    # (null) is the pre-inline behavior and changes nothing. A group shared across systems is not
-    # expressible here and belongs outside this framework; express cross-system reachability with
-    # CIDR rules.
-    #
-    # optional() appears here under a single recorded exception to this repository's no-optional()
-    # style rule (docs/decision-records/repo/0002): it is the only way to add an attribute to this
-    # object type without forcing every pinned consumer to restate it. When omitted, Terraform
-    # supplies a typed null; new and updated value files still write managed_security_group = null
-    # explicitly.
-    managed_security_group = optional(object({
-      description = string
-
-      ingress = list(object({
-        description                  = string
-        ip_protocol                  = string
-        from_port                    = number
-        to_port                      = number
-        cidr_ipv4                    = string
-        cidr_ipv6                    = string
-        prefix_list_id               = string
-        referenced_security_group_id = string
-      }))
-
-      egress = list(object({
-        description                  = string
-        ip_protocol                  = string
-        from_port                    = number
-        to_port                      = number
-        cidr_ipv4                    = string
-        cidr_ipv6                    = string
-        prefix_list_id               = string
-        referenced_security_group_id = string
-      }))
-
-      tags = map(string)
-    }))
 
     # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
     # Requires subnet_id to reference a managed_networks entry with public = true: with an
@@ -284,159 +270,136 @@ variable "all_systems" {
     error_message = "Each all_systems entry must define at least one network_interface (the primary <hostname>-eni-0)."
   }
 
-  # A network interface is covered when it names at least one group, OR when its system declares an
-  # inline managed_security_group. The inline clause is sound ONLY because locals.tf attaches that
-  # group to EVERY one of the system's interfaces (see elastic_network_interfaces); narrowing the
-  # attach scope without narrowing this condition in the same edit leaves an uncovered interface
-  # that AWS silently gives the VPC default allow-all group. The inline term is per-SYSTEM, so a
-  # second system with neither an inline group nor a listed one still fails.
+  # A network interface is covered when it names at least one pre-created group, OR when both rule
+  # collections are non-null and therefore declare that interface's own group. The validation and
+  # locals.tf attachment use the same per-interface predicate; otherwise AWS silently supplies the
+  # VPC default allow-all group to an uncovered interface.
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
         for nic in system.network_interfaces :
-        nic.security_groups != null && (system.managed_security_group != null || length(nic.security_groups) > 0)
+        nic.security_groups != null && (
+          (nic.ingress != null && nic.egress != null) ||
+          length(nic.security_groups) > 0
+        )
       ])
     ])
-    error_message = "Each all_systems network_interfaces security_groups attribute must be a non-null list. Use [] only when the system declares an inline managed_security_group; without an inline group, the list must contain at least one entry or AWS attaches the VPC default (allow-all) security group."
+    error_message = "Each all_systems network interface must have a non-null security_groups list and either declare its own group with non-null ingress and egress or list at least one pre-created group; otherwise AWS attaches the VPC default (allow-all) security group."
   }
 
-  # Former-default structural composites on the inline group. Keep null rule collections and tags
-  # on the named variable-validation path instead of letting them fail later inside expressions.
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || (
-        system.managed_security_group.description != null &&
-        system.managed_security_group.ingress != null &&
-        system.managed_security_group.egress != null &&
-        system.managed_security_group.tags != null
-      )
-    ])
-    error_message = "Each all_systems inline managed_security_group must set description, ingress, egress, and tags explicitly; use [] for either rule collection and {} for tags to declare a zero-inbound group with no extra tags."
-  }
-
-  # The derived name is "<hostname>-sg-<index>", where index is the inline group's raw zero-based
-  # position. Validate the rendered name so future index digits cannot silently exceed the EC2
-  # limit. A nullable object splats to zero or one elements today; the five-character "-sg-0"
-  # suffix leaves a 250-character hostname budget. A future index 10 has a six-character suffix and
-  # therefore a 249-character budget, which this rendered-name check enforces without a naming-rule
-  # change. EC2 rejects names beginning with "sg-" (reserved for group IDs), and
-  # non-default-VPC group names are limited to 255 characters.
+  # Both rule collections declare the interface's group together. A paired null is the explicit
+  # off switch; a half-null pair is ambiguous and would otherwise fail later inside expressions.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
-        for inline_security_group_index, inline_security_group in system.managed_security_group[*] : (
-          length("${system.hostname}-sg-${inline_security_group_index}") <= 255 &&
-          !startswith(lower("${system.hostname}-sg-${inline_security_group_index}"), "sg-") &&
-          can(regex("^[0-9A-Za-z][0-9A-Za-z._-]*$", "${system.hostname}-sg-${inline_security_group_index}"))
-        )
+        for nic in system.network_interfaces :
+        (nic.ingress == null) == (nic.egress == null)
       ]
     ]))
-    error_message = "An inline managed_security_group is named \"<hostname>-sg-<index>\" from its raw zero-based position, so the rendered name must be at most 255 characters (a 250-character hostname for the current index 0; 249 at a future index 10), must not start with \"sg-\" in any letter case (reserved by EC2 for group IDs), and must contain only letters, numbers, dots, underscores, and hyphens after a leading alphanumeric."
+    error_message = "Each all_systems network interface must use matching ingress and egress modes: paired null creates no interface-owned group and attaches only the pre-created security_groups, while non-null lists create the group and [] means that direction has no rules."
+  }
+
+  # The derived name is "<hostname>-eni-<interface index>-sg", where index is the interface's raw
+  # zero-based position. Validate the rendered framework name rather than a separate hostname
+  # approximation. The nine-character "-eni-0-sg" suffix leaves a 246-character hostname budget;
+  # index 10 has a ten-character suffix and therefore a 245-character budget.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for interface_index, nic in system.network_interfaces : (
+          length("${system.hostname}-eni-${interface_index}-sg") <= 255 &&
+          !startswith(lower("${system.hostname}-eni-${interface_index}-sg"), "sg-") &&
+          can(regex("^[0-9A-Za-z][0-9A-Za-z._-]*$", "${system.hostname}-eni-${interface_index}-sg"))
+        )
+        if nic.ingress != null && nic.egress != null
+      ]
+    ]))
+    error_message = "A network interface's own group is named \"<hostname>-eni-<interface index>-sg\" from the interface's raw zero-based position, so the rendered name must be at most 255 characters (a 246-character hostname at index 0; 245 at index 10), must not start with \"sg-\" in any letter case, and must contain only letters, numbers, dots, underscores, and hyphens after a leading alphanumeric."
   }
 
   # EC2 security-group names are case-insensitive within a VPC. Hostname uniqueness above is
   # deliberately unchanged for backward compatibility, so apply the stricter comparison only to
-  # systems opting into an inline group and scope it to the normalized region known here. VPC
+  # interfaces declaring their own groups and scope it to the normalized region known here. VPC
   # identity is not resolvable during variable validation, so this remains conservative within one
   # region: case-variant names in two different VPCs are rejected even though EC2 would accept them.
   validation {
     condition = length(distinct(flatten([
       for system in var.all_systems : [
-        for inline_security_group_index, inline_security_group in system.managed_security_group[*] :
+        for interface_index, nic in system.network_interfaces :
         jsonencode([
           replace(system.region, "-", "_"),
-          lower("${system.hostname}-sg-${inline_security_group_index}"),
+          lower("${system.hostname}-eni-${interface_index}-sg"),
         ])
+        if nic.ingress != null && nic.egress != null
       ]
       ]))) == sum(concat([0], [
-      for system in var.all_systems : length(system.managed_security_group[*])
+      for system in var.all_systems : length([
+        for nic in system.network_interfaces : nic
+        if nic.ingress != null && nic.egress != null
+      ])
     ]))
-    error_message = "Inline managed_security_group names derived as \"<hostname>-sg-<index>\" from raw zero-based position must be unique without regard to letter case within each region because EC2 security-group names are case-insensitive within a VPC. Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction."
+    error_message = "Network-interface security-group names derived as \"<hostname>-eni-<interface index>-sg\" must be unique without regard to letter case within each region because EC2 security-group names are case-insensitive within a VPC. Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction."
   }
 
-  # An inline group is private to its system and attached automatically; naming it in a
-  # security_groups list is invalid. A group shared across systems belongs outside this framework,
-  # and cross-system reachability is expressed with CIDR rules.
+  # An interface's own group is attached automatically; naming any such derived group in a
+  # security_groups list is invalid. A shared group belongs outside this framework, and
+  # cross-system reachability in interface-owned groups is expressed with CIDR rules.
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
         for nic in system.network_interfaces :
         nic.security_groups == null || length(setintersection(
-          toset(nic.security_groups),
+          toset([for group in nic.security_groups : lower(group)]),
           toset(flatten([
             for peer in var.all_systems : [
-              for inline_security_group_index, inline_security_group in peer.managed_security_group[*] :
-              "${peer.hostname}-sg-${inline_security_group_index}"
+              for interface_index, peer_nic in peer.network_interfaces :
+              lower("${peer.hostname}-eni-${interface_index}-sg")
+              if peer_nic.ingress != null && peer_nic.egress != null
             ]
           ])),
         )) == 0
       ])
     ])
-    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg-<index>\"); that group is attached to its own system automatically. A group shared across systems belongs outside this framework; express cross-system reachability with CIDR rules."
+    error_message = "An all_systems network_interfaces security_groups list must not name an interface-owned group (\"<hostname>-eni-<interface index>-sg\"); that group is attached to its own interface automatically. A group shared across systems belongs outside this framework; express cross-system reachability with CIDR rules."
   }
 
-  # Explicitly listed groups must use pre-existing EC2 group-ID syntax. Inline groups are attached
-  # automatically and are forbidden from these lists by the validation above; variable validation
-  # cannot prove that an id exists.
+  # The provider accepts "-1", zero-padded numeric equivalents, and "all" without regard to
+  # letter case as all-protocol spellings. EC2 ignores any port range on those rules, so require
+  # null ports to keep the authored rule's apparent scope equal to its effective scope.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces : alltrue([
+          for rule in concat(
+            nic.ingress == null ? [] : nic.ingress,
+            nic.egress == null ? [] : nic.egress,
+            ) : (
+            (
+              lower(rule.ip_protocol) != "all" &&
+              !can(regex("^-0*1$", rule.ip_protocol))
+            ) ||
+            (rule.from_port == null && rule.to_port == null)
+          )
+        ])
+      ]
+    ]))
+    error_message = "All-protocol security-group rules (ip_protocol \"-1\", a zero-padded numeric equivalent, or \"all\" in any letter case) must leave from_port and to_port null because EC2 ignores supplied ports and opens all ports."
+  }
+
+  # The world-open ingress ban (docs/reference/invariants.md) bound to every interface-owned group.
+  # Ingress-only by design; unrestricted egress stays supported.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
         for nic in system.network_interfaces :
-        nic.security_groups == null ? [] : [
-          for group in nic.security_groups :
-          can(regex("^sg-([0-9a-f]{8}|[0-9a-f]{17})$", group))
-        ]
+        nic.ingress == null || alltrue([
+          for rule in nic.ingress :
+          (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
+          (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
+        ])
       ]
     ]))
-    error_message = "Each all_systems network_interfaces security_groups entry must use EC2 security-group ID syntax: \"sg-\" followed by 8 or 17 lowercase hexadecimal characters. This validation checks syntax only; it does not prove the pre-existing group exists."
-  }
-
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
-        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
-        length(compact([rule.cidr_ipv4, rule.cidr_ipv6, rule.prefix_list_id, rule.referenced_security_group_id])) == 1
-      ])
-    ])
-    error_message = "Every inline managed_security_group rule must set exactly one destination: cidr_ipv4, cidr_ipv6, prefix_list_id, or referenced_security_group_id."
-  }
-
-  # The world-open ingress ban (docs/reference/invariants.md) extended to the inline path, which
-  # would otherwise be a bypass for it. Ingress-only by design; unrestricted egress stays supported.
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || system.managed_security_group.ingress == null || alltrue([
-        for rule in system.managed_security_group.ingress :
-        (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
-        (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
-      ])
-    ])
-    error_message = "An inline managed_security_group ingress rule CIDR prefix must be a positive decimal."
-  }
-
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
-        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
-        rule.ip_protocol == "-1" ? (rule.from_port == null && rule.to_port == null) : (rule.from_port == null) == (rule.to_port == null)
-      ])
-    ])
-    error_message = "Inline managed_security_group rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
-  }
-
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || system.managed_security_group.ingress == null || system.managed_security_group.egress == null || alltrue([
-        for rule in concat(system.managed_security_group.ingress, system.managed_security_group.egress) :
-        !contains(["tcp", "udp", "6", "17"], lower(rule.ip_protocol)) || (rule.from_port != null && rule.to_port != null)
-      ])
-    ])
-    error_message = "Inline managed_security_group rules using ip_protocol tcp or udp in any letter case, or \"6\" or \"17\", must set both from_port and to_port."
+    error_message = "A network-interface security-group ingress rule CIDR prefix must be a positive decimal."
   }
 
 }
@@ -592,11 +555,24 @@ variable "resource_metadata" {
 
   validation {
     condition = var.resource_metadata == null ? true : alltrue([
+      length(var.resource_metadata.repository) <= 256,
+      length(var.resource_metadata.repository_id) <= 256,
+      length(var.resource_metadata.stack) <= 256,
+      length(var.resource_metadata.owner) <= 256,
+      var.resource_metadata.commit_sha == null ? true : length(var.resource_metadata.commit_sha) <= 256,
+      var.resource_metadata.run_id == null ? true : length(var.resource_metadata.run_id) <= 256,
+    ])
+    error_message = "Each resource_metadata value must be at most 256 characters so its provider-default tag value fits the EC2 tag-value limit."
+  }
+
+  validation {
+    # The tautological first term binds this cross-variable invariant to its declared variable;
+    # the tag namespace remains reserved whether metadata is null or populated.
+    condition = (var.resource_metadata == null || var.resource_metadata != null) && alltrue([
       for tags in concat(
         [for system in var.all_systems : try(system.root_block_device.tags == null ? {} : system.root_block_device.tags, {})],
         flatten([for system in var.all_systems : system.ebs_block_devices == null ? [] : [for volume in system.ebs_block_devices : volume.tags == null ? {} : volume.tags]]),
         flatten([for system in var.all_systems : [for nic in system.network_interfaces : nic.tags == null ? {} : nic.tags]]),
-        [for system in var.all_systems : try(system.managed_security_group.tags == null ? {} : system.managed_security_group.tags, {})],
         [for load_balancer in var.all_load_balancers : load_balancer.tags == null ? {} : load_balancer.tags],
         flatten([for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [for target_group in load_balancer.target_groups : target_group.tags == null ? {} : target_group.tags]]),
         [for name, keypair in var.managed_keypairs : keypair.tags == null ? {} : keypair.tags],

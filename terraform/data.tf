@@ -310,14 +310,14 @@ data "aws_key_pair" "us_east_1" {
 #endregion --- [ Load All AWS EC2 Key Pairs ] ------------------------------------------------- #
 
 
-#region ------ [ Load Subnets Backing Inline Per-System Security Groups ] --------------------- #
+#region ------ [ Load Subnets Backing Interface-Owned Security Groups ] ----------------------- #
 
 
-# A system with an inline managed_security_group derives its VPC from the subnet it already
-# declares instead of restating it. A subnet_id naming a managed_networks entry resolves through
-# local.managed_vpc_ids with no API call, so only a LITERAL subnet id reaches this lookup: it has
-# zero instances for every consumer that declares no inline group. It needs ec2:DescribeSubnets,
-# already covered by the read-only statement in the consumer deploy policies.
+# An interface-owned group derives its VPC from the parent system's subnet instead of restating it.
+# A subnet_id naming a managed_networks entry resolves through local.managed_vpc_ids with no API
+# call, so only a LITERAL subnet id reaches this lookup: it has zero instances when no interface
+# declares a group. It needs ec2:DescribeSubnets, already covered by the read-only statement in the
+# consumer deploy policies.
 
 
 data "aws_subnet" "us_east_1_inline_security_group" {
@@ -325,11 +325,14 @@ data "aws_subnet" "us_east_1_inline_security_group" {
   # Set the provider in which to look up the subnet.
   provider = aws.us_east_1
 
-  # Deduplicated by subnet id: several inline systems may share one subnet.
+  # Deduplicated by subnet id: several systems with interface-owned groups may share one subnet.
   for_each = toset([
     for system in var.all_systems : system.subnet_id
     if contains(["us_east_1", "us-east-1"], system.region) &&
-    system.managed_security_group != null &&
+    anytrue([
+      for nic in system.network_interfaces :
+      nic.ingress != null && nic.egress != null
+    ]) &&
     !contains(keys(var.managed_networks), system.subnet_id)
   ])
 
@@ -337,7 +340,7 @@ data "aws_subnet" "us_east_1_inline_security_group" {
 
 }
 
-#endregion --- [ Load Subnets Backing Inline Per-System Security Groups ] --------------------- #
+#endregion --- [ Load Subnets Backing Interface-Owned Security Groups ] ----------------------- #
 
 
 #region ------ [ Load All AWS IAM Instance Profiles ] ----------------------------------------- #
