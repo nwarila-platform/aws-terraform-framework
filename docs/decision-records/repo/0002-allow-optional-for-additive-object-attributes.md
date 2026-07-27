@@ -8,7 +8,7 @@
 | Decision-subject | A bounded exception to the no-`optional()` style rule for backward-compatible attribute additions. |
 | Date accepted    | 2026-07-25                                                                     |
 | Date             | 2026-07-25                                                                     |
-| Last reviewed    | 2026-07-25                                                                     |
+| Last reviewed    | 2026-07-26                                                                     |
 | Authors          | Nick Warila (@NWarila)                                                         |
 | Decision-makers  | Nick Warila (sole portfolio maintainer)                                        |
 | Consulted        | Independent design and wiring reviews of the inline per-system security group. |
@@ -61,6 +61,25 @@ between that design and the inline attribute is therefore a real trade-off, not
 a question of feasibility. Inline won because it keeps a system-owned firewall
 beside the system and avoids repeating the hostname as a separate map key.
 
+The initial inline implementation derived the AWS name as `<hostname>-sg`. A
+verified consumer incident showed why that convention was unsafe:
+`secure-wazuh-poc` shared a VPC with a permanent, hand-stamped standing group
+named `secure-wazuh-poc-sg`. The standing group was attached by ID, so the module
+had no group name available for collision validation. EC2 compares
+security-group names case-insensitively within a VPC, and the attempted inline
+group creation would therefore have failed as a duplicate.
+
+Inline names now use `<hostname>-sg-<index>`, with the raw zero-based index
+derived from the group's position. The current nullable object normalizes to a
+zero-or-one-element sequence and therefore produces `0`; retaining the position
+in the derivation lets a future list produce additional stable names without
+replacing the naming rule. This is the module's native convention: other
+position-derived resource keys in the same local use
+`<hostname>-eni-<index>`, `<hostname>-ebs-<index>`, and
+`<name>/ingress-<index>`, all with raw zero-based indices. This change is
+deliberately confined to inline groups. Keys supplied through
+`managed_security_groups` remain explicit consumer names and are not rewritten.
+
 ## Decision Drivers
 
 1. **Backward compatibility outranks declaration aesthetics.** A pinned consumer
@@ -80,6 +99,15 @@ beside the system and avoids repeating the hostname as a separate map key.
 5. **Divergence must be recorded, not silent.** The style guide states that it
    wins over older code; a deliberate deviation therefore needs a superseding
    record rather than an undocumented exception.
+6. **Generated names must not occupy the standing-group convention.** The bare
+   `<hostname>-sg` form is common for externally managed groups and cannot be
+   discovered when a consumer attaches one by ID. A position suffix avoids the
+   observed collision and reserves a stable namespace for multiple inline
+   groups later.
+7. **Generated names must follow the module's native key style.** Every other
+   position-derived key in `locals.tf` uses a raw zero-based index. Security
+   groups use the same `<hostname>-<type>-<index>` convention instead of
+   introducing a one-based, zero-padded variant.
 
 ## Considered Options
 
@@ -109,6 +137,15 @@ Chosen option: **Option 1, a bounded exception for additive object attributes.**
 `optional()` MUST NOT be used to supply a non-null behavioral default, to make a
 required field convenient to omit, or in any newly introduced object type, where
 every attribute can simply be required from the start.
+
+The inline security-group name MUST be rendered as `<hostname>-sg-<index>`,
+where `index` is the raw zero-based position in the normalized per-system
+sequence. The 255-character EC2 group-name limit is checked against each
+rendered name. The current `-sg-0` suffix leaves 250 characters for the hostname;
+a future `-sg-10` suffix would leave 249, and the rendered-name validation
+adjusts with the index rather than enforcing a permanently conservative bound.
+Top-level `managed_security_groups` map keys are outside this derivation and
+MUST retain their consumer-supplied bytes.
 
 ## Pros and Cons of the Options
 
@@ -154,14 +191,14 @@ every attribute can simply be required from the start.
 
 Moving an existing `managed_security_groups` entry to the inline attribute is
 not generally a rename. If its map key is not already exactly
-`<hostname>-sg`, the move changes both the `for_each` resource address and the
+`<hostname>-sg-0`, the move changes both the `for_each` resource address and the
 immutable AWS security-group name. Terraform therefore replaces the live group;
 `terraform state mv` can move the state address but cannot prevent replacement
 for the changed name. Perform such a migration only in an environment that can
 tolerate the group being recreated and its attachments being rewired.
 
 There is one narrow no-replacement case: an existing map entry already keyed
-exactly `<hostname>-sg` has the same resource address and AWS name after it moves
+exactly `<hostname>-sg-0` has the same resource address and AWS name after it moves
 inline. If its region, VPC, rules, description, and tags also remain equivalent,
 Terraform can retain it without a state move. This exception is why the broader
 claim that every map-to-inline migration replaces a group would be inaccurate.
@@ -232,4 +269,5 @@ implementation together; the merged PR may be added here later.
 
 | Date       | Change                                                        | Reason                                                                              | Author/Role          | Body-diff? |
 | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 2026-07-26 | Changed inline names to position-derived `<hostname>-sg-<index>`. | Avoid the verified standing-group collision and follow the module's native raw zero-based key style. | Portfolio maintainer | Yes        |
 | 2026-07-25 | Accepted the bounded `optional()` exception for additive attributes. | Adding `all_systems[*].managed_security_group` had to be backward compatible. | Portfolio maintainer | Yes        |

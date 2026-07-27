@@ -136,28 +136,44 @@ locals {
     )
   }
 
-  # Inline per-system security groups (all_systems[*].managed_security_group) normalized into the
-  # managed_security_groups SHAPE, so creation, rule flattening, name-to-id resolution, and tagging
-  # are the one existing code path rather than a parallel one. The name is derived deterministically
-  # as "<hostname>-sg" (hostnames are validated unique, and collision with a managed_security_groups
-  # key is rejected in variables.tf). The region comes from the system; vpc_id is the system's own
-  # subnet_id when that names a managed_networks entry, which the same lookup the map entries use
-  # then resolves to the VPC id, and otherwise the VPC of the literal subnet the system sits in.
-  inline_security_groups = {
-    for system in var.all_systems : "${system.hostname}-sg" => {
-      region = replace(system.region, "-", "_")
-      vpc_id = (
-        contains(keys(var.managed_networks), system.subnet_id)
-        ? system.subnet_id
-        : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
-      )
-      description = system.managed_security_group.description
-      ingress     = system.managed_security_group.ingress
-      egress      = system.managed_security_group.egress
-      tags        = system.managed_security_group.tags
-    }
-    if system.managed_security_group != null
+  # Inline per-system security groups (all_systems[*].managed_security_group) normalized into an
+  # indexed sequence per system. A nullable object splats to zero or one elements today; if the
+  # attribute later becomes a list, the position-derived "<hostname>-sg-<index>" naming rule remains
+  # unchanged. The region comes from the system; vpc_id is the system's own subnet_id when that
+  # names a managed_networks entry, which the same lookup the map entries use then resolves to the
+  # VPC id, and otherwise the VPC of the literal subnet the system sits in.
+  inline_security_groups_by_system = {
+    for system in var.all_systems : system.hostname => [
+      for inline_security_group_index, inline_security_group in system.managed_security_group[*] : {
+        name   = "${system.hostname}-sg-${inline_security_group_index}"
+        region = replace(system.region, "-", "_")
+        vpc_id = (
+          contains(keys(var.managed_networks), system.subnet_id)
+          ? system.subnet_id
+          : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
+        )
+        description = inline_security_group.description
+        ingress     = inline_security_group.ingress
+        egress      = inline_security_group.egress
+        tags        = inline_security_group.tags
+      }
+    ]
   }
+
+  # Flatten the per-system sequences into the existing managed_security_groups shape, so creation,
+  # rule flattening, name-to-id resolution, and tagging stay on the one existing code path.
+  inline_security_groups = merge(concat([{}], [
+    for hostname, inline_security_groups in local.inline_security_groups_by_system : {
+      for inline_security_group in inline_security_groups : inline_security_group.name => {
+        region      = inline_security_group.region
+        vpc_id      = inline_security_group.vpc_id
+        description = inline_security_group.description
+        ingress     = inline_security_group.ingress
+        egress      = inline_security_group.egress
+        tags        = inline_security_group.tags
+      }
+    }
+  ])...)
 
   # Managed security groups partitioned per region (same normalization rule the systems use).
   # Map-declared groups (the way to express a group SHARED by several systems) and inline
@@ -338,9 +354,11 @@ locals {
             # defense in depth. It tests the consumer's NAME list, which is known at plan time,
             # rather than distinct() over ids, which are unknown until the group is created and
             # would degrade the whole list to unknown on first create.
-            system.managed_security_group == null || contains(system.network_interfaces[index].security_groups, "${system.hostname}-sg")
-            ? []
-            : [local.managed_security_group_ids[region]["${system.hostname}-sg"]],
+            [
+              for inline_security_group in local.inline_security_groups_by_system[system.hostname] :
+              local.managed_security_group_ids[region][inline_security_group.name]
+              if !contains(system.network_interfaces[index].security_groups, inline_security_group.name)
+            ],
           )
           subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
 

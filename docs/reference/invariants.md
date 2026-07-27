@@ -33,6 +33,15 @@ change at minimum.
   cannot resolve the final VPC identity, so the guard is intentionally
   conservative within one region: case-variant names in different VPCs are still
   rejected even though EC2 permits them.
+- Inline security-group names MUST be derived as `<hostname>-sg-<index>`, where
+  `index` is the raw zero-based position of the group within its system (the
+  current singleton attribute therefore yields `0`). This matches the module's
+  existing `<hostname>-<type>-<index>` keys for ENIs and EBS volumes. Validation
+  MUST apply the 255-character EC2 limit to each rendered name; the current
+  `-sg-0` suffix leaves a 250-character hostname budget, while a future index
+  `10` would leave 249. This convention applies only to inline groups:
+  explicit `managed_security_groups` map keys, names, and resource addresses
+  MUST remain unchanged.
 - Every RDS database MUST attach at least one explicitly supplied VPC security
   group instead of falling back to the VPC default security group.
 - `aws_ec2_instance_state` resources MUST be created only when a system
