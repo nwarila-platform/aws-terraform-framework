@@ -9,9 +9,9 @@ mock_provider "aws" {
 }
 
 # secure-wazuh-shaped baseline: a plain Linux system that references only pre-existing
-# infrastructure and sets none of the managed_* variables. Every managed capability added to this
-# framework MUST keep this run passing untouched — it is the mechanical zero-diff guarantee that
-# consumers which ignore the new variables see no new resources and no re-keyed addresses.
+# infrastructure, sets both interface rule collections to null, and sets none of the managed_*
+# variables. It is the mechanical guarantee that this explicit pre-created-group path creates no
+# additional resources and preserves existing resource keys.
 variables {
   environment = "TEST"
 
@@ -55,6 +55,8 @@ variables {
           security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -84,12 +86,12 @@ run "wazuh_preexisting_shape_is_zero_diff" {
 
   assert {
     condition     = length(aws_security_group.us_east_1) == 0 && length(aws_vpc_security_group_ingress_rule.us_east_1) == 0 && length(aws_vpc_security_group_egress_rule.us_east_1) == 0
-    error_message = "With no inline managed_security_group, the framework must create zero security groups and zero rules."
+    error_message = "With no interface-owned group, the framework must create zero security groups and zero rules."
   }
 
   assert {
     condition     = length(data.aws_subnet.us_east_1_inline_security_group) == 0
-    error_message = "With no inline managed_security_group, the framework must perform zero inline VPC-derivation subnet lookups."
+    error_message = "With no interface-owned group, the framework must perform zero group VPC-derivation subnet lookups."
   }
 
   assert {
@@ -149,6 +151,8 @@ run "managed_key_pair_created_from_public_key" {
             security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -312,22 +316,18 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
           {
             private_ip      = "10.0.0.12"
             security_groups = []
-            description     = null
+            description     = "Managed by aws-terraform-framework"
             interface_type  = null
-            tags            = {}
+            ingress         = []
+            egress = [
+              { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+              { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+              { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+            ]
+            tags = {}
           }
         ]
 
-        managed_security_group = {
-          ingress = []
-          egress = [
-            { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-            { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-            { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-          ]
-          description = "Managed by aws-terraform-framework"
-          tags        = {}
-        }
 
         associate_public_ip = false
       }
@@ -335,13 +335,13 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
   }
 
   assert {
-    condition     = contains(keys(aws_security_group.us_east_1), "managed-sg-host-sg-0")
-    error_message = "The inline security group must be created under its derived name."
+    condition     = contains(keys(aws_security_group.us_east_1), "managed-sg-host-eni-0-sg")
+    error_message = "The interface security group must be created under its derived name."
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["managed-sg-host-sg-0"].vpc_id == "vpc-preexisting"
-    error_message = "The inline security group must derive its VPC from the system subnet."
+    condition     = aws_security_group.us_east_1["managed-sg-host-eni-0-sg"].vpc_id == "vpc-preexisting"
+    error_message = "The interface security group must derive its VPC from the parent system subnet."
   }
 
   assert {
@@ -352,18 +352,16 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
   assert {
     condition = alltrue([
       length(aws_vpc_security_group_egress_rule.us_east_1) == 3,
-      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-0"].cidr_ipv4 == "0.0.0.0/0",
-      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-0"].from_port == 443,
-      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-1"].ip_protocol == "udp",
-      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-1"].from_port == 53,
-      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-2"].ip_protocol == "tcp",
+      one([for rule in values(aws_vpc_security_group_egress_rule.us_east_1) : rule if rule.ip_protocol == "tcp" && rule.from_port == 443]).cidr_ipv4 == "0.0.0.0/0",
+      one([for rule in values(aws_vpc_security_group_egress_rule.us_east_1) : rule if rule.ip_protocol == "udp" && rule.from_port == 53]).to_port == 53,
+      one([for rule in values(aws_vpc_security_group_egress_rule.us_east_1) : rule if rule.ip_protocol == "tcp" && rule.from_port == 53]).to_port == 53,
     ])
-    error_message = "Inline egress rules must materialize with stable <sg>/egress-<index> addresses and exact ports."
+    error_message = "Interface-owned egress rules must materialize with stable content-derived addresses and exact ports."
   }
 
   assert {
-    condition     = contains(aws_network_interface.us_east_1["managed-sg-host-eni-0"].security_groups, aws_security_group.us_east_1["managed-sg-host-sg-0"].id)
-    error_message = "The inline security group must attach automatically when the explicit security_groups list is empty."
+    condition     = contains(aws_network_interface.us_east_1["managed-sg-host-eni-0"].security_groups, aws_security_group.us_east_1["managed-sg-host-eni-0-sg"].id)
+    error_message = "The interface security group must attach automatically when the explicit security_groups list is empty."
   }
 }
 
@@ -421,21 +419,17 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         network_interfaces = [
           {
             security_groups = []
-            description     = null
+            description     = "Managed by aws-terraform-framework"
             interface_type  = null
-            private_ip      = null
-            tags            = {}
+            ingress         = []
+            egress = [
+              { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+            ]
+            private_ip = null
+            tags       = {}
           }
         ]
 
-        managed_security_group = {
-          egress = [
-            { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-          ]
-          description = "Managed by aws-terraform-framework"
-          ingress     = []
-          tags        = {}
-        }
       }
     ]
   }
@@ -460,8 +454,8 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["wsus-poc-host-sg-0"].vpc_id == aws_vpc.us_east_1["wsus-poc"].id
-    error_message = "The inline security group must derive the managed VPC ID from its system's managed-network subnet."
+    condition     = aws_security_group.us_east_1["wsus-poc-host-eni-0-sg"].vpc_id == aws_vpc.us_east_1["wsus-poc"].id
+    error_message = "The interface security group must derive the managed VPC ID from its parent system's managed-network subnet."
   }
 
   assert {
@@ -553,18 +547,14 @@ run "managed_byo_vpc_creates_subnet_only" {
           {
             private_ip      = null
             security_groups = []
-            description     = null
+            description     = "Inline group resolved through a BYO managed-network entry."
             interface_type  = null
+            ingress         = []
+            egress          = []
             tags            = {}
           }
         ]
 
-        managed_security_group = {
-          description = "Inline group resolved through a BYO managed-network entry."
-          ingress     = []
-          egress      = []
-          tags        = {}
-        }
 
         associate_public_ip = false
       }
@@ -577,8 +567,8 @@ run "managed_byo_vpc_creates_subnet_only" {
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["byo-vpc-host-sg-0"].vpc_id == "vpc-preexisting"
-    error_message = "An inline group on a BYO managed-network subnet must resolve to that network's supplied VPC ID."
+    condition     = aws_security_group.us_east_1["byo-vpc-host-eni-0-sg"].vpc_id == "vpc-preexisting"
+    error_message = "An interface group on a BYO managed-network subnet must resolve to that network's supplied VPC ID."
   }
 }
 
@@ -672,6 +662,8 @@ run "managed_network_rejects_public_ip_without_public_network" {
             security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -737,6 +729,8 @@ run "managed_network_rejects_az_mismatch" {
             security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             private_ip      = null
             tags            = {}
           }

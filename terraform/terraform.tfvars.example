@@ -48,48 +48,38 @@ all_systems = [
       {
         private_ip      = "10.0.1.10"
         security_groups = ["sg-REPLACE_ME"]
-        description     = null
-        interface_type  = null
-        tags            = {}
+        # Non-null ingress and egress declare this interface's own "app01-eni-0-sg" group. Its
+        # description and tags come from this same interface, and the framework attaches it only
+        # here. security_groups remains exclusively for pre-created group IDs.
+        description    = "app01 inbound firewall."
+        interface_type = null
+        ingress = [
+          {
+            description                  = "HTTPS from the internal load-balancer subnet"
+            ip_protocol                  = "tcp"
+            from_port                    = 443
+            to_port                      = 443
+            cidr_ipv4                    = "10.0.0.0/16"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          }
+        ]
+        egress = [
+          {
+            description                  = "All outbound"
+            ip_protocol                  = "-1"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            cidr_ipv6                    = null
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          }
+        ]
+        tags = {}
       }
     ]
-
-    # This system's own firewall. The framework creates it as "app01-sg-0", derives its region and
-    # VPC from the system above, and attaches it to every network_interface listed there - it is
-    # never named in a security_groups list. List only pre-existing groups there. A group shared
-    # across systems belongs outside this framework; express cross-system reachability with CIDR
-    # rules.
-    managed_security_group = {
-      description = "app01 inbound firewall."
-
-      ingress = [
-        {
-          description                  = "HTTPS from the internal load-balancer subnet"
-          ip_protocol                  = "tcp"
-          from_port                    = 443
-          to_port                      = 443
-          cidr_ipv4                    = "10.0.0.0/16"
-          cidr_ipv6                    = null
-          prefix_list_id               = null
-          referenced_security_group_id = null
-        }
-      ]
-
-      egress = [
-        {
-          description                  = "All outbound"
-          ip_protocol                  = "-1"
-          from_port                    = null
-          to_port                      = null
-          cidr_ipv4                    = "0.0.0.0/0"
-          cidr_ipv6                    = null
-          prefix_list_id               = null
-          referenced_security_group_id = null
-        }
-      ]
-
-      tags = {}
-    }
 
     associate_public_ip = false
   },
@@ -131,14 +121,12 @@ all_systems = [
         security_groups = ["sg-REPLACE_ME"]
         description     = null
         interface_type  = null
-        tags            = {}
+        # Paired nulls are the off switch: attach only the pre-created group above.
+        ingress = null
+        egress  = null
+        tags    = {}
       }
     ]
-
-    # No system-owned firewall: this system relies entirely on the groups listed above. null is the
-    # off switch and the pre-inline behavior; write it explicitly so one value file stays fully
-    # explicit for both parsers (docs/decision-records/repo/0002).
-    managed_security_group = null
 
     associate_public_ip = false
   }

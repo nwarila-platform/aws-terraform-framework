@@ -199,6 +199,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
             security_groups = ["sg-44444444"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -243,6 +245,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
             security_groups = ["sg-44444444"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -287,6 +291,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
             security_groups = ["sg-55555555"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
@@ -466,6 +472,8 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
             security_groups = ["sg-44444444"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]

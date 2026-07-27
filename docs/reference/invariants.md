@@ -20,27 +20,37 @@ change at minimum.
 - EBS volumes and RDS storage MUST remain encrypted by default.
 - Managed security-group ingress rules MUST NOT accept world-open IPv4
   (`0.0.0.0/0`) or IPv6 (`::/0`) sources; unrestricted egress remains supported.
-  This binds the inline `all_systems[*].managed_security_group`. Any new path
-  that creates security-group rules MUST extend the ban rather than bypass it.
+  This binds `all_systems[*].network_interfaces[*].ingress`. Any new path that
+  creates security-group rules MUST extend the ban rather than bypass it.
 - Every network interface MUST receive at least one security group, from its own
-  `security_groups` list or from its system's inline `managed_security_group`,
-  which the framework attaches to EVERY interface of that system. The validation
-  and the attachment MUST cover the same set of interfaces; narrowing one without
-  the other lets AWS attach the VPC default (allow-all) group.
-- Inline security-group names MUST be compared case-insensitively within the
-  normalized region. Variable validation cannot resolve the final VPC identity,
-  so the guard is intentionally conservative within one region: case-variant
-  names in different VPCs are still rejected even though EC2 permits them.
-- Inline security-group names MUST be derived as `<hostname>-sg-<index>`, where
-  `index` is the raw zero-based position of the group within its system (the
-  current singleton attribute therefore yields `0`). This matches the module's
-  existing `<hostname>-<type>-<index>` keys for ENIs and EBS volumes. Validation
-  MUST apply the 255-character EC2 limit to each rendered name; the current
-  `-sg-0` suffix leaves a 250-character hostname budget, while a future index
-  `10` would leave 249.
+  `security_groups` list or from its own non-null `ingress` and `egress`
+  declarations. The validation and attachment MUST use the same per-interface
+  predicate; diverging them lets AWS attach the VPC default (allow-all) group.
+- Interface-owned security-group names MUST be compared case-insensitively
+  within the normalized region. Variable validation cannot resolve the final
+  VPC identity, so the guard is intentionally conservative within one region:
+  case-variant names in different VPCs are still rejected even though EC2
+  permits them.
+- Interface-owned security-group names MUST be derived as
+  `<hostname>-eni-<interface index>-sg`, using the network interface's raw
+  zero-based position. Validation MUST apply the 255-character EC2 limit to each
+  rendered name; index `0` leaves a 246-character hostname budget, while index
+  `10` leaves 245.
+- An interface-owned security group MUST attach only to its declaring interface.
+  Its consumer tags MUST be the interface's `tags`; its description MUST be the
+  interface's non-null `description` or the fixed
+  `Managed by aws-terraform-framework.` fallback.
+- Interface-owned security-group rule resource keys MUST be derived from
+  direction, lowercased protocol spelling, port range, destination kind, and
+  destination value, never list position. Descriptions MUST NOT affect rule
+  identity. Exact duplicate keys fail during Terraform map construction without
+  a variable validation that duplicates AWS permission checks.
+- An interface's own group MUST be appended after its explicit
+  `security_groups` entries.
 - Security groups that are not specific to one system, including groups shared
-  across systems, MUST be defined outside this framework. Cross-system
-  reachability within inline groups MUST be expressed with CIDR rules.
+  across systems or interfaces, MUST be defined outside this framework.
+  Cross-system reachability within interface-owned groups MUST be expressed with
+  CIDR rules.
 - Every RDS database MUST attach at least one explicitly supplied VPC security
   group instead of falling back to the VPC default security group.
 - `aws_ec2_instance_state` resources MUST be created only when a system

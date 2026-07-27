@@ -47,6 +47,8 @@ variables {
           security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
+          ingress         = null
+          egress          = null
           tags            = {}
         }
       ]
@@ -68,6 +70,16 @@ run "null_metadata_emits_zero_tags" {
     condition     = !contains(keys(aws_instance.us_east_1["tag-host"].root_block_device[0].tags), "nwarila:management:managed-by")
     error_message = "Root volumes must carry no nwarila tags when resource_metadata is unset."
   }
+}
+
+run "rejects_environment_tag_value_over_256_characters" {
+  command = plan
+
+  variables {
+    environment = join("", [for index in range(257) : "e"])
+  }
+
+  expect_failures = [var.environment]
 }
 
 run "full_metadata_stamps_identity_and_provenance" {
@@ -164,6 +176,23 @@ run "rejects_non_numeric_repository_id" {
   expect_failures = [var.resource_metadata]
 }
 
+run "rejects_metadata_tag_value_over_256_characters" {
+  command = plan
+
+  variables {
+    resource_metadata = {
+      repository    = "nwarila-platform/aws-terraform-framework"
+      repository_id = "123456789"
+      stack         = join("", [for index in range(257) : "s"])
+      owner         = "o"
+      commit_sha    = null
+      run_id        = null
+    }
+  }
+
+  expect_failures = [var.resource_metadata]
+}
+
 run "rejects_reserved_prefix_in_consumer_tags" {
   command = plan
 
@@ -219,6 +248,8 @@ run "rejects_reserved_prefix_in_consumer_tags" {
             security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
+            ingress         = null
+            egress          = null
             tags            = {}
           }
         ]
