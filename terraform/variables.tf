@@ -39,7 +39,7 @@ variable "readiness_private_key_paths" {
 }
 
 variable "all_systems" {
-  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg and attached to every interface of that system. Migration warning: moving an existing managed_security_groups entry inline replaces the live group when its map key is not already exactly <hostname>-sg, because both the Terraform for_each address and immutable AWS name change; terraform state mv cannot prevent that name-driven replacement. Only perform such a migration where security-group recreation is tolerable. An entry already keyed exactly <hostname>-sg retains the same address and name when its other settings are unchanged."
+  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg-0 and attached to every interface of that system. Migration warning: moving an existing managed_security_groups entry inline replaces the live group when its map key is not already exactly <hostname>-sg-0, because both the Terraform for_each address and immutable AWS name change; terraform state mv cannot prevent that name-driven replacement. Only perform such a migration where security-group recreation is tolerable. An entry already keyed exactly <hostname>-sg-0 retains the same address and name when its other settings are unchanged."
 
   type = list(object({
     /* Required Parameters */
@@ -119,14 +119,14 @@ variable "all_systems" {
 
     # This system's OWN firewall, created by the framework and attached to EVERY network interface
     # above without being named in any security_groups list. The name is derived deterministically
-    # as "<hostname>-sg"; the region comes from system.region and the VPC from the subnet this
+    # as "<hostname>-sg-0"; the region comes from system.region and the VPC from the subnet this
     # system already declares, so neither is restated and neither reference can dangle. Omitting it
     # (null) is the pre-inline behavior and changes nothing. A group SHARED by several systems
     # cannot be expressed here: declare it once in var.managed_security_groups and reference it by
     # key from each security_groups list. Both mechanisms may land on the same interface.
     #
     # MIGRATION WARNING: moving a map-declared group here is a replacement when its old map key is
-    # not already exactly "<hostname>-sg": both its for_each address and immutable AWS name change,
+    # not already exactly "<hostname>-sg-0": both its for_each address and immutable AWS name change,
     # and terraform state mv cannot bridge the name change. Only do that where recreation is safe.
     #
     # optional() appears here under a single recorded exception to this repository's no-optional()
@@ -320,20 +320,24 @@ variable "all_systems" {
     error_message = "Each all_systems inline managed_security_group must set description, ingress, egress, and tags explicitly; use [] for either rule collection and {} for tags to declare a zero-inbound group with no extra tags."
   }
 
-  # The derived name is "<hostname>-sg", so the hostname must produce a legal EC2 security-group
-  # name. Gated on the inline group being present, so it can never affect an existing consumer.
-  # EC2 rejects group names beginning with "sg-" (reserved for group IDs), and non-default-VPC
-  # group names are limited to 255 characters.
+  # The derived name is "<hostname>-sg-<index>", where index is the inline group's raw zero-based
+  # position. Validate the rendered name so future index digits cannot silently exceed the EC2
+  # limit. A nullable object splats to zero or one elements today; the five-character "-sg-0"
+  # suffix leaves a 250-character hostname budget. A future index 10 has a six-character suffix and
+  # therefore a 249-character budget, which this rendered-name check enforces without a naming-rule
+  # change. EC2 rejects names beginning with "sg-" (reserved for group IDs), and
+  # non-default-VPC group names are limited to 255 characters.
   validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || (
-        length(system.hostname) <= 252 &&
-        !startswith(lower(system.hostname), "sg-") &&
-        can(regex("^[0-9A-Za-z][0-9A-Za-z._-]*$", system.hostname))
-      )
-    ])
-    error_message = "A system declaring an inline managed_security_group is named \"<hostname>-sg\", so its hostname must be at most 252 characters, must not start with \"sg-\" in any letter case (reserved by EC2 for group IDs), and must contain only letters, numbers, dots, underscores, and hyphens after a leading alphanumeric."
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for inline_security_group_index, inline_security_group in system.managed_security_group[*] : (
+          length("${system.hostname}-sg-${inline_security_group_index}") <= 255 &&
+          !startswith(lower("${system.hostname}-sg-${inline_security_group_index}"), "sg-") &&
+          can(regex("^[0-9A-Za-z][0-9A-Za-z._-]*$", "${system.hostname}-sg-${inline_security_group_index}"))
+        )
+      ]
+    ]))
+    error_message = "An inline managed_security_group is named \"<hostname>-sg-<index>\" from its raw zero-based position, so the rendered name must be at most 255 characters (a 250-character hostname for the current index 0; 249 at a future index 10), must not start with \"sg-\" in any letter case (reserved by EC2 for group IDs), and must contain only letters, numbers, dots, underscores, and hyphens after a leading alphanumeric."
   }
 
   # EC2 security-group names are case-insensitive within a VPC. Hostname uniqueness above is
@@ -342,15 +346,18 @@ variable "all_systems" {
   # identity is not resolvable during variable validation, so this remains conservative within one
   # region: case-variant names in two different VPCs are rejected even though EC2 would accept them.
   validation {
-    condition = length(distinct([
-      for system in var.all_systems :
-      jsonencode([replace(system.region, "-", "_"), lower("${system.hostname}-sg")])
-      if system.managed_security_group != null
-      ])) == length([
-      for system in var.all_systems : system.hostname
-      if system.managed_security_group != null
-    ])
-    error_message = "Inline managed_security_group names derived as \"<hostname>-sg\" must be unique without regard to letter case within each region because EC2 security-group names are case-insensitive within a VPC. Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction."
+    condition = length(distinct(flatten([
+      for system in var.all_systems : [
+        for inline_security_group_index, inline_security_group in system.managed_security_group[*] :
+        jsonencode([
+          replace(system.region, "-", "_"),
+          lower("${system.hostname}-sg-${inline_security_group_index}"),
+        ])
+      ]
+      ]))) == sum(concat([0], [
+      for system in var.all_systems : length(system.managed_security_group[*])
+    ]))
+    error_message = "Inline managed_security_group names derived as \"<hostname>-sg-<index>\" from raw zero-based position must be unique without regard to letter case within each region because EC2 security-group names are case-insensitive within a VPC. Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction."
   }
 
   # An inline group is private to its system and attached automatically; naming it in a
@@ -362,11 +369,16 @@ variable "all_systems" {
         for nic in system.network_interfaces :
         nic.security_groups == null || length(setintersection(
           toset(nic.security_groups),
-          toset([for peer in var.all_systems : "${peer.hostname}-sg" if peer.managed_security_group != null]),
+          toset(flatten([
+            for peer in var.all_systems : [
+              for inline_security_group_index, inline_security_group in peer.managed_security_group[*] :
+              "${peer.hostname}-sg-${inline_security_group_index}"
+            ]
+          ])),
         )) == 0
       ])
     ])
-    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg\"); that group is attached to its own system automatically, and sharing one group across systems requires a managed_security_groups entry referenced by key."
+    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg-<index>\"); that group is attached to its own system automatically, and sharing one group across systems requires a managed_security_groups entry referenced by key."
   }
 
   validation {
@@ -1464,21 +1476,23 @@ variable "managed_security_groups" {
   # managed_networks, and managed_networks already reads all_systems, so a back-reference closes
   # that chain into a cycle and terraform validate fails outright.
 
-  # An inline managed_security_group is created as "<hostname>-sg" in the same per-region bucket
+  # An inline managed_security_group is created as "<hostname>-sg-<index>" in the same per-region bucket
   # these map entries feed (locals.tf). A same-named key in that region would be silently
   # overwritten by merge(), creating one group where the consumer declared two and re-pointing the
   # loser's rules. VPC identity is not resolvable during variable validation, so this remains
   # conservative within one region: case-variant names in two different VPCs are still rejected.
   validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.managed_security_group == null || !anytrue([
-        for name, group in var.managed_security_groups :
-        replace(group.region, "-", "_") == replace(system.region, "-", "_") &&
-        lower(name) == lower("${system.hostname}-sg")
-      ])
-    ])
-    error_message = "A managed_security_groups key must not collide, without regard to letter case within the same region, with the name derived for an inline per-system group (\"<hostname>-sg\"). Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction; rename the shared group, or drop that system's managed_security_group and reference the shared group by key instead."
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for inline_security_group_index, inline_security_group in system.managed_security_group[*] :
+        !anytrue([
+          for name, group in var.managed_security_groups :
+          replace(group.region, "-", "_") == replace(system.region, "-", "_") &&
+          lower(name) == lower("${system.hostname}-sg-${inline_security_group_index}")
+        ])
+      ]
+    ]))
+    error_message = "A managed_security_groups key must not collide, without regard to letter case within the same region, with the name derived for an inline per-system group (\"<hostname>-sg-<index>\" from raw zero-based position). Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction; rename the shared group, or drop that system's managed_security_group and reference the shared group by key instead."
   }
 
   # Dangling references: a name in a security_groups list that is neither a pre-existing sg- ID nor

@@ -54,11 +54,11 @@ all_systems = [
       }
     ]
 
-    # This system's own firewall. The framework creates it as "app01-sg", derives its region and
+    # This system's own firewall. The framework creates it as "app01-sg-0", derives its region and
     # VPC from the system above, and attaches it to every network_interface listed there - it is
     # never named in a security_groups list. List only foreign or standing groups there. Use
     # managed_security_groups instead for a group SHARED by several systems.
-    # Migrating a map-declared group whose key is not already exactly "app01-sg" replaces it; only
+    # Migrating a map-declared group whose key is not already exactly "app01-sg-0" replaces it; only
     # make that change where the environment can tolerate security-group recreation.
     managed_security_group = {
       description = "app01 inbound firewall."

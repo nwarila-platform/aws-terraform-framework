@@ -76,19 +76,22 @@ variables {
 }
 
 # CASE 3 (backward compatibility): a consumer that sets no inline group anywhere must see exactly
-# the pre-inline plan — the same single map-keyed security group, no derived "-sg" key, no subnet
+# the pre-inline plan — the same single map-keyed security group, no derived "-sg-<index>" key, no subnet
 # data reads, and an ENI carrying exactly the two groups it listed.
 run "map_only_consumer_plans_unchanged" {
   command = apply
 
   assert {
-    condition     = length(aws_security_group.us_east_1) == 1 && contains(keys(aws_security_group.us_east_1), "shared-mesh")
-    error_message = "A map-only consumer must create exactly its map-keyed groups; the inline mechanism must add no keys."
+    condition = (
+      keys(aws_security_group.us_east_1) == ["shared-mesh"] &&
+      aws_security_group.us_east_1["shared-mesh"].name == "shared-mesh"
+    )
+    error_message = "A map-only consumer must retain its exact managed_security_groups key, resource address, and AWS name; the inline mechanism must add or rewrite nothing."
   }
 
   assert {
-    condition     = !contains(keys(aws_security_group.us_east_1), "map-only-host-sg")
-    error_message = "No inline group was declared, so no <hostname>-sg group may be created."
+    condition     = !contains(keys(aws_security_group.us_east_1), "map-only-host-sg-0")
+    error_message = "No inline group was declared, so no <hostname>-sg-<index> group may be created."
   }
 
   assert {
@@ -199,25 +202,25 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
     ]
   }
 
-  # Deterministic naming: "<hostname>-sg", created through the same resource as map groups.
+  # Deterministic naming: "<hostname>-sg-<index>", created through the same resource as map groups.
   assert {
-    condition     = length(aws_security_group.us_east_1) == 1 && contains(keys(aws_security_group.us_east_1), "inline-host-sg")
-    error_message = "An inline managed_security_group must be created as aws_security_group.us_east_1[\"<hostname>-sg\"]."
+    condition     = length(aws_security_group.us_east_1) == 1 && contains(keys(aws_security_group.us_east_1), "inline-host-sg-0")
+    error_message = "An inline managed_security_group must be created as aws_security_group.us_east_1[\"<hostname>-sg-0\"]."
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["inline-host-sg"].name == "inline-host-sg"
-    error_message = "The created group's AWS name must be the derived <hostname>-sg, not the hostname."
+    condition     = aws_security_group.us_east_1["inline-host-sg-0"].name == "inline-host-sg-0"
+    error_message = "The created group's AWS name must be the raw zero-based, position-derived <hostname>-sg-0, not the hostname or bare <hostname>-sg."
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["inline-host-sg"].description == "Wazuh AIO system-specific inbound firewall."
+    condition     = aws_security_group.us_east_1["inline-host-sg-0"].description == "Wazuh AIO system-specific inbound firewall."
     error_message = "The inline description must reach the created group."
   }
 
   # VPC derived from the system's own subnet - never restated by the consumer.
   assert {
-    condition     = aws_security_group.us_east_1["inline-host-sg"].vpc_id == "vpc-fromsubnetlookup"
+    condition     = aws_security_group.us_east_1["inline-host-sg-0"].vpc_id == "vpc-fromsubnetlookup"
     error_message = "A literal subnet_id must derive the inline group's vpc_id from the subnet lookup."
   }
 
@@ -225,10 +228,10 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
   # preserved, and the nwarila: deployment identity applied through provider default_tags.
   assert {
     condition = alltrue([
-      aws_security_group.us_east_1["inline-host-sg"].tags["Name"] == "inline-host-sg",
-      aws_security_group.us_east_1["inline-host-sg"].tags["Environment"] == "TEST",
-      aws_security_group.us_east_1["inline-host-sg"].tags["Terraform"] == "True",
-      aws_security_group.us_east_1["inline-host-sg"].tags["Role"] == "wazuh-aio",
+      aws_security_group.us_east_1["inline-host-sg-0"].tags["Name"] == "inline-host-sg-0",
+      aws_security_group.us_east_1["inline-host-sg-0"].tags["Environment"] == "TEST",
+      aws_security_group.us_east_1["inline-host-sg-0"].tags["Terraform"] == "True",
+      aws_security_group.us_east_1["inline-host-sg-0"].tags["Role"] == "wazuh-aio",
     ])
     error_message = "An inline-created group must carry the same Name/Environment/Terraform stamp as a map-created group, plus the consumer's own tags."
   }
@@ -248,10 +251,10 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
     condition = alltrue([
       length(aws_vpc_security_group_ingress_rule.us_east_1) == 1,
       length(aws_vpc_security_group_egress_rule.us_east_1) == 0,
-      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg/ingress-0"].from_port == 1514,
-      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg/ingress-0"].to_port == 1515,
-      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg/ingress-0"].cidr_ipv4 == "10.1.10.0/24",
-      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg/ingress-0"].security_group_id == aws_security_group.us_east_1["inline-host-sg"].id,
+      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg-0/ingress-0"].from_port == 1514,
+      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg-0/ingress-0"].to_port == 1515,
+      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg-0/ingress-0"].cidr_ipv4 == "10.1.10.0/24",
+      aws_vpc_security_group_ingress_rule.us_east_1["inline-host-sg-0/ingress-0"].security_group_id == aws_security_group.us_east_1["inline-host-sg-0"].id,
     ])
     error_message = "Inline rules must materialize at stable <sg>/<direction>-<index> addresses bound to the inline group."
   }
@@ -261,7 +264,7 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
     condition = alltrue([
       length(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups) == 2,
       contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, "sg-standing"),
-      contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, aws_security_group.us_east_1["inline-host-sg"].id),
+      contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, aws_security_group.us_east_1["inline-host-sg-0"].id),
     ])
     error_message = "The inline group must be auto-attached to the system's ENI alongside the foreign groups the consumer listed."
   }
@@ -329,14 +332,14 @@ run "inline_and_map_groups_coexist_on_one_eni" {
   }
 
   assert {
-    condition     = length(aws_security_group.us_east_1) == 2 && contains(keys(aws_security_group.us_east_1), "shared-mesh") && contains(keys(aws_security_group.us_east_1), "mixed-host-sg")
+    condition     = length(aws_security_group.us_east_1) == 2 && contains(keys(aws_security_group.us_east_1), "shared-mesh") && contains(keys(aws_security_group.us_east_1), "mixed-host-sg-0")
     error_message = "Map-declared and inline groups must coexist in the same aws_security_group resource."
   }
 
   # Tagging parity: identical framework-stamped key set on both mechanisms, differing only in the
   # per-group Name. Same resource, same provider, so default_tags cannot differ either.
   assert {
-    condition     = keys(aws_security_group.us_east_1["mixed-host-sg"].tags) == keys(aws_security_group.us_east_1["shared-mesh"].tags)
+    condition     = keys(aws_security_group.us_east_1["mixed-host-sg-0"].tags) == keys(aws_security_group.us_east_1["shared-mesh"].tags)
     error_message = "An inline-created group must be tagged through the same expression as a map-created group."
   }
 
@@ -345,7 +348,7 @@ run "inline_and_map_groups_coexist_on_one_eni" {
       length(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups) == 3,
       contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, "sg-standing"),
       contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, aws_security_group.us_east_1["shared-mesh"].id),
-      contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, aws_security_group.us_east_1["mixed-host-sg"].id),
+      contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, aws_security_group.us_east_1["mixed-host-sg-0"].id),
     ])
     error_message = "A single ENI must be able to carry a pre-existing id, a shared map group, and the system's inline group."
   }
@@ -425,8 +428,8 @@ run "inline_group_alone_satisfies_the_empty_list_assert" {
   # Every NIC of the system, not just the primary, or the assert above becomes a hole.
   assert {
     condition = alltrue([
-      aws_network_interface.us_east_1["inline-only-host-eni-0"].security_groups == toset([aws_security_group.us_east_1["inline-only-host-sg"].id]),
-      aws_network_interface.us_east_1["inline-only-host-eni-1"].security_groups == toset([aws_security_group.us_east_1["inline-only-host-sg"].id]),
+      aws_network_interface.us_east_1["inline-only-host-eni-0"].security_groups == toset([aws_security_group.us_east_1["inline-only-host-sg-0"].id]),
+      aws_network_interface.us_east_1["inline-only-host-eni-1"].security_groups == toset([aws_security_group.us_east_1["inline-only-host-sg-0"].id]),
     ])
     error_message = "The inline group must attach to EVERY interface of its system; any interface left with an empty list receives the VPC default allow-all group."
   }
@@ -681,18 +684,18 @@ run "inline_group_derives_vpc_from_managed_network_without_a_subnet_lookup" {
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["managed-net-host-sg"].vpc_id == aws_vpc.us_east_1["inline-net"].id
+    condition     = aws_security_group.us_east_1["managed-net-host-sg-0"].vpc_id == aws_vpc.us_east_1["inline-net"].id
     error_message = "An inline group on a managed network must be created in that network's framework-created VPC."
   }
 }
 
-# Naming collision: the derived <hostname>-sg would silently overwrite a same-named map entry.
+# Naming collision: the derived <hostname>-sg-<index> would silently overwrite a same-named map entry.
 run "inline_group_name_colliding_with_a_map_key_is_rejected" {
   command = plan
 
   variables {
     managed_security_groups = {
-      "collide-host-sg" = {
+      "collide-host-sg-0" = {
         region      = "us_east_1"
         vpc_id      = "vpc-preexisting"
         description = "Shared group whose key collides with a derived inline name."
@@ -1209,14 +1212,14 @@ run "inline_group_allows_world_open_egress" {
   assert {
     condition = alltrue([
       length(aws_vpc_security_group_egress_rule.us_east_1) == 1,
-      aws_vpc_security_group_egress_rule.us_east_1["egress-host-sg/egress-0"].cidr_ipv4 == "0.0.0.0/0",
+      aws_vpc_security_group_egress_rule.us_east_1["egress-host-sg-0/egress-0"].cidr_ipv4 == "0.0.0.0/0",
       length(aws_vpc_security_group_ingress_rule.us_east_1) == 0,
     ])
     error_message = "Unrestricted egress must remain supported on the inline path; only ingress is banned from world-open sources."
   }
 }
 
-# The derived name is "<hostname>-sg", so a hostname EC2 will not accept inside a group name has to
+# The derived name is "<hostname>-sg-<index>", so a hostname EC2 will not accept inside a group name has to
 # be rejected at plan. "sg-" is reserved for group IDs.
 run "inline_group_rejects_an_sg_prefixed_hostname" {
   command = plan
@@ -1267,7 +1270,75 @@ run "inline_group_rejects_an_sg_prefixed_hostname" {
         ]
 
         managed_security_group = {
-          description = "Would be named sg-reserved-host-sg, which EC2 rejects."
+          description = "Would be named sg-reserved-host-sg-0, which EC2 rejects."
+          ingress     = []
+          egress      = []
+          tags        = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+# The current rendered name includes the five-character "-sg-0" suffix. A 251-character hostname
+# produces 256 characters and must fail before EC2 rejects CreateSecurityGroup. The validation
+# measures the rendered name, so a future two-digit index automatically reduces the budget.
+run "inline_group_rejects_a_hostname_over_the_250_character_budget" {
+  command = plan
+
+  variables {
+    managed_security_groups = {}
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = join("", [for index in range(251) : "a"])
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Inline group name over the EC2 length limit"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.66"
+            security_groups = ["sg-standing"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Its rendered name would be 256 characters."
           ingress     = []
           egress      = []
           tags        = {}
@@ -1329,7 +1400,7 @@ run "naming_an_inline_group_in_a_security_groups_list_is_rejected" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.56"
-            security_groups = ["stale-ref-host-sg"]
+            security_groups = ["stale-ref-host-sg-0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1623,7 +1694,7 @@ run "inline_group_name_colliding_case_insensitively_with_a_map_key_is_rejected" 
 
   variables {
     managed_security_groups = {
-      "case-collision-sg" = {
+      "case-collision-sg-0" = {
         region      = "us_east_1"
         vpc_id      = "vpc-fromsubnetlookup"
         description = "Map group differing from the inline name only by case."
@@ -1946,7 +2017,7 @@ run "inline_and_map_names_differing_only_by_case_in_different_regions_do_not_col
     }
 
     managed_security_groups = {
-      "regional-map-twin-sg" = {
+      "regional-map-twin-sg-0" = {
         region      = "eu_west_1"
         vpc_id      = "vpc-west"
         description = "West regional map group."
