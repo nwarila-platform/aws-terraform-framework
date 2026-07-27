@@ -44,7 +44,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.30"
-          security_groups = ["sg-preexisting"]
+          security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -216,7 +216,7 @@ run "rejects_reserved_prefix_in_consumer_tags" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.31"
-            security_groups = ["sg-preexisting"]
+            security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
             tags            = {}

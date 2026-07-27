@@ -38,10 +38,10 @@ resource "aws_key_pair" "us_east_1" {
 
 #region ------ [ Create Managed Security Groups ] ---------------------------------------------- #
 
-# Optional framework-managed security groups (var.managed_security_groups). A group with no
-# ingress entries is zero-inbound (the SSM posture). Rules are granular
+# Optional inline per-system security groups. A group with no ingress entries is zero-inbound
+# (the SSM posture). Rules are granular
 # aws_vpc_security_group_*_rule resources with stable "<sg>/<direction>-<index>" addresses.
-# Empty default map creates nothing.
+# Systems without an inline group create nothing.
 
 
 resource "aws_security_group" "us_east_1" {
@@ -49,7 +49,7 @@ resource "aws_security_group" "us_east_1" {
   # Set the provider in which to deploy the security group.
   provider = aws.us_east_1
 
-  for_each = local.managed_security_groups_by_region.us_east_1
+  for_each = local.inline_security_groups_by_region.us_east_1
 
   name        = each.key
   description = each.value.description

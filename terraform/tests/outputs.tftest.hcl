@@ -67,7 +67,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.20"
-          security_groups = ["sg-preexisting"]
+          security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
           tags            = {}

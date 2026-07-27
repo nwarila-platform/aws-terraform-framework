@@ -39,7 +39,7 @@ variable "readiness_private_key_paths" {
 }
 
 variable "all_systems" {
-  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg-0 and attached to every interface of that system. Migration warning: moving an existing managed_security_groups entry inline replaces the live group when its map key is not already exactly <hostname>-sg-0, because both the Terraform for_each address and immutable AWS name change; terraform state mv cannot prevent that name-driven replacement. Only perform such a migration where security-group recreation is tolerable. An entry already keyed exactly <hostname>-sg-0 retains the same address and name when its other settings are unchanged."
+  description = "Define all EC2 systems managed by this framework. An inline managed_security_group is created as <hostname>-sg-0 and attached to every interface of that system."
 
   type = list(object({
     /* Required Parameters */
@@ -121,13 +121,9 @@ variable "all_systems" {
     # above without being named in any security_groups list. The name is derived deterministically
     # as "<hostname>-sg-0"; the region comes from system.region and the VPC from the subnet this
     # system already declares, so neither is restated and neither reference can dangle. Omitting it
-    # (null) is the pre-inline behavior and changes nothing. A group SHARED by several systems
-    # cannot be expressed here: declare it once in var.managed_security_groups and reference it by
-    # key from each security_groups list. Both mechanisms may land on the same interface.
-    #
-    # MIGRATION WARNING: moving a map-declared group here is a replacement when its old map key is
-    # not already exactly "<hostname>-sg-0": both its for_each address and immutable AWS name change,
-    # and terraform state mv cannot bridge the name change. Only do that where recreation is safe.
+    # (null) is the pre-inline behavior and changes nothing. A group shared across systems is not
+    # expressible here and belongs outside this framework; express cross-system reachability with
+    # CIDR rules.
     #
     # optional() appears here under a single recorded exception to this repository's no-optional()
     # style rule (docs/decision-records/repo/0002): it is the only way to add an attribute to this
@@ -304,9 +300,8 @@ variable "all_systems" {
     error_message = "Each all_systems network_interfaces security_groups attribute must be a non-null list. Use [] only when the system declares an inline managed_security_group; without an inline group, the list must contain at least one entry or AWS attaches the VPC default (allow-all) security group."
   }
 
-  # Former-default structural composites on the inline group. Also closes a gap the top-level map
-  # still has: a null tags map dies inside merge() at plan time with a generic error instead of a
-  # named validation failure.
+  # Former-default structural composites on the inline group. Keep null rule collections and tags
+  # on the named variable-validation path instead of letting them fail later inside expressions.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -361,8 +356,8 @@ variable "all_systems" {
   }
 
   # An inline group is private to its system and attached automatically; naming it in a
-  # security_groups list is the half-finished migration that leaves a stale reference behind.
-  # Sharing one group across systems is what var.managed_security_groups is for.
+  # security_groups list is invalid. A group shared across systems belongs outside this framework,
+  # and cross-system reachability is expressed with CIDR rules.
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
@@ -378,7 +373,23 @@ variable "all_systems" {
         )) == 0
       ])
     ])
-    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg-<index>\"); that group is attached to its own system automatically, and sharing one group across systems requires a managed_security_groups entry referenced by key."
+    error_message = "An all_systems network_interfaces security_groups list must not name an inline group (\"<hostname>-sg-<index>\"); that group is attached to its own system automatically. A group shared across systems belongs outside this framework; express cross-system reachability with CIDR rules."
+  }
+
+  # Explicitly listed groups must use pre-existing EC2 group-ID syntax. Inline groups are attached
+  # automatically and are forbidden from these lists by the validation above; variable validation
+  # cannot prove that an id exists.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces :
+        nic.security_groups == null ? [] : [
+          for group in nic.security_groups :
+          can(regex("^sg-([0-9a-f]{8}|[0-9a-f]{17})$", group))
+        ]
+      ]
+    ]))
+    error_message = "Each all_systems network_interfaces security_groups entry must use EC2 security-group ID syntax: \"sg-\" followed by 8 or 17 lowercase hexadecimal characters. This validation checks syntax only; it does not prove the pre-existing group exists."
   }
 
   validation {
@@ -589,7 +600,6 @@ variable "resource_metadata" {
         [for load_balancer in var.all_load_balancers : load_balancer.tags == null ? {} : load_balancer.tags],
         flatten([for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [for target_group in load_balancer.target_groups : target_group.tags == null ? {} : target_group.tags]]),
         [for name, keypair in var.managed_keypairs : keypair.tags == null ? {} : keypair.tags],
-        [for name, group in var.managed_security_groups : group.tags == null ? {} : group.tags],
         [for name, network in var.managed_networks : network.tags == null ? {} : network.tags],
       ) : alltrue([for key in keys(tags) : !startswith(lower(key), "nwarila:")])
     ])
@@ -1349,166 +1359,6 @@ variable "managed_keypairs" {
       can(regex("^(ssh-ed25519|ssh-rsa)[ \\t]+([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)([ \\t]+[^\\r\\n]*)?(\\r?\\n)?$", keypair.public_key))
     ])
     error_message = "managed_keypairs public_key values must be lexically valid, otherwise-trimmed OpenSSH public keys using the EC2-supported set: ssh-rsa (Linux/Windows) or ssh-ed25519 (Linux only); one terminal LF or CRLF is allowed."
-  }
-}
-
-variable "managed_security_groups" {
-  description = "Security groups this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].network_interfaces[*].security_groups references (mixed lists of managed names and pre-existing sg- IDs are fine). Each vpc_id accepts either a managed_networks key, resolving to that network's framework-created VPC or supplied BYO vpc_id, or a literal VPC ID; when a key and literal have the same value, the managed-network key wins. Rules using the tcp/udp names or their numeric protocol encodings 6/17 must set both from_port and to_port. Declaring no ingress rules yields a zero-inbound group (the SSM posture); egress must be declared explicitly. The empty default preserves consume-pre-existing behavior exactly."
-
-  type = map(object({
-    region      = string
-    vpc_id      = string
-    description = string
-
-    ingress = list(object({
-      description                  = string
-      ip_protocol                  = string
-      from_port                    = number
-      to_port                      = number
-      cidr_ipv4                    = string
-      cidr_ipv6                    = string
-      prefix_list_id               = string
-      referenced_security_group_id = string
-    }))
-
-    egress = list(object({
-      description                  = string
-      ip_protocol                  = string
-      from_port                    = number
-      to_port                      = number
-      cidr_ipv4                    = string
-      cidr_ipv6                    = string
-      prefix_list_id               = string
-      referenced_security_group_id = string
-    }))
-
-    tags = map(string)
-  }))
-
-  default  = {}
-  nullable = false
-
-  # Former-default structural composites and collections.
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups :
-      group.ingress != null && group.egress != null
-    ])
-    error_message = "Each managed_security_groups entry must set ingress and egress explicitly; use [] for either collection to preserve the former default of no rules."
-  }
-
-  # Former-default provider-pass scalars.
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups :
-      group.description != null
-    ])
-    error_message = "Each managed_security_groups entry must set description explicitly; use \"Managed by aws-terraform-framework\" to preserve the former default."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups :
-      contains(var.aws_config.regions, replace(group.region, "-", "_"))
-    ])
-    error_message = "Each managed_security_groups entry region must normalize to one of aws_config.regions."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups :
-      length(trimspace(group.vpc_id)) > 0
-    ])
-    error_message = "Each managed_security_groups entry must set a non-empty vpc_id."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups :
-      !contains(keys(var.managed_networks), group.vpc_id) || replace(group.region, "-", "_") == replace(var.managed_networks[group.vpc_id].region, "-", "_")
-    ])
-    error_message = "A managed_security_groups vpc_id referencing a managed_networks key must be declared in the same region as that network."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
-        for rule in concat(group.ingress, group.egress) :
-        length(compact([rule.cidr_ipv4, rule.cidr_ipv6, rule.prefix_list_id, rule.referenced_security_group_id])) == 1
-      ])
-    ])
-    error_message = "Every managed security-group rule must set exactly one destination: cidr_ipv4, cidr_ipv6, prefix_list_id, or referenced_security_group_id."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups : group.ingress == null || alltrue([
-        for rule in group.ingress :
-        (rule.cidr_ipv4 == null || try(tonumber(split("/", rule.cidr_ipv4)[1]) != 0, false)) &&
-        (rule.cidr_ipv6 == null || try(tonumber(split("/", rule.cidr_ipv6)[1]) != 0, false))
-      ])
-    ])
-    error_message = "A managed security-group ingress rule CIDR prefix must be a positive decimal."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
-        for rule in concat(group.ingress, group.egress) :
-        rule.ip_protocol == "-1" ? (rule.from_port == null && rule.to_port == null) : (rule.from_port == null) == (rule.to_port == null)
-      ])
-    ])
-    error_message = "Rule ports must be set as a from/to pair, and ip_protocol \"-1\" (all traffic) must not set ports."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, group in var.managed_security_groups : group.ingress == null || group.egress == null || alltrue([
-        for rule in concat(group.ingress, group.egress) :
-        !contains(["tcp", "udp", "6", "17"], lower(rule.ip_protocol)) || (rule.from_port != null && rule.to_port != null)
-      ])
-    ])
-    error_message = "Rules using ip_protocol tcp or udp in any letter case, or \"6\" or \"17\", must set both from_port and to_port."
-  }
-
-  # The next two rules constrain var.all_systems but are declared here deliberately. Validations on
-  # all_systems must not reference this variable: managed_security_groups already reads
-  # managed_networks, and managed_networks already reads all_systems, so a back-reference closes
-  # that chain into a cycle and terraform validate fails outright.
-
-  # An inline managed_security_group is created as "<hostname>-sg-<index>" in the same per-region bucket
-  # these map entries feed (locals.tf). A same-named key in that region would be silently
-  # overwritten by merge(), creating one group where the consumer declared two and re-pointing the
-  # loser's rules. VPC identity is not resolvable during variable validation, so this remains
-  # conservative within one region: case-variant names in two different VPCs are still rejected.
-  validation {
-    condition = alltrue(flatten([
-      for system in var.all_systems : [
-        for inline_security_group_index, inline_security_group in system.managed_security_group[*] :
-        !anytrue([
-          for name, group in var.managed_security_groups :
-          replace(group.region, "-", "_") == replace(system.region, "-", "_") &&
-          lower(name) == lower("${system.hostname}-sg-${inline_security_group_index}")
-        ])
-      ]
-    ]))
-    error_message = "A managed_security_groups key must not collide, without regard to letter case within the same region, with the name derived for an inline per-system group (\"<hostname>-sg-<index>\" from raw zero-based position). Validation cannot resolve VPC identity, so different VPCs in one region remain subject to this conservative restriction; rename the shared group, or drop that system's managed_security_group and reference the shared group by key instead."
-  }
-
-  # Dangling references: a name in a security_groups list that is neither a pre-existing sg- ID nor
-  # a key of this map resolves to itself and is handed to EC2 verbatim, failing at apply rather than
-  # at plan. No configuration that applies successfully today is rejected by this rule.
-  validation {
-    condition = alltrue(flatten([
-      for system in var.all_systems : [
-        for nic in system.network_interfaces :
-        nic.security_groups == null ? [] : [
-          for group in nic.security_groups :
-          startswith(group, "sg-") || contains(keys(var.managed_security_groups), group)
-        ]
-      ]
-    ]))
-    error_message = "Each all_systems network_interfaces security_groups entry must be a pre-existing security-group ID (sg-...) or a managed_security_groups key; anything else is a dangling reference that only fails at apply."
   }
 }
 

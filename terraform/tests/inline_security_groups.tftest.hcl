@@ -9,113 +9,12 @@ mock_provider "aws" {
   }
 }
 
-# File-level baseline: a MAP-ONLY consumer (a shared group referenced by key, plus a pre-existing
-# standing sg- id). It declares no inline group at all and must behave exactly as it did before the
-# inline mechanism existed.
 variables {
   environment = "TEST"
-
-  managed_security_groups = {
-    "shared-mesh" = {
-      region      = "us_east_1"
-      vpc_id      = "vpc-preexisting"
-      description = "Shared by several systems; inline cannot express this."
-      ingress     = []
-      egress      = []
-      tags        = {}
-    }
-  }
-
-  all_systems = [
-    {
-      region               = "us_east_1"
-      hostname             = "map-only-host"
-      availability_zone    = "us-east-1a"
-      subnet_id            = "subnet-preexisting"
-      key_name             = "preexisting-key"
-      iam_instance_profile = "preexisting-profile"
-      aws_kms_alias        = "preexisting"
-      ami                  = "test-linux"
-
-      refresh        = false
-      instance_type  = "m6i.large"
-      readiness_user = null
-      readiness_gate = false
-      imds_hop_limit = 1
-      set_state      = null
-
-      tags = {
-        Function = "Map-only consumer, no inline group"
-        Backup   = true
-      }
-
-      root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
-      }
-
-      ebs_block_devices = []
-
-      network_interfaces = [
-        {
-          private_ip      = "10.0.0.40"
-          security_groups = ["sg-standing", "shared-mesh"]
-          description     = null
-          interface_type  = null
-          tags            = {}
-        }
-      ]
-
-      associate_public_ip = false
-    }
-  ]
-}
-
-# CASE 3 (backward compatibility): a consumer that sets no inline group anywhere must see exactly
-# the pre-inline plan — the same single map-keyed security group, no derived "-sg-<index>" key, no subnet
-# data reads, and an ENI carrying exactly the two groups it listed.
-run "map_only_consumer_plans_unchanged" {
-  command = apply
-
-  assert {
-    condition = (
-      keys(aws_security_group.us_east_1) == ["shared-mesh"] &&
-      aws_security_group.us_east_1["shared-mesh"].name == "shared-mesh"
-    )
-    error_message = "A map-only consumer must retain its exact managed_security_groups key, resource address, and AWS name; the inline mechanism must add or rewrite nothing."
-  }
-
-  assert {
-    condition     = !contains(keys(aws_security_group.us_east_1), "map-only-host-sg-0")
-    error_message = "No inline group was declared, so no <hostname>-sg-<index> group may be created."
-  }
-
-  assert {
-    condition     = length(data.aws_subnet.us_east_1_inline_security_group) == 0
-    error_message = "The inline VPC-derivation subnet lookup must have zero instances when no system declares an inline group."
-  }
-
-  assert {
-    condition     = length(local.inline_security_groups) == 0
-    error_message = "local.inline_security_groups must be empty for a map-only consumer."
-  }
-
-  assert {
-    condition = alltrue([
-      length(aws_network_interface.us_east_1["map-only-host-eni-0"].security_groups) == 2,
-      contains(aws_network_interface.us_east_1["map-only-host-eni-0"].security_groups, "sg-standing"),
-      contains(aws_network_interface.us_east_1["map-only-host-eni-0"].security_groups, aws_security_group.us_east_1["shared-mesh"].id),
-    ])
-    error_message = "A map-only ENI must carry exactly the groups the consumer listed, with managed names resolved to ids."
-  }
 }
 
 # CASE 1 (renders and attaches): an inline group is created, deterministically named, tagged like a
-# map-created group, its rules materialize at the same <sg>/<direction>-<index> addresses, and it is
+# managed group, its rules materialize at stable <sg>/<direction>-<index> addresses, and it is
 # auto-attached to the system's ENI alongside the standing group the consumer did list.
 run "inline_group_is_created_named_tagged_and_auto_attached" {
   command = apply
@@ -130,7 +29,6 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
       run_id        = null
     }
 
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -170,7 +68,7 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.41"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -202,7 +100,8 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
     ]
   }
 
-  # Deterministic naming: "<hostname>-sg-<index>", created through the same resource as map groups.
+  # Deterministic naming: "<hostname>-sg-<index>", created through the regional security-group
+  # resource.
   assert {
     condition     = length(aws_security_group.us_east_1) == 1 && contains(keys(aws_security_group.us_east_1), "inline-host-sg-0")
     error_message = "An inline managed_security_group must be created as aws_security_group.us_east_1[\"<hostname>-sg-0\"]."
@@ -224,8 +123,8 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
     error_message = "A literal subnet_id must derive the inline group's vpc_id from the subnet lookup."
   }
 
-  # Tagged identically to a map-created group: same Name/Environment/Terraform stamp, consumer tags
-  # preserved, and the nwarila: deployment identity applied through provider default_tags.
+  # Framework Name/Environment/Terraform tags and consumer tags reach the group directly; the
+  # nwarila: deployment identity is applied through provider default_tags.
   assert {
     condition = alltrue([
       aws_security_group.us_east_1["inline-host-sg-0"].tags["Name"] == "inline-host-sg-0",
@@ -233,20 +132,20 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
       aws_security_group.us_east_1["inline-host-sg-0"].tags["Terraform"] == "True",
       aws_security_group.us_east_1["inline-host-sg-0"].tags["Role"] == "wazuh-aio",
     ])
-    error_message = "An inline-created group must carry the same Name/Environment/Terraform stamp as a map-created group, plus the consumer's own tags."
+    error_message = "An inline-created group must carry the framework Name/Environment/Terraform tags plus the consumer's own tags."
   }
 
   # The nwarila: deployment identity reaches this group through provider default_tags, which the
   # mocked provider does not merge into tags_all. What IS provable here - and what the IAM create
-  # conditions actually key on - is that the group is created by the SAME aws_security_group
-  # resource under the SAME provider as a map-created group, so it cannot receive a different
-  # default_tags set. local.deployment_tags being non-empty is asserted in tagging.tftest.hcl.
+  # conditions actually key on - is that the group is created by the regional aws_security_group
+  # resource under the provider configured with that default_tags set. local.deployment_tags being
+  # non-empty is asserted in tagging.tftest.hcl.
   assert {
     condition     = length(local.deployment_tags) == 6 && local.deployment_tags["nwarila:management:stack"] == "inline-sg-us-east-1"
     error_message = "The deployment identity that provider default_tags stamps onto the inline group must be populated."
   }
 
-  # Rules flow through the same flattening as map groups: <sg>/<direction>-<index>.
+  # Rules flow through the shared flattening path at <sg>/<direction>-<index>.
   assert {
     condition = alltrue([
       length(aws_vpc_security_group_ingress_rule.us_east_1) == 1,
@@ -263,94 +162,10 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
   assert {
     condition = alltrue([
       length(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups) == 2,
-      contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, "sg-standing"),
+      contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, "sg-0123456789abcdef0"),
       contains(aws_network_interface.us_east_1["inline-host-eni-0"].security_groups, aws_security_group.us_east_1["inline-host-sg-0"].id),
     ])
     error_message = "The inline group must be auto-attached to the system's ENI alongside the foreign groups the consumer listed."
-  }
-}
-
-# Mixability: an inline group and a SHARED map group on the same ENI, both resolved to ids.
-run "inline_and_map_groups_coexist_on_one_eni" {
-  command = apply
-
-  variables {
-    all_systems = [
-      {
-        region               = "us_east_1"
-        hostname             = "mixed-host"
-        availability_zone    = "us-east-1a"
-        subnet_id            = "subnet-preexisting"
-        key_name             = "preexisting-key"
-        iam_instance_profile = "preexisting-profile"
-        aws_kms_alias        = "preexisting"
-        ami                  = "test-linux"
-
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
-
-        tags = {
-          Function = "Inline group plus shared map group"
-          Backup   = true
-        }
-
-        root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
-        }
-
-        ebs_block_devices = []
-
-        network_interfaces = [
-          {
-            private_ip      = "10.0.0.42"
-            security_groups = ["sg-standing", "shared-mesh"]
-            description     = null
-            interface_type  = null
-            tags            = {}
-          }
-        ]
-
-        managed_security_group = {
-          description = "Per-system firewall alongside the shared mesh group."
-          ingress     = []
-          egress      = []
-          tags        = {}
-        }
-
-        associate_public_ip = false
-      }
-    ]
-  }
-
-  assert {
-    condition     = length(aws_security_group.us_east_1) == 2 && contains(keys(aws_security_group.us_east_1), "shared-mesh") && contains(keys(aws_security_group.us_east_1), "mixed-host-sg-0")
-    error_message = "Map-declared and inline groups must coexist in the same aws_security_group resource."
-  }
-
-  # Tagging parity: identical framework-stamped key set on both mechanisms, differing only in the
-  # per-group Name. Same resource, same provider, so default_tags cannot differ either.
-  assert {
-    condition     = keys(aws_security_group.us_east_1["mixed-host-sg-0"].tags) == keys(aws_security_group.us_east_1["shared-mesh"].tags)
-    error_message = "An inline-created group must be tagged through the same expression as a map-created group."
-  }
-
-  assert {
-    condition = alltrue([
-      length(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups) == 3,
-      contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, "sg-standing"),
-      contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, aws_security_group.us_east_1["shared-mesh"].id),
-      contains(aws_network_interface.us_east_1["mixed-host-eni-0"].security_groups, aws_security_group.us_east_1["mixed-host-sg-0"].id),
-    ])
-    error_message = "A single ENI must be able to carry a pre-existing id, a shared map group, and the system's inline group."
   }
 }
 
@@ -360,7 +175,6 @@ run "inline_group_alone_satisfies_the_empty_list_assert" {
   command = apply
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -602,13 +416,11 @@ run "inline_group_does_not_cover_a_different_system" {
   expect_failures = [var.all_systems]
 }
 
-# Managed-network subnets need no subnet lookup: the VPC resolves through the same
-# local.managed_vpc_ids path the map entries use.
+# Managed-network subnets need no subnet lookup: the VPC resolves through local.managed_vpc_ids.
 run "inline_group_derives_vpc_from_managed_network_without_a_subnet_lookup" {
   command = apply
 
   variables {
-    managed_security_groups = {}
 
     managed_networks = {
       "inline-net" = {
@@ -689,81 +501,7 @@ run "inline_group_derives_vpc_from_managed_network_without_a_subnet_lookup" {
   }
 }
 
-# Naming collision: the derived <hostname>-sg-<index> would silently overwrite a same-named map entry.
-run "inline_group_name_colliding_with_a_map_key_is_rejected" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "collide-host-sg-0" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Shared group whose key collides with a derived inline name."
-        ingress     = []
-        egress      = []
-        tags        = {}
-      }
-    }
-
-    all_systems = [
-      {
-        region               = "us_east_1"
-        hostname             = "collide-host"
-        availability_zone    = "us-east-1a"
-        subnet_id            = "subnet-preexisting"
-        key_name             = "preexisting-key"
-        iam_instance_profile = "preexisting-profile"
-        aws_kms_alias        = "preexisting"
-        ami                  = "test-linux"
-
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
-
-        tags = {
-          Function = "Derived inline name collides with a map key"
-          Backup   = true
-        }
-
-        root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
-        }
-
-        ebs_block_devices = []
-
-        network_interfaces = [
-          {
-            private_ip      = "10.0.0.48"
-            security_groups = ["sg-standing"]
-            description     = null
-            interface_type  = null
-            tags            = {}
-          }
-        ]
-
-        managed_security_group = {
-          description = "Collides."
-          ingress     = []
-          egress      = []
-          tags        = {}
-        }
-
-        associate_public_ip = false
-      }
-    ]
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
+# Lowercase TCP rules must set both ports.
 run "inline_group_rejects_portless_tcp" {
   command = plan
 
@@ -805,7 +543,7 @@ run "inline_group_rejects_portless_tcp" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.49"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -819,6 +557,154 @@ run "inline_group_rejects_portless_tcp" {
             {
               description                  = "Portless TCP"
               ip_protocol                  = "tcp"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_portless_udp" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "portless-udp-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Portless UDP in an inline group"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.72"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Portless UDP must fail."
+          ingress     = []
+          egress = [
+            {
+              description                  = "Portless UDP"
+              ip_protocol                  = "udp"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_portless_numeric_tcp" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "portless-numeric-tcp-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Portless numeric TCP in an inline group"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.73"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Portless numeric TCP must fail."
+          ingress     = []
+          egress = [
+            {
+              description                  = "Portless numeric TCP"
+              ip_protocol                  = "6"
               from_port                    = null
               to_port                      = null
               cidr_ipv4                    = "0.0.0.0/0"
@@ -879,7 +765,7 @@ run "inline_group_rejects_portless_numeric_udp" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.50"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -895,6 +781,80 @@ run "inline_group_rejects_portless_numeric_udp" {
               ip_protocol                  = "17"
               from_port                    = null
               to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_all_protocol_with_ports" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "all-protocol-with-ports-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "All-protocol rule with ports in an inline group"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.74"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "All-protocol rules must not set ports."
+          ingress     = []
+          egress = [
+            {
+              description                  = "All traffic with ports"
+              ip_protocol                  = "-1"
+              from_port                    = 443
+              to_port                      = 443
               cidr_ipv4                    = "0.0.0.0/0"
               cidr_ipv6                    = null
               prefix_list_id               = null
@@ -953,7 +913,7 @@ run "inline_group_rejects_world_open_ipv4_ingress" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.51"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -971,6 +931,672 @@ run "inline_group_rejects_world_open_ipv4_ingress" {
               to_port                      = null
               cidr_ipv4                    = "0.0.0.0/0"
               cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "world-open-ipv6-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "World-open IPv6 inline ingress"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.71"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "World-open IPv6 ingress must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "World open IPv6"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = null
+              cidr_ipv6                    = "::/0"
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_zero_padded_world_open_ipv4_ingress" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "zero-padded-world-open-ipv4"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Zero-padded world-open IPv4 inline ingress"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.75"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Zero-padded world-open IPv4 ingress must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Zero-padded world-open IPv4"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/00"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_zero_padded_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "zero-padded-world-open-ipv6"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Zero-padded world-open IPv6 inline ingress"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.76"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Zero-padded world-open IPv6 ingress must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Zero-padded world-open IPv6"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = null
+              cidr_ipv6                    = "::/00"
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_noncanonical_world_open_ipv4_ingress" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "noncanonical-world-open-ipv4"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Noncanonical world-open IPv4 inline ingress"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.77"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Noncanonical world-open IPv4 ingress must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Noncanonical world-open IPv4"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "1.2.3.4/0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_noncanonical_world_open_ipv6_ingress" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "noncanonical-world-open-ipv6"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Noncanonical world-open IPv6 inline ingress"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.78"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Noncanonical world-open IPv6 ingress must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Noncanonical world-open IPv6"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = null
+              cidr_ipv6                    = "2001:db8::1/0"
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_whitespace_ipv4_ingress_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "whitespace-ipv4-prefix-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Whitespace-bearing IPv4 inline ingress prefix"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.79"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Whitespace-bearing IPv4 ingress prefix must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Whitespace-bearing IPv4 prefix"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/ 0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_whitespace_ipv6_ingress_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "whitespace-ipv6-prefix-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Whitespace-bearing IPv6 inline ingress prefix"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.80"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Whitespace-bearing IPv6 ingress prefix must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Whitespace-bearing IPv6 prefix"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = null
+              cidr_ipv6                    = "::/ 0"
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_hex_ipv4_ingress_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "hex-ipv4-prefix-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Hexadecimal IPv4 inline ingress prefix"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.81"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Hexadecimal IPv4 ingress prefix must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Hexadecimal IPv4 prefix"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = "0.0.0.0/0x0"
+              cidr_ipv6                    = null
+              prefix_list_id               = null
+              referenced_security_group_id = null
+            }
+          ]
+          tags = {}
+        }
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "inline_group_rejects_hex_ipv6_ingress_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "hex-ipv6-prefix-inline"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Hexadecimal IPv6 inline ingress prefix"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.82"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Hexadecimal IPv6 ingress prefix must fail."
+          egress      = []
+          ingress = [
+            {
+              description                  = "Hexadecimal IPv6 prefix"
+              ip_protocol                  = "-1"
+              from_port                    = null
+              to_port                      = null
+              cidr_ipv4                    = null
+              cidr_ipv6                    = "::/0x0"
               prefix_list_id               = null
               referenced_security_group_id = null
             }
@@ -1027,7 +1653,7 @@ run "inline_group_rejects_rule_without_exactly_one_destination" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.52"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1110,7 +1736,7 @@ run "inline_group_tags_reject_the_reserved_namespace" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.53"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1140,7 +1766,6 @@ run "inline_group_allows_world_open_egress" {
   command = apply
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1262,7 +1887,7 @@ run "inline_group_rejects_an_sg_prefixed_hostname" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.55"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1291,7 +1916,6 @@ run "inline_group_rejects_a_hostname_over_the_250_character_budget" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1330,7 +1954,7 @@ run "inline_group_rejects_a_hostname_over_the_250_character_budget" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.66"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1352,16 +1976,11 @@ run "inline_group_rejects_a_hostname_over_the_250_character_budget" {
   expect_failures = [var.all_systems]
 }
 
-# The half-finished migration in reverse: the group moves inline but its old name is left behind in
-# the list. The inline-name rule on all_systems catches it with the actionable message. The
-# dangling-reference rule on managed_security_groups matches the same input, but validations there
-# read var.all_systems and Terraform stops evaluating them once that variable has already failed,
-# so all_systems is the only reporter here.
+# An inline group is attached automatically, so explicitly listing its derived name is invalid.
 run "naming_an_inline_group_in_a_security_groups_list_is_rejected" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1422,13 +2041,12 @@ run "naming_an_inline_group_in_a_security_groups_list_is_rejected" {
   expect_failures = [var.all_systems]
 }
 
-# A dangling reference to a group that is neither a pre-existing sg- ID nor a map key would
-# otherwise be passed to EC2 verbatim and fail only at apply.
+# A dangling reference that is not a pre-existing sg- ID would otherwise be passed to EC2 verbatim
+# and fail only at apply.
 run "dangling_security_group_reference_is_rejected" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1479,7 +2097,125 @@ run "dangling_security_group_reference_is_rejected" {
     ]
   }
 
-  expect_failures = [var.managed_security_groups]
+  expect_failures = [var.all_systems]
+}
+
+run "preexisting_security_group_id_shape_is_accepted" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "valid-sg-id-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Valid pre-existing security-group ID syntax"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.83"
+            security_groups = ["sg-0123456789abcdef0"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      length(aws_network_interface.us_east_1["valid-sg-id-host-eni-0"].security_groups) == 1,
+      contains(aws_network_interface.us_east_1["valid-sg-id-host-eni-0"].security_groups, "sg-0123456789abcdef0"),
+    ])
+    error_message = "A pre-existing security-group ID with 17 lowercase hexadecimal characters must pass syntax validation unchanged."
+  }
+}
+
+run "malformed_sg_prefixed_security_group_id_is_rejected" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "malformed-sg-id-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Malformed sg-prefixed security-group reference"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.84"
+            security_groups = ["sg-production"]
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
 }
 
 # The port-pair rule, isolated from the tcp/udp rule: icmp with only one end of the range set.
@@ -1524,7 +2260,7 @@ run "inline_group_rejects_a_half_open_port_pair" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.58"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1600,7 +2336,7 @@ run "inline_group_rejects_a_null_rule_collection" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.59"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1627,7 +2363,6 @@ run "inline_group_rejects_an_uppercase_sg_prefixed_hostname" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1666,7 +2401,7 @@ run "inline_group_rejects_an_uppercase_sg_prefixed_hostname" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.60"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1688,88 +2423,11 @@ run "inline_group_rejects_an_uppercase_sg_prefixed_hostname" {
   expect_failures = [var.all_systems]
 }
 
-# A map key and derived inline name collide at EC2 even when their casing differs.
-run "inline_group_name_colliding_case_insensitively_with_a_map_key_is_rejected" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "case-collision-sg-0" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-fromsubnetlookup"
-        description = "Map group differing from the inline name only by case."
-        ingress     = []
-        egress      = []
-        tags        = {}
-      }
-    }
-
-    all_systems = [
-      {
-        region               = "us_east_1"
-        hostname             = "CASE-COLLISION"
-        availability_zone    = "us-east-1a"
-        subnet_id            = "subnet-preexisting"
-        key_name             = "preexisting-key"
-        iam_instance_profile = "preexisting-profile"
-        aws_kms_alias        = "preexisting"
-        ami                  = "test-linux"
-
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
-
-        tags = {
-          Function = "Case-insensitive inline versus map collision"
-          Backup   = true
-        }
-
-        root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
-        }
-
-        ebs_block_devices = []
-
-        network_interfaces = [
-          {
-            private_ip      = "10.0.0.61"
-            security_groups = ["sg-standing"]
-            description     = null
-            interface_type  = null
-            tags            = {}
-          }
-        ]
-
-        managed_security_group = {
-          description = "Derived name differs from the map key only by case."
-          ingress     = []
-          egress      = []
-          tags        = {}
-        }
-
-        associate_public_ip = false
-      }
-    ]
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-# Exact-case hostname uniqueness permits these two systems, but their derived group names collide
-# in the same VPC because EC2 compares security-group names case-insensitively.
+# Derived inline names collide at EC2 even when their casing differs.
 run "inline_group_names_differing_only_by_case_are_rejected" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1808,7 +2466,7 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.62"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1860,7 +2518,7 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.63"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1893,7 +2551,6 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
       regions = ["us_east_1", "eu_west_1"]
     }
 
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -1932,7 +2589,7 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
         network_interfaces = [
           {
             private_ip      = "10.0.0.64"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1984,7 +2641,7 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
         network_interfaces = [
           {
             private_ip      = "10.1.0.64"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2006,92 +2663,11 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
   expect_failures = [var.aws_config]
 }
 
-# The map-versus-inline guard uses the same normalized-region boundary. As above, the module's
-# single-region invariant is the only expected failure; the names themselves must not collide.
-run "inline_and_map_names_differing_only_by_case_in_different_regions_do_not_collide" {
-  command = plan
-
-  variables {
-    aws_config = {
-      regions = ["us_east_1", "eu_west_1"]
-    }
-
-    managed_security_groups = {
-      "regional-map-twin-sg-0" = {
-        region      = "eu_west_1"
-        vpc_id      = "vpc-west"
-        description = "West regional map group."
-        ingress     = []
-        egress      = []
-        tags        = {}
-      }
-    }
-
-    all_systems = [
-      {
-        region               = "us_east_1"
-        hostname             = "Regional-Map-Twin"
-        availability_zone    = "us-east-1a"
-        subnet_id            = "subnet-east"
-        key_name             = "preexisting-key"
-        iam_instance_profile = "preexisting-profile"
-        aws_kms_alias        = "preexisting"
-        ami                  = "test-linux"
-
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
-
-        tags = {
-          Function = "East inline group with a cross-region map namesake"
-          Backup   = true
-        }
-
-        root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
-        }
-
-        ebs_block_devices = []
-
-        network_interfaces = [
-          {
-            private_ip      = "10.0.0.65"
-            security_groups = ["sg-standing"]
-            description     = null
-            interface_type  = null
-            tags            = {}
-          }
-        ]
-
-        managed_security_group = {
-          description = "East regional inline group."
-          ingress     = []
-          egress      = []
-          tags        = {}
-        }
-
-        associate_public_ip = false
-      }
-    ]
-  }
-
-  expect_failures = [var.aws_config]
-}
-
-# Protocol names are case-insensitive for the port-pair rule on the inline declaration path.
+# Protocol spelling is case-insensitive, so uppercase TCP must also set both ports.
 run "inline_group_rejects_portless_uppercase_tcp" {
   command = plan
 
   variables {
-    managed_security_groups = {}
 
     all_systems = [
       {
@@ -2130,7 +2706,7 @@ run "inline_group_rejects_portless_uppercase_tcp" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.64"
-            security_groups = ["sg-standing"]
+            security_groups = ["sg-0123456789abcdef0"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2161,37 +2737,4 @@ run "inline_group_rejects_portless_uppercase_tcp" {
   }
 
   expect_failures = [var.all_systems]
-}
-
-# The same case normalization applies to the pre-existing map declaration path.
-run "map_group_rejects_portless_uppercase_tcp" {
-  command = plan
-
-  variables {
-    all_systems = []
-
-    managed_security_groups = {
-      "uppercase-tcp-map" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Uppercase TCP must still require ports."
-        ingress     = []
-        egress = [
-          {
-            description                  = "Portless uppercase TCP"
-            ip_protocol                  = "TCP"
-            from_port                    = null
-            to_port                      = null
-            cidr_ipv4                    = "10.0.0.0/8"
-            cidr_ipv6                    = null
-            prefix_list_id               = null
-            referenced_security_group_id = null
-          }
-        ]
-        tags = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
 }

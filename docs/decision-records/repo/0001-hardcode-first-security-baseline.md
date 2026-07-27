@@ -222,7 +222,10 @@ decisions remain in force.
 
 ## Superseded by
 
-None (current).
+The 2026-07-27 removal of the top-level `managed_security_groups` map supersedes
+Confirmation item 3 only as to its declaration path. The world-open ingress ban
+remains current and is enforced on
+`all_systems[*].managed_security_group.ingress`.
 
 ## Implementing PRs
 
@@ -246,5 +249,6 @@ encryption, and metadata-service baselines are enforced in module code.
 
 | Date       | Change                                             | Reason                                        | Author/Role          | Body-diff? |
 | ---------- | -------------------------------------------------- | --------------------------------------------- | -------------------- | ---------- |
+| 2026-07-27 | Removed the top-level managed security-group path. | Keep security-group creation system-specific while retaining the ingress baseline on inline groups. | Portfolio maintainer | Yes        |
 | 2026-07-22 | Accepted the hardcode-first security baseline ADR. | Record the maintainer's enforcement ruling.   | Portfolio maintainer | Yes        |
 | 2026-07-22 | Sanctioned `imds_hop_limit` as a validated input.  | Container hosts need hop limit 2; bounded 1-2 with explicit-null rejection per the exposure rule this ADR defines. | Portfolio maintainer | Yes        |

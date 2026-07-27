@@ -1,5 +1,11 @@
 mock_provider "aws" {
   alias = "us_east_1"
+
+  mock_data "aws_subnet" {
+    defaults = {
+      vpc_id = "vpc-preexisting"
+    }
+  }
 }
 
 # secure-wazuh-shaped baseline: a plain Linux system that references only pre-existing
@@ -46,7 +52,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
-          security_groups = ["sg-preexisting"]
+          security_groups = ["sg-01234567"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -78,7 +84,12 @@ run "wazuh_preexisting_shape_is_zero_diff" {
 
   assert {
     condition     = length(aws_security_group.us_east_1) == 0 && length(aws_vpc_security_group_ingress_rule.us_east_1) == 0 && length(aws_vpc_security_group_egress_rule.us_east_1) == 0
-    error_message = "With managed_security_groups unset, the framework must create zero security groups and zero rules."
+    error_message = "With no inline managed_security_group, the framework must create zero security groups and zero rules."
+  }
+
+  assert {
+    condition     = length(data.aws_subnet.us_east_1_inline_security_group) == 0
+    error_message = "With no inline managed_security_group, the framework must perform zero inline VPC-derivation subnet lookups."
   }
 
   assert {
@@ -135,7 +146,7 @@ run "managed_key_pair_created_from_public_key" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.11"
-            security_groups = ["sg-preexisting"]
+            security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -259,25 +270,10 @@ run "managed_key_pair_rejects_embedded_crlf" {
   expect_failures = [var.managed_keypairs]
 }
 
-run "managed_sg_zero_inbound_with_ssm_egress" {
-  command = plan
+run "inline_sg_zero_inbound_with_ssm_egress" {
+  command = apply
 
   variables {
-    managed_security_groups = {
-      "wsus-ssm" = {
-        region  = "us_east_1"
-        vpc_id  = "vpc-preexisting"
-        ingress = []
-        egress = [
-          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-          { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-          { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        tags        = {}
-      }
-    }
-
     all_systems = [
       {
         region               = "us_east_1"
@@ -315,12 +311,23 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
-            security_groups = ["wsus-ssm"]
+            security_groups = []
             description     = null
             interface_type  = null
             tags            = {}
           }
         ]
+
+        managed_security_group = {
+          ingress = []
+          egress = [
+            { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+            { description = "DNS udp", ip_protocol = "udp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+            { description = "DNS tcp", ip_protocol = "tcp", from_port = 53, to_port = 53, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+          ]
+          description = "Managed by aws-terraform-framework"
+          tags        = {}
+        }
 
         associate_public_ip = false
       }
@@ -328,13 +335,13 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
   }
 
   assert {
-    condition     = contains(keys(aws_security_group.us_east_1), "wsus-ssm")
-    error_message = "Managed security groups must be created in the supported region."
+    condition     = contains(keys(aws_security_group.us_east_1), "managed-sg-host-sg-0")
+    error_message = "The inline security group must be created under its derived name."
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["wsus-ssm"].vpc_id == "vpc-preexisting"
-    error_message = "A literal managed-security-group vpc_id must pass through unchanged."
+    condition     = aws_security_group.us_east_1["managed-sg-host-sg-0"].vpc_id == "vpc-preexisting"
+    error_message = "The inline security group must derive its VPC from the system subnet."
   }
 
   assert {
@@ -345,386 +352,19 @@ run "managed_sg_zero_inbound_with_ssm_egress" {
   assert {
     condition = alltrue([
       length(aws_vpc_security_group_egress_rule.us_east_1) == 3,
-      aws_vpc_security_group_egress_rule.us_east_1["wsus-ssm/egress-0"].cidr_ipv4 == "0.0.0.0/0",
-      aws_vpc_security_group_egress_rule.us_east_1["wsus-ssm/egress-0"].from_port == 443,
-      aws_vpc_security_group_egress_rule.us_east_1["wsus-ssm/egress-1"].ip_protocol == "udp",
-      aws_vpc_security_group_egress_rule.us_east_1["wsus-ssm/egress-1"].from_port == 53,
-      aws_vpc_security_group_egress_rule.us_east_1["wsus-ssm/egress-2"].ip_protocol == "tcp",
+      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-0"].cidr_ipv4 == "0.0.0.0/0",
+      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-0"].from_port == 443,
+      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-1"].ip_protocol == "udp",
+      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-1"].from_port == 53,
+      aws_vpc_security_group_egress_rule.us_east_1["managed-sg-host-sg-0/egress-2"].ip_protocol == "tcp",
     ])
-    error_message = "Declared egress rules must materialize with stable <sg>/egress-<index> addresses and exact ports."
-  }
-}
-
-run "managed_sg_rejects_world_open_ipv4_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "world-open-ipv4" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
+    error_message = "Inline egress rules must materialize with stable <sg>/egress-<index> addresses and exact ports."
   }
 
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_world_open_ipv6_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "world-open-ipv6" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
+  assert {
+    condition     = contains(aws_network_interface.us_east_1["managed-sg-host-eni-0"].security_groups, aws_security_group.us_east_1["managed-sg-host-sg-0"].id)
+    error_message = "The inline security group must attach automatically when the explicit security_groups list is empty."
   }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_zero_padded_world_open_ipv4_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "zero-padded-world-open-ipv4" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/00", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_zero_padded_world_open_ipv6_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "zero-padded-world-open-ipv6" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/00", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_noncanonical_world_open_ipv4_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "noncanonical-world-open-ipv4" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "1.2.3.4/0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_noncanonical_world_open_ipv6_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "noncanonical-world-open-ipv6" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "2001:db8::1/0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_whitespace_ipv4_ingress_prefix" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "whitespace-ipv4-prefix" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/ 0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_whitespace_ipv6_ingress_prefix" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "whitespace-ipv6-prefix" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/ 0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_hex_ipv4_ingress_prefix" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "hex-ipv4-prefix" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv4 = "0.0.0.0/0x0", description = null, from_port = null, to_port = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_hex_ipv6_ingress_prefix" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "hex-ipv6-prefix" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        ingress = [
-          { ip_protocol = "-1", cidr_ipv6 = "::/0x0", description = null, from_port = null, to_port = null, cidr_ipv4 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_rule_without_exactly_one_destination" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        egress = [
-          { description = "no destination", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        ingress     = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_all_protocol_with_ports" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region = "us_east_1"
-        vpc_id = "vpc-preexisting"
-        egress = [
-          { ip_protocol = "-1", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", description = null, cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        ingress     = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_portless_tcp" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Portless TCP must fail"
-        ingress     = []
-        egress = [
-          {
-            description                  = "Portless TCP"
-            ip_protocol                  = "tcp"
-            from_port                    = null
-            to_port                      = null
-            cidr_ipv4                    = "0.0.0.0/0"
-            cidr_ipv6                    = null
-            prefix_list_id               = null
-            referenced_security_group_id = null
-          },
-        ]
-        tags = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_portless_udp" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Portless UDP must fail"
-        ingress     = []
-        egress = [
-          {
-            description                  = "Portless UDP"
-            ip_protocol                  = "udp"
-            from_port                    = null
-            to_port                      = null
-            cidr_ipv4                    = "0.0.0.0/0"
-            cidr_ipv6                    = null
-            prefix_list_id               = null
-            referenced_security_group_id = null
-          },
-        ]
-        tags = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_portless_numeric_tcp" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Portless numeric TCP must fail"
-        ingress     = []
-        egress = [
-          {
-            description                  = "Portless numeric TCP"
-            ip_protocol                  = "6"
-            from_port                    = null
-            to_port                      = null
-            cidr_ipv4                    = "0.0.0.0/0"
-            cidr_ipv6                    = null
-            prefix_list_id               = null
-            referenced_security_group_id = null
-          },
-        ]
-        tags = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
-}
-
-run "managed_sg_rejects_portless_numeric_udp" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "bad-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "vpc-preexisting"
-        description = "Portless numeric UDP must fail"
-        ingress     = []
-        egress = [
-          {
-            description                  = "Portless numeric UDP"
-            ip_protocol                  = "17"
-            from_port                    = null
-            to_port                      = null
-            cidr_ipv4                    = "0.0.0.0/0"
-            cidr_ipv6                    = null
-            prefix_list_id               = null
-            referenced_security_group_id = null
-          },
-        ]
-        tags = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
 }
 
 run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
@@ -740,19 +380,6 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         public            = true
         vpc_id            = null
         tags              = {}
-      }
-    }
-
-    managed_security_groups = {
-      "wsus-ssm" = {
-        region = "us_east_1"
-        vpc_id = "wsus-poc"
-        egress = [
-          { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
-        ]
-        description = "Managed by aws-terraform-framework"
-        ingress     = []
-        tags        = {}
       }
     }
 
@@ -793,13 +420,22 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
 
         network_interfaces = [
           {
-            security_groups = ["wsus-ssm"]
+            security_groups = []
             description     = null
             interface_type  = null
             private_ip      = null
             tags            = {}
           }
         ]
+
+        managed_security_group = {
+          egress = [
+            { description = "SSM/HTTPS", ip_protocol = "tcp", from_port = 443, to_port = 443, cidr_ipv4 = "0.0.0.0/0", cidr_ipv6 = null, prefix_list_id = null, referenced_security_group_id = null },
+          ]
+          description = "Managed by aws-terraform-framework"
+          ingress     = []
+          tags        = {}
+        }
       }
     ]
   }
@@ -824,8 +460,8 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["wsus-ssm"].vpc_id == aws_vpc.us_east_1["wsus-poc"].id
-    error_message = "A managed-security-group vpc_id matching a managed-network key must resolve to the managed VPC ID."
+    condition     = aws_security_group.us_east_1["wsus-poc-host-sg-0"].vpc_id == aws_vpc.us_east_1["wsus-poc"].id
+    error_message = "The inline security group must derive the managed VPC ID from its system's managed-network subnet."
   }
 
   assert {
@@ -879,16 +515,60 @@ run "managed_byo_vpc_creates_subnet_only" {
       }
     }
 
-    managed_security_groups = {
-      "byo-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "byo-net"
-        description = "Managed by aws-terraform-framework"
-        ingress     = []
-        egress      = []
-        tags        = {}
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "byo-vpc-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "byo-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = false
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Inline security group in a BYO VPC"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = null
+            security_groups = []
+            description     = null
+            interface_type  = null
+            tags            = {}
+          }
+        ]
+
+        managed_security_group = {
+          description = "Inline group resolved through a BYO managed-network entry."
+          ingress     = []
+          egress      = []
+          tags        = {}
+        }
+
+        associate_public_ip = false
       }
-    }
+    ]
   }
 
   assert {
@@ -897,8 +577,8 @@ run "managed_byo_vpc_creates_subnet_only" {
   }
 
   assert {
-    condition     = aws_security_group.us_east_1["byo-sg"].vpc_id == "vpc-preexisting"
-    error_message = "A managed-security-group vpc_id matching a BYO-network key must resolve to that network's supplied VPC ID."
+    condition     = aws_security_group.us_east_1["byo-vpc-host-sg-0"].vpc_id == "vpc-preexisting"
+    error_message = "An inline group on a BYO managed-network subnet must resolve to that network's supplied VPC ID."
   }
 }
 
@@ -922,19 +602,8 @@ run "managed_network_rejects_unsupported_region" {
       }
     }
 
-    managed_security_groups = {
-      "wrong-region-sg" = {
-        region      = "us_east_1"
-        vpc_id      = "west-net"
-        description = "Managed by aws-terraform-framework"
-        ingress     = []
-        egress      = []
-        tags        = {}
-      }
-    }
   }
 
-  # Invalid var.aws_config suppresses var.managed_networks' cross-variable validation, foreclosing the SG-region-mismatch path.
   expect_failures = [var.aws_config]
 }
 
@@ -1000,7 +669,7 @@ run "managed_network_rejects_public_ip_without_public_network" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.13"
-            security_groups = ["sg-preexisting"]
+            security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1065,7 +734,7 @@ run "managed_network_rejects_az_mismatch" {
 
         network_interfaces = [
           {
-            security_groups = ["sg-preexisting"]
+            security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
             private_ip      = null
@@ -1114,25 +783,6 @@ run "managed_keypairs_rejects_null_tags" {
   }
 
   expect_failures = [var.managed_keypairs]
-}
-
-run "managed_security_groups_rejects_null_ingress" {
-  command = plan
-
-  variables {
-    managed_security_groups = {
-      "null-ingress" = {
-        region      = "us-east-1"
-        vpc_id      = "vpc-test"
-        description = "Managed by aws-terraform-framework"
-        ingress     = null
-        egress      = []
-        tags        = {}
-      }
-    }
-  }
-
-  expect_failures = [var.managed_security_groups]
 }
 
 run "managed_networks_rejects_null_public" {

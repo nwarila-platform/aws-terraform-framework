@@ -42,7 +42,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
-          security_groups = ["sg-west"]
+          security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -87,7 +87,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.11"
-          security_groups = ["sg-west"]
+          security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -132,7 +132,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.0.0.12"
-          security_groups = ["sg-west"]
+          security_groups = ["sg-11111111"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -177,7 +177,7 @@ variables {
       network_interfaces = [
         {
           private_ip      = "10.1.0.10"
-          security_groups = ["sg-east"]
+          security_groups = ["sg-22222222"]
           description     = null
           interface_type  = null
           tags            = {}
@@ -278,7 +278,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         network_interfaces = [
           {
             private_ip      = "10.0.12.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -323,7 +323,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         network_interfaces = [
           {
             private_ip      = "10.0.12.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -494,7 +494,7 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -563,7 +563,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -608,7 +608,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         network_interfaces = [
           {
             private_ip      = "10.1.9.10"
-            security_groups = ["sg-east"]
+            security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -653,7 +653,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         network_interfaces = [
           {
             private_ip      = "10.0.9.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -839,7 +839,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         network_interfaces = [
           {
             private_ip      = "10.0.5.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -894,7 +894,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         network_interfaces = [
           {
             private_ip      = "10.0.5.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -949,7 +949,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         network_interfaces = [
           {
             private_ip      = "10.1.5.10"
-            security_groups = ["sg-east"]
+            security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1004,7 +1004,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         network_interfaces = [
           {
             private_ip      = "10.0.5.12"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1228,7 +1228,7 @@ run "systems_reject_more_than_23_ebs_block_devices" {
         network_interfaces = [
           {
             private_ip      = "10.0.5.13"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1286,7 +1286,7 @@ run "systems_reject_duplicate_hostnames" {
         network_interfaces = [
           {
             private_ip      = "10.0.2.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1331,7 +1331,7 @@ run "systems_reject_duplicate_hostnames" {
         network_interfaces = [
           {
             private_ip      = "10.0.2.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1389,7 +1389,7 @@ run "systems_reject_regions_outside_aws_config" {
         network_interfaces = [
           {
             private_ip      = "10.2.0.10"
-            security_groups = ["sg-eu"]
+            security_groups = ["sg-33333333"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1477,7 +1477,7 @@ run "systems_reject_invalid_ami_identifiers" {
         network_interfaces = [
           {
             private_ip      = "10.0.3.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1535,7 +1535,7 @@ run "systems_reject_invalid_set_state" {
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1606,7 +1606,7 @@ run "systems_accept_windows_server_2025_base_ami" {
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1665,7 +1665,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         network_interfaces = [
           {
             private_ip      = "10.0.11.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1710,7 +1710,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         network_interfaces = [
           {
             private_ip      = "10.1.11.10"
-            security_groups = ["sg-east"]
+            security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1755,7 +1755,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         network_interfaces = [
           {
             private_ip      = "10.0.11.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1895,7 +1895,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         network_interfaces = [
           {
             private_ip      = "10.0.10.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -1940,7 +1940,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         network_interfaces = [
           {
             private_ip      = "10.1.10.10"
-            security_groups = ["sg-east"]
+            security_groups = ["sg-22222222"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2046,7 +2046,7 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         network_interfaces = [
           {
             private_ip      = "10.0.7.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2104,7 +2104,7 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         network_interfaces = [
           {
             private_ip      = "10.0.7.12"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2162,7 +2162,7 @@ run "systems_reject_all_numeric_windows_hostnames" {
         network_interfaces = [
           {
             private_ip      = "10.0.7.13"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2220,7 +2220,7 @@ run "systems_accept_valid_windows_hostnames" {
         network_interfaces = [
           {
             private_ip      = "10.0.7.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2337,7 +2337,7 @@ run "readiness_gate_allows_empty_private_key_paths" {
         network_interfaces = [
           {
             private_ip      = "10.0.13.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2409,7 +2409,7 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
         network_interfaces = [
           {
             private_ip      = "10.0.13.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2476,7 +2476,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         network_interfaces = [
           {
             private_ip      = "10.0.14.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2521,7 +2521,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         network_interfaces = [
           {
             private_ip      = "10.0.14.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2566,7 +2566,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         network_interfaces = [
           {
             private_ip      = "10.0.14.12"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2611,7 +2611,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         network_interfaces = [
           {
             private_ip      = "10.0.14.13"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2699,7 +2699,7 @@ run "systems_render_readiness_user_data_per_os" {
         network_interfaces = [
           {
             private_ip      = "10.0.8.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2744,7 +2744,7 @@ run "systems_render_readiness_user_data_per_os" {
         network_interfaces = [
           {
             private_ip      = "10.0.8.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2879,7 +2879,7 @@ run "systems_reject_kms_alias_prefix" {
         network_interfaces = [
           {
             private_ip      = "10.0.4.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -2937,7 +2937,7 @@ run "systems_reject_empty_iam_instance_profile" {
         network_interfaces = [
           {
             private_ip      = "10.0.6.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -3612,7 +3612,7 @@ run "readiness_gate_optout_creates_no_gate" {
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -3657,7 +3657,7 @@ run "readiness_gate_optout_creates_no_gate" {
         network_interfaces = [
           {
             private_ip      = "10.0.9.11"
-            security_groups = ["sg-west"]
+            security_groups = ["sg-11111111"]
             description     = null
             interface_type  = null
             tags            = {}
@@ -3711,7 +3711,7 @@ run "all_systems_rejects_null_root_block_device" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -3761,7 +3761,7 @@ run "all_systems_rejects_null_instance_type" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -3851,7 +3851,7 @@ run "all_systems_threads_imds_hop_limit_two" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -3890,7 +3890,7 @@ run "all_systems_threads_imds_hop_limit_two" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -3958,7 +3958,7 @@ run "all_systems_rejects_imds_hop_limit_zero" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -4008,7 +4008,7 @@ run "all_systems_rejects_imds_hop_limit_three" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
@@ -4058,7 +4058,7 @@ run "all_systems_rejects_null_imds_hop_limit" {
             description     = null
             interface_type  = null
             private_ip      = null
-            security_groups = ["sg-test"]
+            security_groups = ["sg-eeeeeeee"]
             tags            = {}
           }
         ]
