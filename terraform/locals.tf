@@ -140,8 +140,8 @@ locals {
   # indexed sequence per system. A nullable object splats to zero or one elements today; if the
   # attribute later becomes a list, the position-derived "<hostname>-sg-<index>" naming rule remains
   # unchanged. The region comes from the system; vpc_id is the system's own subnet_id when that
-  # names a managed_networks entry, which the same lookup the map entries use then resolves to the
-  # VPC id, and otherwise the VPC of the literal subnet the system sits in.
+  # names a managed_networks entry, which local.managed_vpc_ids resolves to the VPC id, and
+  # otherwise the VPC of the literal subnet the system sits in.
   inline_security_groups_by_system = {
     for system in var.all_systems : system.hostname => [
       for inline_security_group_index, inline_security_group in system.managed_security_group[*] : {
@@ -160,8 +160,8 @@ locals {
     ]
   }
 
-  # Flatten the per-system sequences into the existing managed_security_groups shape, so creation,
-  # rule flattening, name-to-id resolution, and tagging stay on the one existing code path.
+  # Flatten the per-system sequences into the resource input shape, so creation, rule flattening,
+  # name-to-id resolution, and tagging stay on one code path.
   inline_security_groups = merge(concat([{}], [
     for hostname, inline_security_groups in local.inline_security_groups_by_system : {
       for inline_security_group in inline_security_groups : inline_security_group.name => {
@@ -175,35 +175,26 @@ locals {
     }
   ])...)
 
-  # Managed security groups partitioned per region (same normalization rule the systems use).
-  # Map-declared groups (the way to express a group SHARED by several systems) and inline
-  # per-system groups land in the same bucket, so both are created by one resource with one set of
-  # name, VPC, and tag semantics. With no inline group the merge is merge(<map entries>, {}), which
-  # leaves every existing for_each key untouched.
-  managed_security_groups_by_region = {
-    for region in var.aws_config.regions : region => merge(
-      {
-        for name, group in var.managed_security_groups : name => group
-        if replace(group.region, "-", "_") == region
-      },
-      {
-        for name, group in local.inline_security_groups : name => group
-        if group.region == region
-      },
-    )
+  # Inline per-system security groups partitioned per region (same normalization rule the systems
+  # use).
+  inline_security_groups_by_region = {
+    for region in var.aws_config.regions : region => {
+      for name, group in local.inline_security_groups : name => group
+      if group.region == region
+    }
   }
 
   # Managed SG rules flattened to stable per-rule addresses: "<sg>/<direction>-<index>".
   managed_security_group_rules = {
     for region in var.aws_config.regions : region => merge(concat([{}], [
-      for name, group in local.managed_security_groups_by_region[region] : merge(
+      for name, group in local.inline_security_groups_by_region[region] : merge(
         { for index, rule in group.ingress : "${name}/ingress-${index}" => merge(rule, { sg_key = name, direction = "ingress" }) },
         { for index, rule in group.egress : "${name}/egress-${index}" => merge(rule, { sg_key = name, direction = "egress" }) },
       )
     ])...)
   }
 
-  # Name -> created SG id, used to resolve managed names inside NIC security_groups lists.
+  # Name -> inline-created SG id, used to auto-attach each system's group to its interfaces.
   managed_security_group_ids = {
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
@@ -338,13 +329,12 @@ locals {
           interface_type = system.network_interfaces[index].interface_type
           # Null lets AWS pick a free address from the subnet CIDR.
           private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
-          # The groups the consumer listed (managed names resolved to ids, pre-existing sg- ids
-          # passed through) plus, appended, this system's own inline group. The append is strictly
-          # additive: with no inline group the expression is concat(<original list>, []), which is
-          # the original list, so consumers that declare none plan byte-identically. The inline
-          # group goes on EVERY interface of the system, which is what makes the empty-list
-          # validation in variables.tf sound; narrowing this to the primary ENI would leave a
-          # secondary interface with the VPC default allow-all group.
+          # The pre-existing security-group ids the consumer listed plus, appended, this system's
+          # own inline group. The append is strictly additive: with no inline group the expression
+          # is concat(<original list>, []), which is the original list, so consumers that declare
+          # none plan byte-identically. The inline group goes on EVERY interface of the system,
+          # which is what makes the empty-list validation in variables.tf sound; narrowing this to
+          # the primary ENI would leave a secondary interface with the VPC default allow-all group.
           security_groups = concat(
             [
               for group in system.network_interfaces[index].security_groups :

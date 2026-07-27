@@ -252,7 +252,10 @@ the carve-out and links here.
 
 ## Superseded by
 
-None (current).
+The 2026-07-27 removal of the top-level `managed_security_groups` map supersedes
+only this decision's map-coexistence, explicit-map-key, and map-to-inline
+migration statements. The decision establishing the inline attribute, its
+bounded `optional()` use, and its derived naming remains current.
 
 ## Implementing PRs
 
@@ -269,5 +272,6 @@ implementation together; the merged PR may be added here later.
 
 | Date       | Change                                                        | Reason                                                                              | Author/Role          | Body-diff? |
 | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 2026-07-27 | Removed the top-level managed security-group path.             | Keep security-group creation system-specific; map coexistence and migration contracts no longer apply. | Portfolio maintainer | Yes        |
 | 2026-07-26 | Changed inline names to position-derived `<hostname>-sg-<index>`. | Avoid the verified standing-group collision and follow the module's native raw zero-based key style. | Portfolio maintainer | Yes        |
 | 2026-07-25 | Accepted the bounded `optional()` exception for additive attributes. | Adding `all_systems[*].managed_security_group` had to be backward compatible. | Portfolio maintainer | Yes        |
