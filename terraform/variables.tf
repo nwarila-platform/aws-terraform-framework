@@ -145,9 +145,10 @@ variable "all_systems" {
     )
 
     # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
-    # Requires subnet_id to reference a managed_networks entry with public = true: with an
-    # explicitly attached ENI, subnet auto-assign public IPs are inert, so an EIP is the only
-    # public-IPv4 path this framework supports.
+    # Requires subnet_id to reference a managed_networks entry with public = true. The EIP provides
+    # a stable public IPv4 address. Independently, AWS assigns a public IPv4 address at launch when
+    # this pre-created primary ENI is in a subnet with public-IP auto-assignment enabled; that
+    # address is not managed by this framework.
     associate_public_ip = bool
 
     # lifecycle doesn't allow variable declaration.

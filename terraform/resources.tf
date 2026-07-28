@@ -132,10 +132,11 @@ resource "aws_vpc_security_group_egress_rule" "us_east_1" {
 #region ------ [ Create Managed Networking ] --------------------------------------------------- #
 
 # Optional framework-managed throwaway networking (var.managed_networks): VPC (or BYO vpc_id),
-# one subnet, and for public networks an internet gateway + default route. Systems opt into a
-# public IPv4 with associate_public_ip = true, which allocates an EIP and binds it to the primary
-# ENI - the only public-IPv4 path that works with explicitly attached ENIs. Empty default map
-# creates nothing.
+# one subnet, and for public networks an internet gateway + default route. Setting
+# associate_public_ip = true allocates an EIP and binds it to the primary ENI for a stable public
+# IPv4 address. Independently, AWS assigns a public IPv4 address at launch to an instance with a
+# pre-created primary ENI when subnet public-IP auto-assignment is enabled; that address is not
+# managed by this framework. Empty default map creates nothing.
 
 
 resource "aws_vpc" "us_east_1" {
@@ -197,8 +198,9 @@ resource "aws_subnet" "us_east_1" {
   cidr_block        = each.value.subnet_cidr
   availability_zone = each.value.availability_zone
 
-  # Inert for this framework's explicitly attached ENIs; kept false so nothing else launched into
-  # the subnet silently receives a public address either.
+  # Kept false so AWS does not automatically assign a public IPv4 address to instances launched in
+  # this managed subnet. If enabled, subnet auto-assignment also applies when an instance launches
+  # with this framework's pre-created primary ENI.
   map_public_ip_on_launch = false
 
   tags = merge(
