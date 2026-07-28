@@ -275,7 +275,8 @@ locals {
     us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
   }
 
-  # Systems that requested a public IPv4: an EIP is allocated and associated with the primary ENI.
+  # Systems that requested a stable public IPv4: an EIP is allocated and associated with the
+  # primary ENI.
   eip_systems = {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => system
