@@ -403,6 +403,44 @@ variable "all_systems" {
     error_message = "A network-interface security-group ingress rule CIDR prefix must be a positive decimal."
   }
 
+  # A pinned interface address must be a well-formed IPv4 host address. Omitting it (null) hands
+  # selection to AWS, which is the ordinary choice now that Ansible inventory is generated from the
+  # aws_instances output rather than hand-authored - so every address reaching AWS here is one the
+  # consumer chose deliberately, and a typo in one deserves to fail at plan rather than mid-apply.
+  # The dotted-quad regex rejects IPv6 (which belongs on ipv6_addresses, not private_ips) and the
+  # /32 parse rejects out-of-range octets and embedded prefixes.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces :
+        nic.private_ip == null || (
+          can(regex("^([0-9]{1,3}[.]){3}[0-9]{1,3}$", nic.private_ip)) &&
+          can(cidrhost("${nic.private_ip}/32", 0))
+        )
+      ]
+    ]))
+    error_message = "An all_systems network_interfaces private_ip must be a single well-formed IPv4 address (no prefix, no IPv6), or null to let AWS pick a free address from the subnet CIDR."
+  }
+
+  # Every interface on a system inherits that system's subnet_id, so two pinned addresses that
+  # collide - on one system or across systems sharing a subnet - are a guaranteed apply failure
+  # after the ENIs ahead of them in the graph already exist. Auto-assigned (null) addresses cannot
+  # collide and are excluded.
+  validation {
+    condition = length(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces : "${system.subnet_id}|${nic.private_ip}"
+        if nic.private_ip != null
+      ]
+      ])) == length(distinct(flatten([
+        for system in var.all_systems : [
+          for nic in system.network_interfaces : "${system.subnet_id}|${nic.private_ip}"
+          if nic.private_ip != null
+        ]
+    ])))
+    error_message = "Each pinned all_systems network_interfaces private_ip must be unique within its subnet; two interfaces in one subnet cannot claim the same address. Leave private_ip null to let AWS pick."
+  }
+
 }
 
 variable "all_databases" {
@@ -1432,5 +1470,40 @@ variable "managed_networks" {
       system.associate_public_ip == null || system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public != null && var.managed_networks[system.subnet_id].public)
     ])
     error_message = "associate_public_ip = true requires subnet_id to reference a managed_networks entry with public = true (explicit-ENI systems cannot use subnet auto-assign, and BYO subnets manage their own public path)."
+  }
+
+  # A pinned address is only checkable against its subnet when the framework owns that subnet, where
+  # subnet_cidr is known at plan time; for a BYO subnet id the CIDR exists only behind a data
+  # lookup. Containment compares network addresses by re-masking the candidate with the subnet's own
+  # prefix length. The five AWS-reserved addresses in every subnet - the network address, the next
+  # three, and the last - can never be assigned, so pinning one is always an apply failure.
+  # Syntactically invalid addresses are skipped here and reported by the all_systems IPv4 guard, and
+  # an unparseable subnet_cidr is skipped and reported by the CIDR guard above; every validation on a
+  # variable is evaluated even after another fails, so without both skips a malformed input would
+  # surface a raw cidrhost function error next to the message that actually explains it.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces :
+        !contains(keys(var.managed_networks), system.subnet_id) ||
+        nic.private_ip == null ||
+        !can(cidrhost("${nic.private_ip}/32", 0)) ||
+        !can(cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, 0)) ||
+        (
+          cidrhost(
+            "${nic.private_ip}/${split("/", var.managed_networks[system.subnet_id].subnet_cidr)[1]}",
+            0
+          ) == cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, 0) &&
+          !contains(
+            [
+              for reserved in [0, 1, 2, 3, -1] :
+              cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, reserved)
+            ],
+            nic.private_ip
+          )
+        )
+      ]
+    ]))
+    error_message = "A pinned network_interfaces private_ip on a system in a managed network must fall inside that network's subnet_cidr and must not be one of the five addresses AWS reserves in every subnet (the first four and the last). Leave private_ip null to let AWS pick."
   }
 }

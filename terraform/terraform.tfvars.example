@@ -46,7 +46,10 @@ all_systems = [
 
     network_interfaces = [
       {
-        private_ip      = "10.0.1.10"
+        # Null lets AWS pick a free address from the subnet CIDR, and the aws_instances output
+        # reports whichever address it picked. Prefer this: a generated Ansible inventory reads
+        # the address back after apply, so nothing needs it hand-allocated up front.
+        private_ip      = null
         security_groups = ["sg-REPLACE_ME"]
         # Non-null ingress and egress declare this interface's own "app01-eni-0-sg" group. Its
         # description and tags come from this same interface, and the framework attaches it only
@@ -117,6 +120,10 @@ all_systems = [
 
     network_interfaces = [
       {
+        # The deliberate-pin form, for an interface something outside this framework addresses by
+        # IP. A pinned address must be a bare IPv4 address, unique within its subnet, and - when
+        # the system sits in a managed_networks subnet - inside that subnet_cidr and clear of the
+        # five addresses AWS reserves in every subnet (the first four and the last).
         private_ip      = "10.0.2.10"
         security_groups = ["sg-REPLACE_ME"]
         description     = null
