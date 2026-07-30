@@ -21,8 +21,8 @@ jobs:
       contents: write # required for release-please to create tags and GitHub releases
       pull-requests: write # required for release-please to open and update release PRs
       issues: write # required for release-please issue and label bookkeeping
-      actions: write # required by the reusable to dispatch the release-evidence task on new tags
-    uses: nwarila-platform/.github/.github/workflows/reusable-release-please.yaml@928b8a3d3dce43f4c2bdd8369fbf5ea86f53b681 # nwarila-platform/.github main @ 2026-07-20
+      actions: write # required by the reusable to probe for release.yaml and dispatch release-evidence
+    uses: nwarila-platform/.github/.github/workflows/reusable-release-please.yaml@1923b2d024800b0bd11eb72de9af7c5788ffade1 # nwarila-platform/.github main @ 2026-07-30
     with:
       config_file: release-please-config.json
       manifest_file: .release-please-manifest.json
