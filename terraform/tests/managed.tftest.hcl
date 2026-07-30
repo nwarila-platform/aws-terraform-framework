@@ -798,3 +798,377 @@ run "managed_networks_rejects_null_public" {
 
   expect_failures = [var.managed_networks]
 }
+
+# --- pinned private_ip against a managed subnet ------------------------------------------------- #
+# When the framework owns the subnet, subnet_cidr is known at plan time, so a pinned address can be
+# checked for containment and against the five addresses AWS reserves in every subnet. The guard
+# lives on managed_networks because it reads both variables, so these runs expect that variable to
+# fail. In a 10.20.0.0/28 subnet the reserves are .0 through .3 and .15; .4 through .14 are
+# assignable.
+
+run "managed_network_rejects_private_ip_outside_subnet_cidr" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "pin-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.20.0.0/24"
+        subnet_cidr       = "10.20.0.0/28"
+        public            = false
+        vpc_id            = null
+        tags              = {}
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "pin-outside"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "pin-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = false
+        readiness_gate       = false
+        imds_hop_limit       = 1
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
+        tags = {
+          Function = "Pinned address outside the managed subnet"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.200"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [var.managed_networks]
+}
+
+run "managed_network_rejects_private_ip_in_the_first_four_reserved_addresses" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "pin-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.20.0.0/24"
+        subnet_cidr       = "10.20.0.0/28"
+        public            = false
+        vpc_id            = null
+        tags              = {}
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "pin-reserved-low"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "pin-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = false
+        readiness_gate       = false
+        imds_hop_limit       = 1
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
+        tags = {
+          Function = "Pinned address inside the low reserved range"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.2"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [var.managed_networks]
+}
+
+run "managed_network_rejects_the_last_reserved_private_ip" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "pin-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.20.0.0/24"
+        subnet_cidr       = "10.20.0.0/28"
+        public            = false
+        vpc_id            = null
+        tags              = {}
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "pin-reserved-last"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "pin-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = false
+        readiness_gate       = false
+        imds_hop_limit       = 1
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
+        tags = {
+          Function = "Pinned address on the subnet broadcast reserve"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.15"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [var.managed_networks]
+}
+
+run "managed_network_allows_assignable_pinned_and_auto_addresses_together" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "pin-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.20.0.0/24"
+        subnet_cidr       = "10.20.0.0/28"
+        public            = false
+        vpc_id            = null
+        tags              = {}
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "pin-ok"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "pin-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = false
+        readiness_gate       = false
+        imds_hop_limit       = 1
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        set_state      = null
+
+        tags = {
+          Function = "Assignable pin beside an auto-assigned interface"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.4"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.14"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      length(local.elastic_network_interfaces.us_east_1["pin-ok-eni-0"].private_ips) == 1,
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-0"].private_ips[0] == "10.20.0.4",
+      length(local.elastic_network_interfaces.us_east_1["pin-ok-eni-1"].private_ips) == 1,
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-1"].private_ips[0] == "10.20.0.14",
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-2"].private_ips == null,
+    ])
+    error_message = "The first and last assignable addresses of a managed subnet must pass the containment guard, and a null interface beside them must still defer to AWS."
+  }
+}
+
+# A pinned address beside an unparseable subnet_cidr must fail on the CIDR guard alone. Terraform
+# evaluates every validation on a variable even after one fails, so the containment guard has to skip
+# an unparseable CIDR rather than call cidrhost on it and surface a raw function error beside the
+# message that actually explains the problem.
+run "managed_network_reports_malformed_subnet_cidr_without_a_raw_function_error" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "broken-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.20.0.0/24"
+        subnet_cidr       = "not-a-cidr"
+        public            = false
+        vpc_id            = null
+        tags              = {}
+      }
+    }
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "cidr-probe"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "broken-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = false
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        set_state            = null
+        tags                 = { Function = "Pinned address beside an unparseable subnet_cidr", Backup = true }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.20.0.4"
+            security_groups = ["sg-01234567"]
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  expect_failures = [var.managed_networks]
+}

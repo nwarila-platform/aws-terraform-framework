@@ -46,7 +46,11 @@ all_systems = [
 
     network_interfaces = [
       {
-        private_ip      = "10.0.1.10"
+        # Null lets AWS pick a free address from the subnet CIDR. Prefer it: the readiness gate
+        # and the Ansible inventory both read the resolved address back out of the
+        # aws_instances output, so nothing downstream needs the address up front. Pin an
+        # address only when something outside this framework points at it.
+        private_ip      = null
         security_groups = ["sg-0123456789abcdef0"]
       }
     ]
@@ -134,6 +138,13 @@ are included for hand-off and debugging, not for secret distribution. Refresh
 instances use the same primary ENI naming pattern as normal instances, so the
 output resolves their `<hostname>-eni-0` address from the shared regional ENI
 map.
+
+Because these values are read back from the created interface, `private_ip`
+resolves identically whether the consumer pinned the address or left
+`private_ip = null` for AWS to assign. A generated inventory therefore never
+needs a hand-allocated address, and AWS gives no guarantee about *which* free
+address it picks - treat an auto-assigned address as stable for the life of the
+interface but never predictable ahead of apply.
 
 Example:
 

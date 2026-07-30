@@ -4169,3 +4169,488 @@ run "all_systems_rejects_null_imds_hop_limit" {
 
   expect_failures = [var.all_systems]
 }
+
+# --- private_ip guards -------------------------------------------------------------------------- #
+# Omitting private_ip (null) is the ordinary path and is exercised throughout this file and by
+# managed.tftest.hcl. These runs pin the pinned path down: a deliberately chosen address is checked
+# at plan time so a typo cannot surface as a mid-apply AWS error, and identical addresses cannot
+# collide inside one subnet. Cross-checks against a managed subnet's CIDR live in managed.tftest.hcl,
+# where subnet_cidr is known.
+
+run "all_systems_rejects_private_ip_with_out_of_range_octet" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "bad-octet"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Out-of-range private_ip octet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.999"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_ipv6_private_ip" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "ipv6-pin"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "IPv6 address in an IPv4-only argument"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "fd00::1"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_private_ip_carrying_a_prefix" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "prefixed-pin"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "CIDR where a host address belongs"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10/24"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_duplicate_private_ip_on_one_system" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "dup-self"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-test"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Two interfaces claiming one address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "dup-peer-a"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-shared"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "First claimant of a shared-subnet address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "dup-peer-b"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-shared"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Second claimant of the same address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_allows_one_address_reused_across_distinct_subnets" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "reuse-a"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-alpha"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Pinned address in the first subnet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      },
+      {
+        region               = "us-east-1"
+        hostname             = "reuse-b"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-beta"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "Same address, different subnet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      length(local.elastic_network_interfaces.us_east_1["reuse-a-eni-0"].private_ips) == 1,
+      local.elastic_network_interfaces.us_east_1["reuse-a-eni-0"].private_ips[0] == "10.0.1.10",
+      length(local.elastic_network_interfaces.us_east_1["reuse-b-eni-0"].private_ips) == 1,
+      local.elastic_network_interfaces.us_east_1["reuse-b-eni-0"].private_ips[0] == "10.0.1.10",
+    ])
+    error_message = "One address pinned in two distinct subnets must plan cleanly and reach both interfaces; the uniqueness guard is scoped per subnet."
+  }
+}
+
+run "all_systems_allows_auto_assigned_private_ip_in_a_preexisting_subnet" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "auto-assigned"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-preexisting"
+        key_name             = "test-key"
+        iam_instance_profile = "test-profile"
+        aws_kms_alias        = "test"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags = {
+          Backup   = true
+          Function = "AWS-assigned address in a pre-existing subnet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      local.elastic_network_interfaces.us_east_1["auto-assigned-eni-0"].private_ips == null,
+      local.elastic_network_interfaces.us_east_1["auto-assigned-eni-1"].private_ips == null,
+    ])
+    error_message = "Interfaces omitting private_ip in a pre-existing subnet must leave private_ips null on every interface so AWS assigns each address."
+  }
+}
