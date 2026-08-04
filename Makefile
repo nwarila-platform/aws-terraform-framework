@@ -3,34 +3,42 @@ TFLINT ?= tflint
 
 # The deny-all guard scans the whole repository. Only rooted, known runtime/scratch artifacts are
 # excluded: Terraform's local cache/state, Python bytecode caches, and the handoff workspace.
-GUARD_EXCLUDE := ^(_handoff/|terraform/\.terraform/|terraform/terraform\.tfstate(\.backup)?$$|terraform/\.terraform\.tfstate\.lock\.info$$|([^/]+/)*__pycache__/|([^/]+/)*[^/]+\.py[co]$$)
+GUARD_EXCLUDE := ^(_handoff/|(terraform|overlays)/\.terraform/|(terraform|overlays)/terraform\.tfstate(\.backup)?$$|(terraform|overlays)/\.terraform\.tfstate\.lock\.info$$|([^/]+/)*__pycache__/|([^/]+/)*[^/]+\.py[co]$$)
 
-.PHONY: fmt fmt-check init validate test docs docs-diff docs-check allowlist-check tflint ci
+.PHONY: fmt fmt-check init validate test docs docs-diff docs-check allowlist-check tflint \
+	overlay-check alias-contract-check ci
 
 # Mutating: rewrites HCL in place. Use locally before committing.
 fmt:
 	terraform -chdir=terraform fmt -recursive
+	terraform -chdir=overlays fmt -recursive
 
 # Non-mutating: fails if any file would change. Use in CI.
 fmt-check:
 	terraform -chdir=terraform fmt -check -recursive
+	terraform -chdir=overlays fmt -check -recursive
 
 init:
 	terraform -chdir=terraform init -backend=false -input=false
+	terraform -chdir=overlays init -backend=false -input=false
 
 validate:
 	terraform -chdir=terraform validate
+	terraform -chdir=overlays validate
 
 test:
 	terraform -chdir=terraform test
+	terraform -chdir=overlays test
 
-# Mutating: regenerates the injected block in docs/reference/terraform.md.
+# Mutating: regenerates the injected blocks in both Terraform reference pages.
 docs:
 	terraform-docs --config .terraform-docs.yml terraform
+	terraform-docs --config .terraform-docs.overlays.yml overlays
 
-# Non-mutating: fails if docs/reference/terraform.md is out of sync with terraform/.
+# Non-mutating: fails if either generated reference page is out of sync with its root.
 docs-diff:
 	terraform-docs --config .terraform-docs.yml --output-check terraform
+	terraform-docs --config .terraform-docs.overlays.yml --output-check overlays
 
 docs-check:
 	$(PYTHON) tools/check_docs_layout.py
@@ -68,6 +76,13 @@ allowlist-check:
 
 tflint:
 	$(TFLINT) --config "$(CURDIR)/.tflint.hcl" --chdir terraform
+	$(TFLINT) --config "$(CURDIR)/.tflint.hcl" --chdir overlays
+
+overlay-check:
+	tools/check_overlay_plan.sh
+
+alias-contract-check:
+	tools/check_alias_file.sh --self-test
 
 ci:
 	$(MAKE) fmt-check
@@ -75,6 +90,8 @@ ci:
 	$(MAKE) validate
 	$(MAKE) test
 	$(MAKE) tflint
+	$(MAKE) overlay-check
+	$(MAKE) alias-contract-check
 	$(MAKE) docs-diff
 	$(MAKE) docs-check
 	$(MAKE) allowlist-check

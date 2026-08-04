@@ -53,7 +53,7 @@ resource "aws_security_group" "us_east_1" {
 
   name        = each.key
   description = each.value.description
-  vpc_id      = lookup(local.managed_vpc_ids.us_east_1, each.value.vpc_id, each.value.vpc_id)
+  vpc_id      = each.value["vpc_id"]
 
   lifecycle { ignore_changes = [description] }
 
@@ -129,138 +129,13 @@ resource "aws_vpc_security_group_egress_rule" "us_east_1" {
 #endregion --- [ Create Managed Security Groups ] ---------------------------------------------- #
 
 
-#region ------ [ Create Managed Networking ] --------------------------------------------------- #
+#region ------ [ Create Elastic IPs ] ---------------------------------------------------------- #
 
-# Optional framework-managed throwaway networking (var.managed_networks): VPC (or BYO vpc_id),
-# one subnet, and for public networks an internet gateway + default route. Setting
-# associate_public_ip = true allocates an EIP and binds it to the primary ENI for a stable public
-# IPv4 address. Independently, AWS assigns a public IPv4 address at launch to an instance with a
-# pre-created primary ENI when subnet public-IP auto-assignment is enabled; that address is not
-# managed by this framework. Empty default map creates nothing.
-
-
-resource "aws_vpc" "us_east_1" {
-
-  # Set the provider in which to deploy the VPC.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.vpc_cidr != null
-  }
-
-  cidr_block           = each.value.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_internet_gateway" "us_east_1" {
-
-  # Set the provider in which to deploy the internet gateway.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.public && network.vpc_cidr != null
-  }
-
-  vpc_id = aws_vpc.us_east_1[each.key].id
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_subnet" "us_east_1" {
-
-  # Set the provider in which to deploy the subnet.
-  provider = aws.us_east_1
-
-  for_each = local.managed_networks_by_region.us_east_1
-
-  vpc_id            = local.managed_vpc_ids.us_east_1[each.key]
-  cidr_block        = each.value.subnet_cidr
-  availability_zone = each.value.availability_zone
-
-  # Kept false so AWS does not automatically assign a public IPv4 address to instances launched in
-  # this managed subnet. If enabled, subnet auto-assignment also applies when an instance launches
-  # with this framework's pre-created primary ENI.
-  map_public_ip_on_launch = false
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_route_table" "us_east_1" {
-
-  # Set the provider in which to deploy the route table.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.public && network.vpc_cidr != null
-  }
-
-  vpc_id = aws_vpc.us_east_1[each.key].id
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_route" "us_east_1_default" {
-
-  # Set the provider in which to deploy the route.
-  provider = aws.us_east_1
-
-  for_each = aws_route_table.us_east_1
-
-  route_table_id         = each.value.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.us_east_1[each.key].id
-
-}
-
-resource "aws_route_table_association" "us_east_1" {
-
-  # Set the provider in which to deploy the route table association.
-  provider = aws.us_east_1
-
-  for_each = aws_route_table.us_east_1
-
-  subnet_id      = aws_subnet.us_east_1[each.key].id
-  route_table_id = each.value.id
-
-}
+# Elastic IPs for systems that request a stable public IPv4 address. The framework does not create
+# the VPC, subnet, gateway, or route these addresses depend on - a caller-supplied subnet must
+# already be internet-routable (see the overlays/ root module). Independently, AWS assigns a public
+# IPv4 address at launch to an instance with a pre-created primary ENI when subnet public-IP
+# auto-assignment is enabled; that address is not managed by this framework.
 
 resource "aws_eip" "us_east_1" {
 
@@ -289,12 +164,13 @@ resource "aws_eip_association" "us_east_1" {
   allocation_id        = aws_eip.us_east_1[each.key].id
   network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
 
-  # EC2 requires the VPC internet gateway to exist before an EIP can be associated.
-  depends_on = [aws_internet_gateway.us_east_1]
+  # EC2 rejects an EIP association in a VPC with no attached internet gateway. The two-phase apply
+  # protocol in docs/how-to/deploy-with-ephemeral-network.md guarantees that the gateway exists;
+  # ordering has moved from an in-state dependency to a cross-root sequence.
 
 }
 
-#endregion --- [ Create Managed Networking ] --------------------------------------------------- #
+#endregion --- [ Create Elastic IPs ] ---------------------------------------------------------- #
 
 
 #region ------ [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #

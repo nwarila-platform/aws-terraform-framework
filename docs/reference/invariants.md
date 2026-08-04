@@ -59,3 +59,19 @@ change at minimum.
   version and pass `make docs-diff`.
 - Local state, `.terraform/`, tfvars containing real values, and credentials
   MUST stay untracked.
+- Every `all_systems[*].subnet_id` MUST be a subnet reference shaped as
+  `subnet-<identifier>` or a key of `network_aliases`. This is deliberately a
+  shape check rather than an AWS ID validator: it catches symbolic names that
+  resolve to nothing while preserving descriptive test references; a typo in a
+  real ID still fails at apply.
+- The `overlays/` root's `network_aliases` output MUST retain exactly the element
+  type of framework `var.network_aliases`, and every emitted `vpc_id` MUST be
+  non-null. That keeps
+  `data.aws_subnet.us_east_1_inline_security_group` empty and teardown free of
+  live subnet lookups for the supported overlay path.
+- Overlay subnets MUST keep `map_public_ip_on_launch = false`. Public
+  reachability for SSH-over-SSM comes from a framework Elastic IP and MUST NOT
+  depend on subnet auto-assignment.
+- The overlays root MUST stamp the same `nwarila:*` provider `default_tags` as
+  the framework, with identical values. The workflow leak gate cannot see an
+  untagged or misidentified network, and no automatic sweeper exists.

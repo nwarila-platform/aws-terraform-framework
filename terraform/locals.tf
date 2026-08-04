@@ -138,9 +138,9 @@ locals {
 
   # Each interface with non-null rule collections declares one group at its raw interface index.
   # Its "<hostname>-eni-<index>-sg" name pairs it visibly with the corresponding ENI. The region
-  # and VPC come from the parent system because every interface already uses that system's subnet.
-  # Description and tags come from the interface itself; a null description uses a stable framework
-  # string.
+  # comes from the parent system. The VPC comes from an alias entry when it supplies vpc_id;
+  # otherwise a DescribeSubnets lookup uses the resolved subnet id. Description and tags come from
+  # the interface itself; a null description uses a stable framework string.
   network_interface_security_groups = merge(concat([{}], [
     for system in var.all_systems : {
       for interface_index, network_interface in system.network_interfaces :
@@ -148,9 +148,11 @@ locals {
         name   = "${system.hostname}-eni-${interface_index}-sg"
         region = replace(system.region, "-", "_")
         vpc_id = (
-          contains(keys(var.managed_networks), system.subnet_id)
-          ? system.subnet_id
-          : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
+          lookup(local.alias_vpc_ids, system.subnet_id, null) != null
+          ? local.alias_vpc_ids[system.subnet_id]
+          : data.aws_subnet.us_east_1_inline_security_group[
+            lookup(local.alias_subnet_ids, system.subnet_id, system.subnet_id)
+          ].vpc_id
         )
         description = network_interface.description != null ? network_interface.description : "Managed by aws-terraform-framework."
         ingress     = network_interface.ingress
@@ -254,25 +256,15 @@ locals {
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
 
-  # Managed networks partitioned per region (same normalization rule the systems use).
-  managed_networks_by_region = {
-    for region in var.aws_config.regions : region => {
-      for name, network in var.managed_networks : name => network
-      if replace(network.region, "-", "_") == region
-    }
-  }
+  # Alias name -> the caller-supplied subnet id it resolves to. A subnet_id that is not an alias key
+  # is already a subnet reference and passes through untouched.
+  alias_subnet_ids = { for name, alias in var.network_aliases : name => alias.subnet_id }
 
-  # Network key -> VPC id (framework-created VPC, or the BYO vpc_id passthrough).
-  managed_vpc_ids = {
-    us_east_1 = {
-      for name, network in local.managed_networks_by_region.us_east_1 :
-      name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_east_1[name].id
-    }
-  }
-
-  # Network key -> created subnet id, used to resolve managed names in all_systems[*].subnet_id.
-  managed_subnet_ids = {
-    us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
+  # Alias name -> caller-supplied VPC id, present only for aliases that supplied one. An absent entry
+  # is what sends an interface-owned security group through data.aws_subnet instead.
+  alias_vpc_ids = {
+    for name, alias in var.network_aliases : name => alias.vpc_id
+    if alias.vpc_id != null
   }
 
   # Systems that requested a stable public IPv4: an EIP is allocated and associated with the
@@ -397,7 +389,7 @@ locals {
             ) ? [local.network_interface_security_group_ids[region]["${system.hostname}-eni-${index}-sg"]]
             : [],
           )
-          subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
+          subnet_id = lookup(local.alias_subnet_ids, system.subnet_id, system.subnet_id)
 
           # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
           # ?      calculated tags. The default tags cannot be overwritten, if the user provides

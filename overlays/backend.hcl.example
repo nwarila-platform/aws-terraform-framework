@@ -1,0 +1,8 @@
+# Copy this file to backend.hcl, fill in real values, and pass it with
+# terraform -chdir=overlays init -backend-config=backend.hcl.
+#
+# Consumers derive the real key as <owner>/<stack>/aws-network.tfstate. Only deployment-specific
+# values belong here; `encrypt` and `use_lockfile` are invariants in backend.tf.
+bucket = "REPLACE_ME-terraform-state-bucket"
+key    = "aws-terraform-framework/overlays/network.tfstate"
+region = "us-east-1"

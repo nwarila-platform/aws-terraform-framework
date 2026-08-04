@@ -5,16 +5,33 @@
 This repository is a Terraform framework module for a pre-existing AWS account
 and network. It owns the transformation from typed resource inventory into AWS
 resources. It does not own account bootstrap, networking, IAM, OIDC, remote
-state, key-pair creation, or KMS alias creation.
+state, or KMS alias creation. Key pairs and interface-owned security groups stay
+inside the framework because they support instances directly. Subnets arrive as
+literal references or through `network_aliases`.
 
 The module currently declares:
 
 - EC2 instances and optional EC2 instance-state resources.
 - Elastic network interfaces attached to those instances.
+- Interface-owned security groups and their granular rules.
+- Optional managed EC2 key pairs.
+- Elastic IPs and their associations.
 - EBS volumes and volume attachments.
 - RDS database instances.
 - Application or network load balancers.
 - `terraform_data.refresh` triggers for replace-driven refresh workflows.
+
+## Two Root Modules
+
+`terraform/` is the framework root. `overlays/` is a companion root for one
+throwaway public network per map entry. They have exact-matching tool and
+provider pins but separate backends, lock lifecycles, and state files.
+
+The seam is the overlays root's `network_aliases` output and the framework
+root's input of the same name. Apply the overlay first, export and validate the
+alias map, and then apply the framework. Destroy in reverse: framework first,
+overlay second. Because the framework no longer owns gateways or routes, it
+cannot prove at plan time that a caller-supplied subnet is internet-routable.
 
 ## Inputs And Locals
 
@@ -40,7 +57,7 @@ Outputs expose stable, non-secret load-balancer attributes keyed by
 not exposed as outputs.
 
 Generated input, resource, and output reference material lives in
-`docs/reference/terraform.md`.
+`docs/reference/terraform.md` and `docs/reference/overlays.md`.
 
 ## External Dependencies
 

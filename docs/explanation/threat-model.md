@@ -58,8 +58,20 @@ What this module guarantees:
 
 What this module does **not** guarantee:
 
-- It does not create VPCs, subnets, security groups, KMS aliases, key pairs,
-  IAM roles, OIDC trust policies, or backend buckets.
+- It does not create VPCs, subnets, internet gateways, route tables, KMS
+  aliases, IAM roles, OIDC trust policies, or backend buckets. Security groups
+  are created only for interfaces that declare `ingress` and `egress`, and key
+  pairs only for `managed_keypairs` entries.
+- It no longer proves at plan time that a system with
+  `associate_public_ip = true` is in an internet-routable subnet. That guarantee
+  depended on owning the VPC and route table; a bad caller-supplied subnet now
+  surfaces as an EC2 apply error.
+- The ephemeral stack can leak a VPC, subnet, gateway, route table, or framework
+  Elastic IP after a failed destroy. No automatic sweeper exists. The ordinary
+  failure backstop is a workflow leak gate that depends on the overlays root
+  stamping exactly the framework's `default_tags`, prints surviving IDs, fails
+  the run, and escalates to the platform owner/on-call. A force-cancelled or
+  timed-out job defeats the gate itself and remains a residual risk.
 - It does not prove that a live AWS account has the referenced AMIs, KMS aliases,
   key pairs, subnets, or security groups.
 - It does not harden operating systems, databases, application workloads, or

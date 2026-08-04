@@ -3,12 +3,18 @@
 Terraform framework for modeling AWS infrastructure in the supported
 `us_east_1` region. Adding another region requires a code change. The module currently manages EC2
 instances, network interfaces, EBS volumes and attachments, EC2 instance state,
-RDS database instances, load balancers, and refresh trigger resources.
+RDS database instances, load balancers, optional managed key pairs, and refresh
+trigger resources.
 
 This repository is an infrastructure framework module, not a complete
 deployment root by itself. Consumers still provide backend configuration,
 credentials, account-specific network IDs, KMS aliases, key pairs, and resource
 inventory through Terraform variables.
+
+Networking is not part of the framework module. The companion `overlays/` root
+creates a throwaway per-deployment VPC, subnet, internet gateway, and route
+table in separate state. Its `network_aliases` output feeds the framework's
+`network_aliases` input. See [Deploy with an ephemeral network](docs/how-to/deploy-with-ephemeral-network.md).
 
 ## Quickstart
 
@@ -20,9 +26,11 @@ Run the local quality gate before changing Terraform sources:
 make ci
 ```
 
-The CI path runs Terraform formatting, init, validation, tests, TFLint,
-terraform-docs drift detection, documentation layout checks, and the
-bidirectional deny-all `.gitignore` allowlist guard.
+The CI path runs Terraform formatting, init, validation, tests, and TFLint for
+both roots; a real-provider overlays plan that proves the exact provider-tag
+contract; the alias-file checker; terraform-docs drift detection;
+documentation layout checks; and the bidirectional deny-all `.gitignore`
+allowlist guard.
 
 ### Deploy from this framework
 
@@ -58,4 +66,6 @@ only through SSM set `readiness_gate = false` and skip the gate.
 - [Architecture](docs/explanation/architecture.md)
 - [Threat model](docs/explanation/threat-model.md)
 - [Terraform reference](docs/reference/terraform.md)
+- [Overlays reference](docs/reference/overlays.md)
+- [Deploy with an ephemeral network](docs/how-to/deploy-with-ephemeral-network.md)
 - [Release gates](docs/reference/release-gates.md)

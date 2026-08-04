@@ -8,6 +8,7 @@
 !.gitignore
 !.markdownlint-cli2.jsonc
 !.pre-commit-config.yaml
+!.terraform-docs.overlays.yml
 !.terraform-docs.yml
 !.tflint.hcl
 !CHANGELOG.md
@@ -51,9 +52,11 @@
 !/docs/reference/mirroring.md
 !/docs/reference/release-gates.md
 !/docs/reference/runner-protocol.md
+!/docs/reference/overlays.md
 !/docs/reference/terraform.md
 !/docs/how-to/
 !/docs/how-to/develop-this-module.md
+!/docs/how-to/deploy-with-ephemeral-network.md
 !/docs/how-to/manage-ec2-over-ssh.md
 !/docs/decision-records/
 !/docs/decision-records/README.md
@@ -75,7 +78,18 @@
 !/docs/decision-records/template/0004-isolate-pull-request-target-triggers.md
 !/docs/decision-records/template/0005-classify-org-control-plane-callers-as-scaffold.md
 
+# Ephemeral network overlay stack (a separate Terraform root module with its own state)
+!/overlays/
+!/overlays/.terraform.lock.hcl
+!/overlays/*.tf
+!/overlays/backend.hcl.example
+!/overlays/ephemeral-poc.tfvars
+!/overlays/tests/
+!/overlays/tests/*.tftest.hcl
+
 # Tools
 !/tools/
+!/tools/check_alias_file.sh
 !/tools/check_docs_layout.py
+!/tools/check_overlay_plan.sh
 !/tools/install_ci_tools.sh

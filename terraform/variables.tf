@@ -110,7 +110,7 @@ variable "all_systems" {
         description    = string
         interface_type = string
         # Omit (null) to let AWS pick a free address from the subnet CIDR - the usual choice for
-        # managed_networks subnets whose CIDR the consumer does not want to hand-allocate.
+        # network_aliases subnets whose CIDR the consumer does not want to hand-allocate.
         private_ip      = string
         security_groups = list(string)
         # Non-null ingress and egress declare this interface's own group, named
@@ -145,10 +145,11 @@ variable "all_systems" {
     )
 
     # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
-    # Requires subnet_id to reference a managed_networks entry with public = true. The EIP provides
-    # a stable public IPv4 address. Independently, AWS assigns a public IPv4 address at launch when
-    # this pre-created primary ENI is in a subnet with public-IP auto-assignment enabled; that
-    # address is not managed by this framework.
+    # The caller is responsible for placing the system in an internet-routable subnet: a VPC with
+    # an attached internet gateway and a default route. The framework no longer proves that path at
+    # plan time. The EIP provides a stable public IPv4 address. Independently, AWS assigns a public
+    # IPv4 address at launch when this pre-created primary ENI is in a subnet with public-IP
+    # auto-assignment enabled; that address is not managed by this framework.
     associate_public_ip = bool
 
     # lifecycle doesn't allow variable declaration.
@@ -615,7 +616,6 @@ variable "resource_metadata" {
         [for load_balancer in var.all_load_balancers : load_balancer.tags == null ? {} : load_balancer.tags],
         flatten([for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [for target_group in load_balancer.target_groups : target_group.tags == null ? {} : target_group.tags]]),
         [for name, keypair in var.managed_keypairs : keypair.tags == null ? {} : keypair.tags],
-        [for name, network in var.managed_networks : network.tags == null ? {} : network.tags],
       ) : alltrue([for key in keys(tags) : !startswith(lower(key), "nwarila:")])
     ])
     error_message = "The nwarila: tag namespace is reserved for resource_metadata-derived tags; consumer-supplied tag maps must not use it."
@@ -1377,133 +1377,147 @@ variable "managed_keypairs" {
   }
 }
 
+# Intentional removal tombstone, scheduled for 4.0.0.
+# tflint-ignore: terraform_unused_declarations
 variable "managed_networks" {
-  description = "Throwaway per-deploy networks this framework creates instead of consuming pre-existing ones. Map key = the name that all_systems[*].subnet_id references. Each entry creates a VPC (or attaches into a supplied vpc_id as the BYO escape hatch) plus one subnet; public = true additionally creates an internet gateway, a route table with a 0.0.0.0/0 default route, and the association - the plumbing an Elastic IP needs. The empty default preserves consume-pre-existing behavior exactly."
+  description = <<-EOT
+    REMOVED in 3.0.0. The framework no longer creates networking. Apply the overlays/ root module
+    and pass its network_aliases output to var.network_aliases instead. This declaration exists
+    only so that a value file still assigning managed_networks fails at plan time with this
+    message rather than emitting an undeclared-variable warning and silently deploying without an
+    ephemeral network. Scheduled for deletion in 4.0.0.
+  EOT
+
+  type     = any
+  default  = null
+  nullable = true
+
+  validation {
+    condition     = var.managed_networks == null
+    error_message = "managed_networks was removed in 3.0.0. Delete the assignment from your value file, apply the overlays/ root module, and pass its network_aliases output to var.network_aliases (see docs/how-to/deploy-with-ephemeral-network.md)."
+  }
+}
+
+variable "network_aliases" {
+  description = <<-EOT
+    Caller-supplied network references. The map key is the name that all_systems[*].subnet_id may use
+    instead of a literal subnet id; the framework resolves the name to subnet_id and creates nothing.
+    The companion overlays/ root module emits exactly this map as its network_aliases output, so a
+    consumer wires the two together with one file. vpc_id, subnet_cidr, and availability_zone are
+    optional metadata: supply them to keep the interface-owned security group's VPC derivation free of
+    a DescribeSubnets call and to keep the pinned private_ip and availability-zone checks at plan time;
+    set them to null to skip those checks. The empty default preserves literal-subnet-id behavior
+    exactly, so a consumer that never adopts an ephemeral network plans byte-identically.
+  EOT
 
   type = map(object({
-    region            = string
-    availability_zone = string
+    subnet_id         = string
+    vpc_id            = string
     subnet_cidr       = string
-    # Exactly one of vpc_cidr (framework-managed VPC) or vpc_id (BYO routable VPC: the framework
-    # creates only the subnet and assumes the VPC already routes - no IGW or route table).
-    vpc_cidr = string
-    vpc_id   = string
-    public   = bool
-    tags     = map(string)
+    availability_zone = string
   }))
 
   default  = {}
   nullable = false
 
-  # Former-default boolean gates.
+  # These identifier predicates deliberately prove reference shape, not hexadecimal AWS id
+  # validity. They catch symbolic names that resolve to nothing; a typo in a real id still fails at
+  # apply, preserving the descriptive non-hex subnet references used by the test suite.
   validation {
     condition = alltrue([
-      for name, network in var.managed_networks :
-      network.public != null
+      for name, alias in var.network_aliases :
+      alias.subnet_id != null && can(regex("^subnet-[0-9a-z][0-9a-z-]*$", alias.subnet_id))
     ])
-    error_message = "Each managed_networks entry must set public explicitly; use false to preserve the former default."
+    error_message = "Each network_aliases entry must set subnet_id to a subnet reference of the form subnet-<identifier>; the alias map carries references to existing subnets, never names to be created."
   }
 
   validation {
     condition = alltrue([
-      for name, network in var.managed_networks :
-      contains(var.aws_config.regions, replace(network.region, "-", "_"))
+      for name, alias in var.network_aliases :
+      !can(regex("^subnet-", name))
     ])
-    error_message = "Each managed_networks entry region must normalize to one of aws_config.regions."
+    error_message = "A network_aliases key is a symbolic network name and must not begin with 'subnet-'; a subnet-shaped key is indistinguishable from a literal reference, so V5 would accept it through the literal branch when the alias map is absent and Terraform would send the symbolic name to AWS."
   }
 
   validation {
     condition = alltrue([
-      for name, network in var.managed_networks :
-      length(compact([network.vpc_cidr, network.vpc_id])) == 1
-    ])
-    error_message = "Each managed_networks entry must set exactly one of vpc_cidr (managed VPC) or vpc_id (BYO VPC)."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, network in var.managed_networks :
-      can(cidrhost(network.subnet_cidr, 0)) && (network.vpc_cidr == null ? true : can(cidrhost(network.vpc_cidr, 0)))
-    ])
-    error_message = "managed_networks subnet_cidr and vpc_cidr must be valid IPv4 CIDR blocks."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, network in var.managed_networks : network.vpc_cidr == null ? true : try(
-        tonumber(split("/", network.subnet_cidr)[1]) >= tonumber(split("/", network.vpc_cidr)[1]) &&
-        sum([for index, octet in split(".", cidrhost(network.subnet_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) >= sum([for index, octet in split(".", cidrhost(network.vpc_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) &&
-        sum([for index, octet in split(".", cidrhost(network.subnet_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) + pow(2, 32 - tonumber(split("/", network.subnet_cidr)[1])) - 1 <= sum([for index, octet in split(".", cidrhost(network.vpc_cidr, 0)) : tonumber(octet) * pow(256, 3 - index)]) + pow(2, 32 - tonumber(split("/", network.vpc_cidr)[1])) - 1,
-        false
+      for name, alias in var.network_aliases :
+      alias.subnet_cidr == null || (
+        can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", alias.subnet_cidr)) &&
+        can(cidrhost(alias.subnet_cidr, 0))
       )
     ])
-    error_message = "Each managed_networks subnet_cidr must be wholly contained within its vpc_cidr."
+    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block; null skips the pinned private_ip containment check."
   }
 
   validation {
     condition = alltrue([
-      for name, network in var.managed_networks :
-      network.public == null || network.public == false || network.vpc_cidr != null
+      for name, alias in var.network_aliases :
+      alias.vpc_id == null || can(regex("^vpc-[0-9a-z][0-9a-z-]*$", alias.vpc_id))
     ])
-    error_message = "managed_networks public = true requires a framework-managed VPC (vpc_cidr); a BYO vpc_id is assumed to bring its own routing."
+    error_message = "Each network_aliases vpc_id must be null or a VPC reference of the form vpc-<identifier>; null makes an interface-owned security group fall back to a DescribeSubnets lookup."
   }
 
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      !contains(keys(var.managed_networks), system.subnet_id) || system.availability_zone == var.managed_networks[system.subnet_id].availability_zone
+      for name, alias in var.network_aliases :
+      alias.availability_zone == null || can(regex("^us-east-1[a-f]$", alias.availability_zone))
     ])
-    error_message = "Systems referencing a managed network must use that network's availability_zone; the managed subnet exists only there."
-  }
-
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      !contains(keys(var.managed_networks), system.subnet_id) || replace(system.region, "-", "_") == replace(var.managed_networks[system.subnet_id].region, "-", "_")
-    ])
-    error_message = "Systems referencing a managed network must be declared in the same region as that network."
+    error_message = "Each network_aliases availability_zone must be null or one of us-east-1a through us-east-1f; local zones such as us-east-1-atl-1a are deliberately unsupported."
   }
 
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      system.associate_public_ip == null || system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public != null && var.managed_networks[system.subnet_id].public)
+      contains(keys(var.network_aliases), system.subnet_id) || can(regex("^subnet-[0-9a-z][0-9a-z-]*$", system.subnet_id))
     ])
-    error_message = "associate_public_ip = true requires subnet_id to reference a managed_networks entry with public = true (explicit-ENI systems cannot use subnet auto-assign, and BYO subnets manage their own public path)."
+    error_message = "Each all_systems subnet_id must be either a subnet reference of the form subnet-<identifier> or a key of network_aliases. A symbolic name that is neither resolves to nothing: apply the overlays/ root module and pass its network_aliases output (see docs/how-to/deploy-with-ephemeral-network.md)."
   }
 
-  # A pinned address is only checkable against its subnet when the framework owns that subnet, where
-  # subnet_cidr is known at plan time; for a BYO subnet id the CIDR exists only behind a data
-  # lookup. Containment compares network addresses by re-masking the candidate with the subnet's own
-  # prefix length. The five AWS-reserved addresses in every subnet - the network address, the next
-  # three, and the last - can never be assigned, so pinning one is always an apply failure.
-  # Syntactically invalid addresses are skipped here and reported by the all_systems IPv4 guard, and
-  # an unparseable subnet_cidr is skipped and reported by the CIDR guard above; every validation on a
+  # No region cross-check is needed: aws_config.regions is fixed to us_east_1 and all_systems
+  # already validates every system against that single-region configuration.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !contains(keys(var.network_aliases), system.subnet_id) ||
+      var.network_aliases[system.subnet_id].availability_zone == null ||
+      system.availability_zone == var.network_aliases[system.subnet_id].availability_zone
+    ])
+    error_message = "Systems referencing a network_aliases entry with availability_zone metadata must use that same availability_zone; set the alias metadata to null to skip this check."
+  }
+
+  # A pinned address is only checkable against its subnet when the caller supplies subnet_cidr.
+  # Containment compares network addresses by re-masking the candidate with the subnet's own prefix
+  # length. The five AWS-reserved addresses in every subnet - the network address, the next three,
+  # and the last - can never be assigned, so pinning one is always an apply failure. Syntactically
+  # invalid addresses are skipped here and reported by the all_systems IPv4 guard, and an
+  # unparseable subnet_cidr is skipped and reported by the CIDR guard above; every validation on a
   # variable is evaluated even after another fails, so without both skips a malformed input would
   # surface a raw cidrhost function error next to the message that actually explains it.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
         for nic in system.network_interfaces :
-        !contains(keys(var.managed_networks), system.subnet_id) ||
+        !contains(keys(var.network_aliases), system.subnet_id) ||
+        var.network_aliases[system.subnet_id].subnet_cidr == null ||
         nic.private_ip == null ||
         !can(cidrhost("${nic.private_ip}/32", 0)) ||
-        !can(cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, 0)) ||
+        !can(cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0)) ||
         (
           cidrhost(
-            "${nic.private_ip}/${split("/", var.managed_networks[system.subnet_id].subnet_cidr)[1]}",
+            "${nic.private_ip}/${split("/", var.network_aliases[system.subnet_id].subnet_cidr)[1]}",
             0
-          ) == cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, 0) &&
+          ) == cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0) &&
           !contains(
             [
               for reserved in [0, 1, 2, 3, -1] :
-              cidrhost(var.managed_networks[system.subnet_id].subnet_cidr, reserved)
+              cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, reserved)
             ],
             nic.private_ip
           )
         )
       ]
     ]))
-    error_message = "A pinned network_interfaces private_ip on a system in a managed network must fall inside that network's subnet_cidr and must not be one of the five addresses AWS reserves in every subnet (the first four and the last). Leave private_ip null to let AWS pick."
+    error_message = "A pinned network_interfaces private_ip on a system using a network_aliases entry with subnet_cidr must fall inside that CIDR and must not be one of the five addresses AWS reserves in every subnet (the first four and the last). Leave private_ip null to let AWS pick, or subnet_cidr null to skip this check."
   }
 }

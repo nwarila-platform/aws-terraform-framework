@@ -122,7 +122,7 @@ all_systems = [
       {
         # The deliberate-pin form, for an interface something outside this framework addresses by
         # IP. A pinned address must be a bare IPv4 address, unique within its subnet, and - when
-        # the system sits in a managed_networks subnet - inside that subnet_cidr and clear of the
+        # its network_aliases entry supplies subnet_cidr - inside that CIDR and clear of the
         # five addresses AWS reserves in every subnet (the first four and the last).
         private_ip      = "10.0.2.10"
         security_groups = ["sg-REPLACE_ME"]
@@ -138,6 +138,18 @@ all_systems = [
     associate_public_ip = false
   }
 ]
+
+# Symbolic subnet names resolve through this map. The overlays root module's network_aliases output
+# has exactly this shape; export it as a .tfvars.json file for framework apply and destroy commands.
+# network_aliases = {
+#   "poc-net" = {
+#     subnet_id         = "subnet-REPLACE_ME"
+#     vpc_id            = "vpc-REPLACE_ME"
+#     subnet_cidr       = "10.1.10.0/24"
+#     availability_zone = "us-east-1a"
+#   }
+# }
+network_aliases = {}
 
 # See docs/reference/terraform.md for fully-specified database and load balancer
 # object schemas when these collections are populated.

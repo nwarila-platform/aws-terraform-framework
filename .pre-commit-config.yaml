@@ -3,17 +3,17 @@ repos:
     hooks:
       - id: terraform-fmt
         name: terraform fmt
-        entry: terraform -chdir=terraform fmt -recursive
+        entry: make fmt
         language: system
         pass_filenames: false
-        files: ^terraform/.*\.tf$
+        files: ^(terraform|overlays)/.*\.(tf|tfvars|tftest\.hcl)$
 
       - id: terraform-docs
         name: terraform-docs
         entry: make docs
         language: system
         pass_filenames: false
-        files: ^terraform/.*\.tf$
+        files: ^(terraform|overlays)/.*\.tf$
 
       - id: docs-layout
         name: docs layout

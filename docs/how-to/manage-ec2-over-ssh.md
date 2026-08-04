@@ -16,7 +16,8 @@ settings. Zero-inbound systems reached only through SSM set
 
 This repository stops at creating reachable instances, gating initial readiness,
 and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
-roles, create networking, or create security group rules.
+roles or networking; it does create interface-owned security groups and their
+rules.
 
 ## Configure the instance profile
 

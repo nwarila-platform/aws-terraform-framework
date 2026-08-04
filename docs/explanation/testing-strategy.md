@@ -2,8 +2,9 @@
 
 ## What The Tests Cover
 
-`terraform test` runs with mocked AWS providers, so the tests exercise Terraform
-configuration behavior without making AWS API calls.
+`terraform -chdir=terraform test` and `terraform -chdir=overlays test` run with
+mocked AWS providers, so both roots exercise Terraform configuration behavior
+without making AWS API calls.
 
 - `terraform/tests/load_balancers.tftest.hcl` verifies that load balancers are
   bucketed into the supported region, inherit the environment tag, preserve
@@ -12,17 +13,25 @@ configuration behavior without making AWS API calls.
   resources are created only for systems that explicitly set `set_state`, and
   that hyphenated and underscored east-region inputs normalize to the same regional
   bucket. It also asserts the module-owned encryption and IMDSv2 hardcodes.
-- `terraform/tests/managed.tftest.hcl` verifies default-off managed capabilities,
-  security-group rule validation, and network composition without live AWS calls.
-- `make ci` also runs formatting, `terraform init`, validation, TFLint,
-  terraform-docs drift detection, documentation layout checks, and the
-  bidirectional deny-all `.gitignore` allowlist guard.
+- `terraform/tests/managed.tftest.hcl` verifies default-off managed key pairs and
+  interface-owned security groups. `terraform/tests/network_aliases.tftest.hcl`
+  supplies 20 seam runs, and the tombstone has its own rejection run.
+- `overlays/tests/networks.tftest.hcl` supplies 12 runs for the separate network
+  root, including its zero-resource anchor and all validation rules.
+- `make overlay-check` runs a credential-free, real-provider overlays plan. It
+  proves all four taggable resource addresses carry the six exact `nwarila:*`
+  values through provider `default_tags`; mocked providers cannot prove
+  `tags_all` stamping.
+- `make ci` also runs formatting, init, validation, TFLint, the alias contract
+  self-test, terraform-docs drift detection, documentation layout checks, and
+  the bidirectional deny-all `.gitignore` allowlist guard.
 
 ## What The Tests Do Not Cover
 
 - They do not apply resources to a live AWS account.
 - They do not prove the referenced AMIs, KMS aliases, key pairs, subnets, or
   security groups exist in a consumer account.
+- They do not prove that a caller-supplied subnet is internet-routable.
 - They do not yet cover every validation block in `terraform/variables.tf`.
 - They do not test remote state locking, OIDC role assumption, or backend
   encryption because those are consumer-owned deployment concerns.

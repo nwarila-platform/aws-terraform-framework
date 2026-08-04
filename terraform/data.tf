@@ -26,55 +26,36 @@ data "aws_ami" "us_east_1_selfbuilt" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
 
-  # [Optional(String[])] List of AMI owners to limit search.
-  # Valid values: <AWS account ID>, 'self', <AWS owner alias>
   # Self-owned AMIs in the deploying account.
   owners = ["self"]
 
-  # [Optional(String)] Name Regex: Anchors the self-built family/version after the server-side glob.
+  # Anchors the self-built family/version after the server-side glob.
   name_regex = local.ami_specs[each.value].name_regex
 
-  // ===================================================================================== //
-  // === Filter(s): One or more name/value pairs to filter off of.                     === //
-  // ------------------------------------------------------------------------------------- //
-  // All filters are optional, most filters are lists, and all of them are combined to     //
-  // allow robust targeting.                                                               //
-  // ===================================================================================== //
-
-  # [String[]] Name: Self-built AMI name glob. The glob template is assembled in
-  # local.ami_specs so future naming-delimiter changes are localized.
+  # Self-built AMI name glob. The glob template is assembled in local.ami_specs so future
+  # naming-delimiter changes are localized.
   filter {
     name   = "name"
     values = [local.ami_specs[each.value].glob]
   }
 
-  # [String[]] image-type: Type of image.
-  # Valid values: "machine", "kernel", "ramdisk"
   filter {
     name   = "image-type"
     values = ["machine"]
   }
 
-  # [String[]] Root Device Type: Type of root device.
-  # Valid values: "ebs", "instance-store"
   filter {
     name   = "root-device-type"
     values = ["ebs"]
   }
 
-  # [String[]] Architecture: OS architecture of the AMI.
-  # Valid values: "x86_64", "arm64", "arm64_mac", "x86_64_mac", "i386"
   filter {
     name   = "architecture"
     values = ["x86_64"]
   }
 
-  # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
-  #     successfully registered and can be used to launch an instance.
-  # Valid values: "available", "pending", "failed"
   filter {
     name   = "state"
     values = ["available"]
@@ -97,63 +78,36 @@ data "aws_ami" "us_east_1_windows_server_2022_base" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
 
-  # [Optional(String[])] List of AMI owners to limit search.
-  # Valid values: <AWS account ID>, 'self', <AWS owner alias>
   owners = var.windows_ami_owners
 
-  # [Optional(String)] Name Regex:
   name_regex = "^Windows_Server-2022-English-Full-Base-[\\d.]+$"
 
-  // ===================================================================================== //
-  // === Filter(s): One or more name/value pairs to filter off of.                     === //
-  // ------------------------------------------------------------------------------------- //
-  // All filters are optional, most filters are lists, and all of them are combined to     //
-  // allow robust targeting.                                                               //
-  // ===================================================================================== //
-
-  # [String[]] image-type: Type of image.
-  # Valid values: "machine", "kernel", "ramdisk"
   filter {
     name   = "image-type"
     values = ["machine"]
   }
 
-  # [String[]] Root Device Type: Type of root device.
-  # Valid values: "ebs", "instance-store"
   filter {
     name   = "root-device-type"
     values = ["ebs"]
   }
 
-  # [String[]] Architecture: OS architecture of the AMI.
-  # Valid values: "x86_64", "arm64", "arm64_mac", "x86_64_mac", "i386"
   filter {
     name   = "architecture"
     values = ["x86_64"]
   }
 
-  # [String[]] Root Device Name: Device name of the root device.
   filter {
     name   = "root-device-name"
     values = ["/dev/sda1"]
   }
 
-  # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
-  #     successfully registered and can be used to launch an instance.
-  # Valid values: "available", "pending", "failed"
   filter {
     name   = "state"
     values = ["available"]
   }
-
-  # [String[]] Description: Description of the AMI that was provided during image creation.
-  # filter {
-  #   name   = "description"
-  #   values = ["Provided by Red Hat, Inc."]
-  # }
 }
 
 #endregion --- [ Amazon Machine Image(s): Windows Server 2022 Base ] ------------------------ #
@@ -172,63 +126,36 @@ data "aws_ami" "us_east_1_windows_server_2025_base" {
   # Set the provider in which to deploy the instance.
   provider = aws.us_east_1
 
-  // [Optional(Boolean)] most_recent: If more than one result is returned, use the most recent.
   most_recent = true
 
-  # [Optional(String[])] List of AMI owners to limit search.
-  # Valid values: <AWS account ID>, 'self', <AWS owner alias>
   owners = var.windows_ami_owners
 
-  # [Optional(String)] Name Regex:
   name_regex = "^Windows_Server-2025-English-Full-Base-[\\d.]+$"
 
-  // ===================================================================================== //
-  // === Filter(s): One or more name/value pairs to filter off of.                     === //
-  // ------------------------------------------------------------------------------------- //
-  // All filters are optional, most filters are lists, and all of them are combined to     //
-  // allow robust targeting.                                                               //
-  // ===================================================================================== //
-
-  # [String[]] image-type: Type of image.
-  # Valid values: "machine", "kernel", "ramdisk"
   filter {
     name   = "image-type"
     values = ["machine"]
   }
 
-  # [String[]] Root Device Type: Type of root device.
-  # Valid values: "ebs", "instance-store"
   filter {
     name   = "root-device-type"
     values = ["ebs"]
   }
 
-  # [String[]] Architecture: OS architecture of the AMI.
-  # Valid values: "x86_64", "arm64", "arm64_mac", "x86_64_mac", "i386"
   filter {
     name   = "architecture"
     values = ["x86_64"]
   }
 
-  # [String[]] Root Device Name: Device name of the root device.
   filter {
     name   = "root-device-name"
     values = ["/dev/sda1"]
   }
 
-  # [String[]] Status: Current state of the AMI. If the state is 'available', the image is
-  #     successfully registered and can be used to launch an instance.
-  # Valid values: "available", "pending", "failed"
   filter {
     name   = "state"
     values = ["available"]
   }
-
-  # [String[]] Description: Description of the AMI that was provided during image creation.
-  # filter {
-  #   name   = "description"
-  #   values = ["Provided by Red Hat, Inc."]
-  # }
 }
 
 #endregion --- [ Amazon Machine Image(s): Windows Server 2025 Base ] ------------------------ #
@@ -314,9 +241,9 @@ data "aws_key_pair" "us_east_1" {
 
 
 # An interface-owned group derives its VPC from the parent system's subnet instead of restating it.
-# A subnet_id naming a managed_networks entry resolves through local.managed_vpc_ids with no API
-# call, so only a LITERAL subnet id reaches this lookup: it has zero instances when no interface
-# declares a group. It needs ec2:DescribeSubnets, already covered by the read-only statement in the
+# An alias entry that supplies vpc_id resolves with no API call. Every other interface-owned group
+# (a literal subnet id, or an alias with vpc_id = null) reaches this lookup through the resolved
+# subnet id. It needs ec2:DescribeSubnets, already covered by the read-only statement in the
 # consumer deploy policies.
 
 
@@ -327,13 +254,11 @@ data "aws_subnet" "us_east_1_inline_security_group" {
 
   # Deduplicated by subnet id: several systems with interface-owned groups may share one subnet.
   for_each = toset([
-    for system in var.all_systems : system.subnet_id
+    for system in var.all_systems :
+    lookup(local.alias_subnet_ids, system.subnet_id, system.subnet_id)
     if contains(["us_east_1", "us-east-1"], system.region) &&
-    anytrue([
-      for nic in system.network_interfaces :
-      nic.ingress != null && nic.egress != null
-    ]) &&
-    !contains(keys(var.managed_networks), system.subnet_id)
+    anytrue([for nic in system.network_interfaces : nic.ingress != null && nic.egress != null]) &&
+    lookup(local.alias_vpc_ids, system.subnet_id, null) == null
   ])
 
   id = each.value
