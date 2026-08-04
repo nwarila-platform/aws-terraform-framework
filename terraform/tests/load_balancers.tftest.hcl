@@ -193,6 +193,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         imds_hop_limit = 1
         set_state      = null
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.10"
@@ -239,6 +241,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         imds_hop_limit = 1
         set_state      = null
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.11"
@@ -284,6 +288,8 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         readiness_gate = true
         imds_hop_limit = 1
         set_state      = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -465,6 +471,8 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         readiness_gate = true
         imds_hop_limit = 1
         set_state      = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {

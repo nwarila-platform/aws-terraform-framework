@@ -49,6 +49,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
@@ -144,6 +146,8 @@ run "managed_key_pair_created_from_public_key" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -312,6 +316,8 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
@@ -415,6 +421,8 @@ run "managed_public_network_creates_vpc_subnet_igw_route_and_eip" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -543,6 +551,8 @@ run "managed_byo_vpc_creates_subnet_only" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = null
@@ -656,6 +666,8 @@ run "managed_network_rejects_public_ip_without_public_network" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.13"
@@ -723,6 +735,8 @@ run "managed_network_rejects_az_mismatch" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -857,6 +871,8 @@ run "managed_network_rejects_private_ip_outside_subnet_cidr" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -925,6 +941,8 @@ run "managed_network_rejects_private_ip_in_the_first_four_reserved_addresses" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -995,6 +1013,8 @@ run "managed_network_rejects_the_last_reserved_private_ip" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -1063,6 +1083,8 @@ run "managed_network_allows_assignable_pinned_and_auto_addresses_together" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1154,7 +1176,9 @@ run "managed_network_reports_malformed_subnet_cidr_without_a_raw_function_error"
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null

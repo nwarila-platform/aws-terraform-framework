@@ -17,7 +17,16 @@ change at minimum.
 - Terraform variable validations MUST be reserved for valid-typeable consumer
   settings that objectively deviate from the established security baseline and
   cannot be hard-coded.
-- EBS volumes and RDS storage MUST remain encrypted by default.
+- Every EBS volume attached at EC2 launch MUST be encrypted. Root devices and
+  standalone `ebs_block_devices` are module-encrypted; every non-root mapping
+  inherited from an AMI MUST also appear in `ami_block_device_overrides` with
+  the exact AMI device name so Terraform replaces the inherited mapping with an
+  encrypted inline block. This explicit collision is necessary because an AMI
+  mapping otherwise passes through `RunInstances` unchanged: the CIS RHEL 8
+  STIG AMI (`ami-0ca8a2e788e4c5869`) launched its 40 GB `/dev/sdf` snapshot
+  unencrypted even while `root_block_device.encrypted = true` encrypted
+  `/dev/sda1`.
+- RDS storage MUST remain encrypted by default.
 - Managed security-group ingress rules MUST NOT accept world-open IPv4
   (`0.0.0.0/0`) or IPv6 (`::/0`) sources; unrestricted egress remains supported.
   This binds `all_systems[*].network_interfaces[*].ingress`. Any new path that

@@ -204,6 +204,13 @@ EC2 instance, so data volumes do not delete automatically when an instance is
 terminated. That is why data-volume entries do not have
 `delete_on_termination`; use `skip_destroy` instead.
 
+AMI-defined non-root devices use a separate path. Add each such mapping to
+`ami_block_device_overrides` with the exact `device_name` from the AMI. The
+framework then renders an encrypted inline `ebs_block_device` that replaces the
+AMI mapping at launch. Do not copy the AMI's `snapshot_id` into the override;
+the AMI mapping supplies it. Use `ami_block_device_overrides = []` only when the
+AMI defines no device beyond its root mapping.
+
 `skip_destroy` defaults to `false`. With the default, Terraform detaches the
 volume when destroying the attachment. When `skip_destroy = true`, Terraform
 leaves the attachment in place while removing it from state.

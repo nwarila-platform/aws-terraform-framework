@@ -64,6 +64,8 @@ variables {
         volume_size           = "100"
       }
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.20"

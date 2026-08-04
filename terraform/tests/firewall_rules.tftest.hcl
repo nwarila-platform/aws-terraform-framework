@@ -45,6 +45,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.80"
@@ -135,6 +137,8 @@ run "front_insert_preserves_existing_rule_keys" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -234,6 +238,8 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -547,6 +553,8 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.85"
@@ -589,4 +597,3 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
     error_message = "The authored group must remain first, the derived group must append once, and neither group may be dropped."
   }
 }
-

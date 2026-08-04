@@ -44,6 +44,8 @@ all_systems = [
 
     ebs_block_devices = []
 
+    ami_block_device_overrides = []
+
     network_interfaces = [
       {
         # Null lets AWS pick a free address from the subnet CIDR, and the aws_instances output
@@ -117,6 +119,8 @@ all_systems = [
     }
 
     ebs_block_devices = []
+
+    ami_block_device_overrides = []
 
     network_interfaces = [
       {

@@ -824,7 +824,19 @@ resource "aws_instance" "us_east_1" {
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
-  # dynamic "ebs_block_device" {}
+  dynamic "ebs_block_device" {
+    for_each = each.value.ami_block_device_overrides
+    content {
+      device_name           = ebs_block_device.value.device_name
+      encrypted             = true
+      kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      volume_type           = ebs_block_device.value.volume_type
+      volume_size           = ebs_block_device.value.volume_size
+      iops                  = ebs_block_device.value.iops
+      throughput            = ebs_block_device.value.throughput
+      delete_on_termination = ebs_block_device.value.delete_on_termination
+    }
+  }
 
 }
 
@@ -897,7 +909,19 @@ resource "aws_instance" "us_east_1_refresh" {
   # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
   # ?  configured will not automatically reattach the volume when the EC2 instance is
   # ?  recreated, it will just abandon the volume and create/attach a new volume.
-  # dynamic "ebs_block_device" {}
+  dynamic "ebs_block_device" {
+    for_each = each.value.ami_block_device_overrides
+    content {
+      device_name           = ebs_block_device.value.device_name
+      encrypted             = true
+      kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      volume_type           = ebs_block_device.value.volume_type
+      volume_size           = ebs_block_device.value.volume_size
+      iops                  = ebs_block_device.value.iops
+      throughput            = ebs_block_device.value.throughput
+      delete_on_termination = ebs_block_device.value.delete_on_termination
+    }
+  }
 
   lifecycle {
     replace_triggered_by = [

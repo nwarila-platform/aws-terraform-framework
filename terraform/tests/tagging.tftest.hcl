@@ -41,6 +41,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.30"
@@ -241,6 +243,8 @@ run "rejects_reserved_prefix_in_consumer_tags" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {

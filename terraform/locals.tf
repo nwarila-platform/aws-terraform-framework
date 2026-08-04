@@ -323,6 +323,19 @@ locals {
           )
         }
 
+        ami_block_device_overrides = [
+          for override in system.ami_block_device_overrides : {
+            delete_on_termination = override.delete_on_termination
+            device_name           = override.device_name
+            encrypted             = true
+            iops                  = override.iops
+            kms_key_id            = system.aws_kms_alias
+            throughput            = override.throughput
+            volume_type           = override.volume_type
+            volume_size           = override.volume_size
+          }
+        ]
+
         tags = merge(
           system.tags,
           # Normalized Overwritable Tags

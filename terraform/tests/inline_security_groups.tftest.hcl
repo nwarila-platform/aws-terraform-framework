@@ -65,6 +65,8 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
         ebs_block_devices = []
 
         # The consumer lists ONLY the foreign/standing group; this interface declares its own.
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.41"
@@ -207,6 +209,8 @@ run "interface_group_alone_satisfies_the_empty_list_assert" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.43"
@@ -270,6 +274,8 @@ run "multiple_interfaces_get_distinct_groups_rules_and_attachments" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -404,6 +410,8 @@ run "nic_with_no_group_at_all_is_still_rejected" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.45"
@@ -462,6 +470,8 @@ run "interface_group_does_not_cover_another_interface" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -544,6 +554,8 @@ run "inline_group_derives_vpc_from_managed_network_without_a_subnet_lookup" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = null
@@ -610,6 +622,8 @@ run "inline_group_rejects_world_open_ipv4_ingress" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -681,6 +695,8 @@ run "inline_group_rejects_world_open_ipv6_ingress" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.71"
@@ -750,6 +766,8 @@ run "inline_group_rejects_zero_padded_world_open_ipv4_ingress" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -821,6 +839,8 @@ run "inline_group_rejects_zero_padded_world_open_ipv6_ingress" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.76"
@@ -890,6 +910,8 @@ run "inline_group_rejects_noncanonical_world_open_ipv4_ingress" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -961,6 +983,8 @@ run "inline_group_rejects_noncanonical_world_open_ipv6_ingress" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.78"
@@ -1030,6 +1054,8 @@ run "inline_group_rejects_whitespace_ipv4_ingress_prefix" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1101,6 +1127,8 @@ run "inline_group_rejects_whitespace_ipv6_ingress_prefix" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.80"
@@ -1170,6 +1198,8 @@ run "inline_group_rejects_hex_ipv4_ingress_prefix" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1241,6 +1271,8 @@ run "inline_group_rejects_hex_ipv6_ingress_prefix" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.82"
@@ -1310,6 +1342,8 @@ run "inline_group_rejects_all_protocol_with_ports" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1389,6 +1423,8 @@ run "inline_group_tags_reject_the_reserved_namespace" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.53"
@@ -1452,6 +1488,8 @@ run "inline_group_tags_reject_the_reserved_namespace_with_null_metadata" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.84"
@@ -1514,6 +1552,8 @@ run "inline_group_allows_world_open_egress" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1594,6 +1634,8 @@ run "inline_group_rejects_an_sg_prefixed_hostname" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.55"
@@ -1657,6 +1699,8 @@ run "inline_group_rejects_a_hostname_over_the_246_character_budget" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.66"
@@ -1718,6 +1762,8 @@ run "naming_an_inline_group_in_a_security_groups_list_is_rejected" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.56"
@@ -1777,6 +1823,8 @@ run "naming_an_inline_group_with_different_case_is_rejected" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.57"
@@ -1834,6 +1882,8 @@ run "inline_group_rejects_a_null_rule_collection" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1896,6 +1946,8 @@ run "inline_group_rejects_an_uppercase_sg_prefixed_hostname" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.60"
@@ -1957,6 +2009,8 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.62"
@@ -2004,6 +2058,8 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2072,6 +2128,8 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.64"
@@ -2119,6 +2177,8 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {

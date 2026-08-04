@@ -103,6 +103,23 @@ variable "all_systems" {
       })
     )
 
+    # Overrides for block devices the AMI itself defines. `device_name` must match the AMI's
+    # mapping exactly; the rendered block replaces it, which is the only way to encrypt a device
+    # the AMI ships unencrypted. Use [] when the AMI defines nothing beyond its root device.
+    ami_block_device_overrides = list(
+      object({
+        delete_on_termination = bool
+        device_name           = string
+        #encrypted            = # Statically set to 'true'
+        iops = string
+        #kms_key_id           = # Calculated automatically from system.aws_kms_alias
+        #snapshot_id          = # Never set: the AMI mapping supplies the snapshot.
+        throughput  = string
+        volume_type = string
+        volume_size = string
+      })
+    )
+
     network_interfaces = list(
       object({
         #subnet_ip      = # Calculated automatically from parent object
@@ -171,9 +188,10 @@ variable "all_systems" {
       try(system.tags.Backup != null, false) &&
       system.readiness_gate != null &&
       system.root_block_device != null &&
-      system.ebs_block_devices != null
+      system.ebs_block_devices != null &&
+      system.ami_block_device_overrides != null
     ])
-    error_message = "Each all_systems entry must set tags.Backup, readiness_gate, root_block_device, and ebs_block_devices explicitly; use tags.Backup = true, readiness_gate = true, root_block_device = { delete_on_termination = true, iops = null, tags = {}, throughput = null, volume_type = \"gp3\", volume_size = \"100\" }, and ebs_block_devices = [] to preserve the former defaults."
+    error_message = "Each all_systems entry must set tags.Backup, readiness_gate, root_block_device, ebs_block_devices, and ami_block_device_overrides explicitly; use tags.Backup = true, readiness_gate = true, root_block_device = { delete_on_termination = true, iops = null, tags = {}, throughput = null, volume_type = \"gp3\", volume_size = \"100\" }, ebs_block_devices = [], and ami_block_device_overrides = [] to preserve existing behaviour."
   }
 
   # Former-default boolean gates.
@@ -228,6 +246,66 @@ variable "all_systems" {
   validation {
     condition     = alltrue([for system in var.all_systems : system.ebs_block_devices == null || length(system.ebs_block_devices) <= 23])
     error_message = "Each all_systems entry supports at most 23 ebs_block_devices (device names run /dev/sdd..sdz); split larger volume sets across instances."
+  }
+
+  # An arbitrary AMI's platform is data-resolved after variable validation, so reserve both the
+  # Linux and Windows spellings that the standalone-volume path may derive for this system.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.ami_block_device_overrides == null || (
+        alltrue([
+          for override in system.ami_block_device_overrides :
+          try(trimspace(override.device_name) != "", false)
+        ]) &&
+        length(distinct([
+          for override in system.ami_block_device_overrides : override.device_name
+        ])) == length(system.ami_block_device_overrides) &&
+        alltrue([
+          for override in system.ami_block_device_overrides :
+          try(!contains(
+            concat(
+              [
+                for index in range(length(system.ebs_block_devices == null ? [] : system.ebs_block_devices)) :
+                "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+              ],
+              [
+                for index in range(length(system.ebs_block_devices == null ? [] : system.ebs_block_devices)) :
+                "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+              ],
+            ),
+            override.device_name,
+          ), false)
+        ])
+      )
+    ])
+    error_message = format(
+      "Each ami_block_device_overrides device_name must be non-empty, unique within its system, and distinct from the /dev/sdd../dev/sdz or xvdd..xvdz names reserved by that system's ebs_block_devices. Offending system/device pairs: %s.",
+      join(", ", distinct(flatten([
+        for system in var.all_systems : [
+          for override in system.ami_block_device_overrides == null ? [] : system.ami_block_device_overrides :
+          format("%s/%s", system.hostname, jsonencode(override.device_name))
+          if !try(trimspace(override.device_name) != "", false) ||
+          length([
+            for candidate in system.ami_block_device_overrides : candidate
+            if candidate.device_name == override.device_name
+          ]) > 1 ||
+          try(contains(
+            concat(
+              [
+                for index in range(length(system.ebs_block_devices == null ? [] : system.ebs_block_devices)) :
+                "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+              ],
+              [
+                for index in range(length(system.ebs_block_devices == null ? [] : system.ebs_block_devices)) :
+                "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+              ],
+            ),
+            override.device_name,
+          ), false)
+        ]
+      ]))),
+    )
   }
 
   validation {

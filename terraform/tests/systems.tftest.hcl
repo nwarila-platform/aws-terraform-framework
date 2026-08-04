@@ -39,6 +39,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.10"
@@ -85,6 +87,8 @@ variables {
       }
 
       ebs_block_devices = []
+
+      ami_block_device_overrides = []
 
       network_interfaces = [
         {
@@ -133,6 +137,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.12"
@@ -179,6 +185,8 @@ variables {
       }
 
       ebs_block_devices = []
+
+      ami_block_device_overrides = []
 
       network_interfaces = [
         {
@@ -283,6 +291,8 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.12.10"
@@ -329,6 +339,8 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -503,6 +515,8 @@ run "instance_state_includes_refresh_instances_after_readiness" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.12"
@@ -574,6 +588,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
@@ -621,6 +637,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.1.9.10"
@@ -667,6 +685,8 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -856,6 +876,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
           volume_size           = "100"
         }
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.5.10"
@@ -912,6 +934,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -970,6 +994,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
           volume_size           = "100"
         }
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.1.5.10"
@@ -1026,6 +1052,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1253,6 +1281,8 @@ run "systems_reject_more_than_23_ebs_block_devices" {
           volume_size           = "100"
         }
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.5.13"
@@ -1313,6 +1343,8 @@ run "systems_reject_duplicate_hostnames" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.2.10"
@@ -1359,6 +1391,8 @@ run "systems_reject_duplicate_hostnames" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1419,6 +1453,8 @@ run "systems_reject_regions_outside_aws_config" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1510,6 +1546,8 @@ run "systems_reject_invalid_ami_identifiers" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.3.10"
@@ -1569,6 +1607,8 @@ run "systems_reject_invalid_set_state" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1643,6 +1683,8 @@ run "systems_accept_windows_server_2025_base_ami" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.3.11"
@@ -1704,6 +1746,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.11.10"
@@ -1751,6 +1795,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.1.11.10"
@@ -1797,6 +1843,8 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -1940,6 +1988,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.10.10"
@@ -1986,6 +2036,8 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2095,6 +2147,8 @@ run "systems_reject_windows_hostnames_over_15_characters" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.7.10"
@@ -2154,6 +2208,8 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2215,6 +2271,8 @@ run "systems_reject_all_numeric_windows_hostnames" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.7.13"
@@ -2274,6 +2332,8 @@ run "systems_accept_valid_windows_hostnames" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2394,6 +2454,8 @@ run "readiness_gate_allows_empty_private_key_paths" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.13.10"
@@ -2468,6 +2530,8 @@ run "readiness_gate_rejects_populated_map_missing_key_name" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.13.11"
@@ -2537,6 +2601,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.14.10"
@@ -2583,6 +2649,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2631,6 +2699,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.14.12"
@@ -2677,6 +2747,8 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2768,6 +2840,8 @@ run "systems_render_readiness_user_data_per_os" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.8.10"
@@ -2814,6 +2888,8 @@ run "systems_render_readiness_user_data_per_os" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -2952,6 +3028,8 @@ run "systems_reject_kms_alias_prefix" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.4.10"
@@ -3011,6 +3089,8 @@ run "systems_reject_empty_iam_instance_profile" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -3072,6 +3152,8 @@ run "systems_reject_empty_network_interface_security_groups" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.6.11"
@@ -3131,6 +3213,8 @@ run "systems_reject_empty_network_interfaces" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = []
 
@@ -3691,6 +3775,8 @@ run "readiness_gate_optout_creates_no_gate" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.9.10"
@@ -3737,6 +3823,8 @@ run "readiness_gate_optout_creates_no_gate" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -3790,8 +3878,10 @@ run "all_systems_rejects_null_root_block_device" {
           Backup   = true
           Function = "Null root block device validation"
         }
-        root_block_device = null
-        ebs_block_devices = []
+        root_block_device          = null
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -3843,7 +3933,9 @@ run "all_systems_rejects_null_instance_type" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -3935,7 +4027,9 @@ run "all_systems_threads_imds_hop_limit_two" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -3976,7 +4070,9 @@ run "all_systems_threads_imds_hop_limit_two" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4046,7 +4142,9 @@ run "all_systems_rejects_imds_hop_limit_zero" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4098,7 +4196,9 @@ run "all_systems_rejects_imds_hop_limit_three" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4150,7 +4250,9 @@ run "all_systems_rejects_null_imds_hop_limit" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4209,7 +4311,9 @@ run "all_systems_rejects_private_ip_with_out_of_range_octet" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4261,7 +4365,9 @@ run "all_systems_rejects_ipv6_private_ip" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4313,7 +4419,9 @@ run "all_systems_rejects_private_ip_carrying_a_prefix" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4365,7 +4473,9 @@ run "all_systems_rejects_duplicate_private_ip_on_one_system" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4426,7 +4536,9 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4467,7 +4579,9 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4519,7 +4633,9 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4560,7 +4676,9 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
@@ -4620,7 +4738,9 @@ run "all_systems_allows_auto_assigned_private_ip_in_a_preexisting_subnet" {
           volume_type           = "gp3"
           volume_size           = "100"
         }
-        ebs_block_devices = []
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             description     = null
