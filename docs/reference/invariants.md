@@ -51,6 +51,20 @@ change at minimum.
   across systems or interfaces, MUST be defined outside this framework.
   Cross-system reachability within interface-owned groups MUST be expressed with
   CIDR rules.
+- Every `all_systems[*].subnet_id` MUST resolve through one of three supported
+  forms: a literal `subnet-<identifier>` reference, a `managed_networks` key, or
+  a `network_aliases` key. Managed names take precedence: any value matching a
+  `managed_networks` key resolves to its framework-created subnet, including a
+  subnet-shaped value. Alias names resolve to caller-supplied existing subnets,
+  and remaining literal references pass through unchanged.
+- `network_aliases` keys MUST NOT begin with `subnet-` or overlap
+  `managed_networks` keys, and an alias `vpc_id` MUST NOT equal a
+  `managed_networks` key. These namespace constraints keep subnet resolution
+  unambiguous and prevent an alias-supplied `vpc_id` from colliding with a
+  `managed_networks` name; however, managed-name resolution can still capture
+  a VPC id returned by the subnet lookup when a `managed_networks` entry is
+  named like a real VPC id, a hazard shared with literal subnet references
+  rather than caused by aliases.
 - Every RDS database MUST attach at least one explicitly supplied VPC security
   group instead of falling back to the VPC default security group.
 - `aws_ec2_instance_state` resources MUST be created only when a system

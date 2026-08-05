@@ -315,9 +315,10 @@ data "aws_key_pair" "us_east_1" {
 
 # An interface-owned group derives its VPC from the parent system's subnet instead of restating it.
 # A subnet_id naming a managed_networks entry resolves through local.managed_vpc_ids with no API
-# call, so only a LITERAL subnet id reaches this lookup: it has zero instances when no interface
-# declares a group. It needs ec2:DescribeSubnets, already covered by the read-only statement in the
-# consumer deploy policies.
+# call. Literal subnet ids and network_aliases keys reach this lookup; an alias with vpc_id metadata
+# still has a stable data instance, but the group consumes the supplied VPC id. It has zero instances
+# when no interface declares a group. It needs ec2:DescribeSubnets, already covered by the read-only
+# statement in the consumer deploy policies.
 
 
 data "aws_subnet" "us_east_1_inline_security_group" {
@@ -325,7 +326,8 @@ data "aws_subnet" "us_east_1_inline_security_group" {
   # Set the provider in which to look up the subnet.
   provider = aws.us_east_1
 
-  # Deduplicated by subnet id: several systems with interface-owned groups may share one subnet.
+  # Deduplicated by raw subnet symbol. Two aliases naming one subnet, or an alias and a literal
+  # naming one subnet, produce harmless duplicate reads.
   for_each = toset([
     for system in var.all_systems : system.subnet_id
     if contains(["us_east_1", "us-east-1"], system.region) &&
@@ -336,7 +338,7 @@ data "aws_subnet" "us_east_1_inline_security_group" {
     !contains(keys(var.managed_networks), system.subnet_id)
   ])
 
-  id = each.value
+  id = lookup(local.alias_subnet_ids, each.value, each.value)
 
 }
 

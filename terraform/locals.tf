@@ -150,7 +150,11 @@ locals {
         vpc_id = (
           contains(keys(var.managed_networks), system.subnet_id)
           ? system.subnet_id
-          : data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
+          : lookup(
+            local.alias_vpc_ids,
+            system.subnet_id,
+            data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
+          )
         )
         description = network_interface.description != null ? network_interface.description : "Managed by aws-terraform-framework."
         ingress     = network_interface.ingress
@@ -275,6 +279,15 @@ locals {
     us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
   }
 
+  # Alias key -> caller-supplied subnet id.
+  alias_subnet_ids = { for name, alias in var.network_aliases : name => alias.subnet_id }
+
+  # Alias key -> caller-supplied VPC id when present.
+  alias_vpc_ids = {
+    for name, alias in var.network_aliases : name => alias.vpc_id
+    if alias.vpc_id != null
+  }
+
   # Systems that requested a stable public IPv4: an EIP is allocated and associated with the
   # primary ENI.
   eip_systems = {
@@ -397,7 +410,7 @@ locals {
             ) ? [local.network_interface_security_group_ids[region]["${system.hostname}-eni-${index}-sg"]]
             : [],
           )
-          subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, system.subnet_id)
+          subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, lookup(local.alias_subnet_ids, system.subnet_id, system.subnet_id))
 
           # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
           # ?      calculated tags. The default tags cannot be overwritten, if the user provides
