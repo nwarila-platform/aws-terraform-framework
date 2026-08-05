@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.0.0...v2.1.0) (2026-08-05)
+
+
+### Features
+
+* **ec2:** resolve symbolic subnet aliases to existing subnets ([#100](https://github.com/nwarila-platform/aws-terraform-framework/issues/100)) ([a5ded6f](https://github.com/nwarila-platform/aws-terraform-framework/commit/a5ded6f2b107c5289537176486508350939d85a5))
+
 ## [2.0.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v1.1.0...v2.0.0) (2026-07-30)
 
 
