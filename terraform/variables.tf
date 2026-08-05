@@ -1507,3 +1507,144 @@ variable "managed_networks" {
     error_message = "A pinned network_interfaces private_ip on a system in a managed network must fall inside that network's subnet_cidr and must not be one of the five addresses AWS reserves in every subnet (the first four and the last). Leave private_ip null to let AWS pick."
   }
 }
+
+variable "network_aliases" {
+  description = <<-EOT
+    Caller-supplied references to existing networks. The map key is the name that
+    all_systems[*].subnet_id may use instead of a literal subnet id; the framework resolves the
+    name to subnet_id and creates nothing. vpc_id, subnet_cidr, and availability_zone are optional
+    metadata: supply them to keep the interface-owned security group's VPC derivation free of a
+    DescribeSubnets call and to keep the pinned private_ip and availability-zone checks at plan
+    time; set them to null to skip those checks. The empty default preserves literal-subnet-id
+    behavior exactly.
+  EOT
+
+  type = map(object({
+    subnet_id         = string
+    vpc_id            = string
+    subnet_cidr       = string
+    availability_zone = string
+  }))
+
+  default  = {}
+  nullable = false
+
+  # These identifier predicates deliberately prove reference shape, not hexadecimal AWS id
+  # validity. They catch symbolic names that resolve to nothing; a typo in a real id still fails at
+  # apply, preserving the descriptive non-hex subnet references used by the test suite.
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias.subnet_id != null && can(regex("^subnet-[0-9a-z][0-9a-z-]*$", alias.subnet_id))
+    ])
+    error_message = "Each network_aliases entry must set subnet_id to a subnet reference of the form subnet-<identifier>; the alias map carries references to existing subnets, never names to be created."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      !can(regex("^subnet-", name))
+    ])
+    error_message = "A network_aliases key is a symbolic network name and must not begin with 'subnet-'; a subnet-shaped key is indistinguishable from a literal reference."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias.subnet_cidr == null || (
+        can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", alias.subnet_cidr)) &&
+        can(cidrhost(alias.subnet_cidr, 0))
+      )
+    ])
+    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block; null skips the pinned private_ip containment check."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias.vpc_id == null || can(regex("^vpc-[0-9a-z][0-9a-z-]*$", alias.vpc_id))
+    ])
+    error_message = "Each network_aliases vpc_id must be null or a VPC reference of the form vpc-<identifier>; null makes an interface-owned security group fall back to a DescribeSubnets lookup."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias.availability_zone == null || can(regex("^us-east-1[a-f]$", alias.availability_zone))
+    ])
+    error_message = "Each network_aliases availability_zone must be null or one of us-east-1a through us-east-1f; local zones such as us-east-1-atl-1a are deliberately unsupported."
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      can(regex("^subnet-[0-9a-z][0-9a-z-]*$", system.subnet_id)) ||
+      contains(keys(var.managed_networks), system.subnet_id) ||
+      contains(keys(var.network_aliases), system.subnet_id)
+    ])
+    error_message = "Each all_systems subnet_id must be a subnet reference of the form subnet-<identifier>, a managed_networks key, or a network_aliases key. A symbolic name that is neither resolves to nothing."
+  }
+
+  # No region cross-check is needed: aws_config.regions is fixed to us_east_1 and all_systems
+  # already validates every system against that single-region configuration.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !contains(keys(var.network_aliases), system.subnet_id) ||
+      var.network_aliases[system.subnet_id].availability_zone == null ||
+      system.availability_zone == var.network_aliases[system.subnet_id].availability_zone
+    ])
+    error_message = "Systems referencing a network_aliases entry with availability_zone metadata must use that same availability_zone; set the alias metadata to null to skip this check."
+  }
+
+  # A pinned address is only checkable against its subnet when the caller supplies subnet_cidr.
+  # Containment compares network addresses by re-masking the candidate with the subnet's own prefix
+  # length. The five AWS-reserved addresses in every subnet - the network address, the next three,
+  # and the last - can never be assigned, so pinning one is always an apply failure. Syntactically
+  # invalid addresses are skipped here and reported by the all_systems IPv4 guard, and an
+  # unparseable subnet_cidr is skipped and reported by the CIDR guard above; every validation on a
+  # variable is evaluated even after another fails, so without both skips a malformed input would
+  # surface a raw cidrhost function error next to the message that actually explains it.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in system.network_interfaces :
+        !contains(keys(var.network_aliases), system.subnet_id) ||
+        var.network_aliases[system.subnet_id].subnet_cidr == null ||
+        nic.private_ip == null ||
+        !can(cidrhost("${nic.private_ip}/32", 0)) ||
+        !can(cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0)) ||
+        (
+          cidrhost(
+            "${nic.private_ip}/${split("/", var.network_aliases[system.subnet_id].subnet_cidr)[1]}",
+            0
+          ) == cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0) &&
+          !contains(
+            [
+              for reserved in [0, 1, 2, 3, -1] :
+              cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, reserved)
+            ],
+            nic.private_ip
+          )
+        )
+      ]
+    ]))
+    error_message = "A pinned network_interfaces private_ip on a system using a network_aliases entry with subnet_cidr must fall inside that CIDR and must not be one of the five addresses AWS reserves in every subnet (the first four and the last). Leave private_ip null to let AWS pick, or subnet_cidr null to skip this check."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      !contains(keys(var.managed_networks), name)
+    ])
+    error_message = "A network name must not appear in both managed_networks and network_aliases."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias.vpc_id == null ? true : !contains(keys(var.managed_networks), alias.vpc_id)
+    ])
+    error_message = "A network_aliases vpc_id must not equal a managed_networks key."
+  }
+}
