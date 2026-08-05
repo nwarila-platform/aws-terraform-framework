@@ -14,6 +14,10 @@ configuration behavior without making AWS API calls.
   bucket. It also asserts the module-owned encryption and IMDSv2 hardcodes.
 - `terraform/tests/managed.tftest.hcl` verifies default-off managed capabilities,
   security-group rule validation, and network composition without live AWS calls.
+- `terraform/tests/network_aliases.tftest.hcl` verifies symbolic aliases to
+  caller-supplied existing subnets, coexistence with managed networks, literal
+  passthrough, the empty default, metadata checks, and every alias validation
+  rejection path.
 - `make ci` also runs formatting, `terraform init`, validation, TFLint,
   terraform-docs drift detection, documentation layout checks, and the
   bidirectional deny-all `.gitignore` allowlist guard.
