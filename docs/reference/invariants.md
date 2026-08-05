@@ -53,9 +53,10 @@ change at minimum.
   CIDR rules.
 - Every `all_systems[*].subnet_id` MUST resolve through one of three supported
   forms: a literal `subnet-<identifier>` reference, a `managed_networks` key, or
-  a `network_aliases` key. Managed names resolve to framework-created subnets,
-  alias names resolve to caller-supplied existing subnets, and literal references
-  pass through unchanged.
+  a `network_aliases` key. Managed names take precedence: any value matching a
+  `managed_networks` key resolves to its framework-created subnet, including a
+  subnet-shaped value. Alias names resolve to caller-supplied existing subnets,
+  and remaining literal references pass through unchanged.
 - `network_aliases` keys MUST NOT begin with `subnet-` or overlap
   `managed_networks` keys, and an alias `vpc_id` MUST NOT equal a
   `managed_networks` key. These namespace constraints keep subnet and VPC
