@@ -1530,13 +1530,21 @@ variable "network_aliases" {
   default  = {}
   nullable = false
 
+  validation {
+    condition = alltrue([
+      for name, alias in var.network_aliases :
+      alias != null
+    ])
+    error_message = "Each network_aliases key must map to an object, not null; to omit an alias, omit its key instead of assigning null."
+  }
+
   # These identifier predicates deliberately prove reference shape, not hexadecimal AWS id
   # validity. They catch symbolic names that resolve to nothing; a typo in a real id still fails at
   # apply, preserving the descriptive non-hex subnet references used by the test suite.
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      alias.subnet_id != null && can(regex("^subnet-[0-9a-z][0-9a-z-]*$", alias.subnet_id))
+      alias == null ? true : alias.subnet_id != null && can(regex("^subnet-[0-9a-z][0-9a-z-]*$", alias.subnet_id))
     ])
     error_message = "Each network_aliases entry must set subnet_id to a subnet reference of the form subnet-<identifier>; the alias map carries references to existing subnets, never names to be created."
   }
@@ -1544,7 +1552,7 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      !can(regex("^subnet-", name))
+      alias == null ? true : !can(regex("^subnet-", name))
     ])
     error_message = "A network_aliases key is a symbolic network name and must not begin with 'subnet-'; a subnet-shaped key is indistinguishable from a literal reference."
   }
@@ -1552,7 +1560,7 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      alias.subnet_cidr == null || (
+      alias == null ? true : alias.subnet_cidr == null || (
         can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", alias.subnet_cidr)) &&
         can(cidrhost(alias.subnet_cidr, 0)) &&
         can(regex("/(1[6-9]|2[0-8])$", alias.subnet_cidr))
@@ -1564,7 +1572,7 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      alias.vpc_id == null || can(regex("^vpc-[0-9a-z][0-9a-z-]*$", alias.vpc_id))
+      alias == null ? true : alias.vpc_id == null || can(regex("^vpc-[0-9a-z][0-9a-z-]*$", alias.vpc_id))
     ])
     error_message = "Each network_aliases vpc_id must be null or a VPC reference of the form vpc-<identifier>; null makes an interface-owned security group fall back to a DescribeSubnets lookup."
   }
@@ -1572,7 +1580,7 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      alias.availability_zone == null || can(regex("^us-east-1[a-f]$", alias.availability_zone))
+      alias == null ? true : alias.availability_zone == null || can(regex("^us-east-1[a-f]$", alias.availability_zone))
     ])
     error_message = "Each network_aliases availability_zone must be null or one of us-east-1a through us-east-1f; local zones such as us-east-1-atl-1a are deliberately unsupported."
   }
@@ -1592,7 +1600,8 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      !contains(keys(var.network_aliases), system.subnet_id) ||
+      !contains(keys(var.network_aliases), system.subnet_id) ? true :
+      var.network_aliases[system.subnet_id] == null ? true :
       var.network_aliases[system.subnet_id].availability_zone == null ||
       system.availability_zone == var.network_aliases[system.subnet_id].availability_zone
     ])
@@ -1611,24 +1620,27 @@ variable "network_aliases" {
     condition = alltrue(flatten([
       for system in var.all_systems : [
         for nic in system.network_interfaces :
-        !contains(keys(var.network_aliases), system.subnet_id) ||
-        var.network_aliases[system.subnet_id].subnet_cidr == null ||
-        nic.private_ip == null ||
-        !can(cidrhost("${nic.private_ip}/32", 0)) ||
-        !can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
-        !can(cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0)) ||
-        !can(regex("/(1[6-9]|2[0-8])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
+        !contains(keys(var.network_aliases), system.subnet_id) ? true :
+        var.network_aliases[system.subnet_id] == null ? true :
         (
-          cidrhost(
-            "${nic.private_ip}/${split("/", var.network_aliases[system.subnet_id].subnet_cidr)[1]}",
-            0
-          ) == cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0) &&
-          !contains(
-            [
-              for reserved in [0, 1, 2, 3, -1] :
-              cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, reserved)
-            ],
-            nic.private_ip
+          var.network_aliases[system.subnet_id].subnet_cidr == null ||
+          nic.private_ip == null ||
+          !can(cidrhost("${nic.private_ip}/32", 0)) ||
+          !can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
+          !can(cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0)) ||
+          !can(regex("/(1[6-9]|2[0-8])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
+          (
+            cidrhost(
+              "${nic.private_ip}/${split("/", var.network_aliases[system.subnet_id].subnet_cidr)[1]}",
+              0
+            ) == cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0) &&
+            !contains(
+              [
+                for reserved in [0, 1, 2, 3, -1] :
+                cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, reserved)
+              ],
+              nic.private_ip
+            )
           )
         )
       ]
@@ -1639,7 +1651,7 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      !contains(keys(var.managed_networks), name)
+      alias == null ? true : !contains(keys(var.managed_networks), name)
     ])
     error_message = "A network name must not appear in both managed_networks and network_aliases."
   }
@@ -1647,7 +1659,9 @@ variable "network_aliases" {
   validation {
     condition = alltrue([
       for name, alias in var.network_aliases :
-      alias.vpc_id == null ? true : !contains(keys(var.managed_networks), alias.vpc_id)
+      alias == null ? true : (
+        alias.vpc_id == null ? true : !contains(keys(var.managed_networks), alias.vpc_id)
+      )
     ])
     error_message = "A network_aliases vpc_id must not equal a managed_networks key."
   }

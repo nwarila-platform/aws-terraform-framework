@@ -339,6 +339,19 @@ run "rejects_a_subnet_id_that_is_neither_alias_nor_reference" {
   expect_failures = [var.network_aliases]
 }
 
+run "rejects_a_null_alias_entry" {
+  command = plan
+
+  variables {
+    network_aliases = {
+      "null-entry" = null
+    }
+    all_systems = []
+  }
+
+  expect_failures = [var.network_aliases]
+}
+
 run "rejects_a_subnet_shaped_alias_key" {
   command = plan
 
