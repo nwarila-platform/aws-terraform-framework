@@ -530,14 +530,46 @@ run "rejects_private_ip_in_the_first_four_reserved_addresses" {
   command = plan
 
   variables {
-    network_aliases = {
-      "poc-net" = {
-        subnet_id         = "subnet-0123456789abcdef0"
-        vpc_id            = "vpc-0123456789abcdef0"
-        subnet_cidr       = "10.20.0.4/30"
-        availability_zone = "us-east-1a"
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "first-reserved"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "poc-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        refresh              = false
+        instance_type        = "m6i.large"
+        readiness_user       = null
+        readiness_gate       = false
+        imds_hop_limit       = 1
+        set_state            = null
+        tags                 = { Function = "First reserved address", Backup = true }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices = []
+        network_interfaces = [
+          {
+            private_ip      = "10.20.0.1"
+            security_groups = ["sg-preexisting"]
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
       }
-    }
+    ]
   }
 
   expect_failures = [var.network_aliases]

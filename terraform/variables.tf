@@ -1513,10 +1513,11 @@ variable "network_aliases" {
     Caller-supplied references to existing networks. The map key is the name that
     all_systems[*].subnet_id may use instead of a literal subnet id; the framework resolves the
     name to subnet_id and creates nothing. vpc_id, subnet_cidr, and availability_zone are optional
-    metadata: supply them to keep the interface-owned security group's VPC derivation free of a
-    DescribeSubnets call and to keep the pinned private_ip and availability-zone checks at plan
-    time; set them to null to skip those checks. The empty default preserves literal-subnet-id
-    behavior exactly.
+    metadata: supplying vpc_id makes the interface-owned security group's VPC derivation
+    independent of the lookup result; the DescribeSubnets call still occurs. When supplied,
+    subnet_cidr and availability_zone keep the pinned private_ip and availability-zone checks at
+    plan time; set them to null to skip those checks. The empty default preserves
+    literal-subnet-id behavior exactly.
   EOT
 
   type = map(object({
@@ -1557,7 +1558,7 @@ variable "network_aliases" {
         can(regex("/(1[6-9]|2[0-8])$", alias.subnet_cidr))
       )
     ])
-    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block with a prefix from /16 through /28. Prefixes outside /16-/28 cannot be created as AWS subnets, and /29-/32 would make the reserved-address containment arithmetic fail with raw function errors; null skips the pinned private_ip containment check."
+    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block with a prefix from /16 through /28. Prefixes outside /16-/28 cannot be created as AWS subnets; null skips the pinned private_ip containment check."
   }
 
   validation {
