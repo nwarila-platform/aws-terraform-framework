@@ -664,6 +664,15 @@ run "allows_assignable_pinned_and_auto_addresses_together" {
     ])
     error_message = "The first and last assignable addresses must pass while null still delegates address selection to AWS."
   }
+
+  assert {
+    condition = alltrue([
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-0"].subnet_id == "subnet-0123456789abcdef0",
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-1"].subnet_id == "subnet-0123456789abcdef0",
+      local.elastic_network_interfaces.us_east_1["pin-ok-eni-2"].subnet_id == "subnet-0123456789abcdef0",
+    ])
+    error_message = "Every interface on a multi-interface system must resolve the symbolic network name to the alias subnet_id."
+  }
 }
 
 run "skips_the_private_ip_check_when_the_alias_omits_subnet_cidr" {
@@ -695,6 +704,29 @@ run "reports_malformed_subnet_cidr_without_a_raw_function_error" {
         subnet_id         = "subnet-0123456789abcdef0"
         vpc_id            = "vpc-0123456789abcdef0"
         subnet_cidr       = "not-a-cidr"
+        availability_zone = "us-east-1a"
+      }
+    }
+  }
+
+  expect_failures = [var.network_aliases]
+}
+
+run "rejects_an_unrepresentable_subnet_cidr_prefix" {
+  command = plan
+
+  variables {
+    network_aliases = {
+      "poc-net" = {
+        subnet_id         = "subnet-0123456789abcdef0"
+        vpc_id            = "vpc-0123456789abcdef0"
+        subnet_cidr       = "10.20.0.0/28"
+        availability_zone = "us-east-1a"
+      }
+      "unreferenced-net" = {
+        subnet_id         = "subnet-22222222222222222"
+        vpc_id            = "vpc-22222222222222222"
+        subnet_cidr       = "10.20.0.4/32"
         availability_zone = "us-east-1a"
       }
     }

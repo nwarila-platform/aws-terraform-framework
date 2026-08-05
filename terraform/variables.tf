@@ -1553,10 +1553,11 @@ variable "network_aliases" {
       for name, alias in var.network_aliases :
       alias.subnet_cidr == null || (
         can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", alias.subnet_cidr)) &&
-        can(cidrhost(alias.subnet_cidr, 0))
+        can(cidrhost(alias.subnet_cidr, 0)) &&
+        can(regex("/(1[6-9]|2[0-8])$", alias.subnet_cidr))
       )
     ])
-    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block; null skips the pinned private_ip containment check."
+    error_message = "Each network_aliases subnet_cidr must be null or a valid IPv4 CIDR block with a prefix from /16 through /28. Prefixes outside /16-/28 cannot be created as AWS subnets, and /29-/32 would make the reserved-address containment arithmetic fail with raw function errors; null skips the pinned private_ip containment check."
   }
 
   validation {
@@ -1601,10 +1602,10 @@ variable "network_aliases" {
   # Containment compares network addresses by re-masking the candidate with the subnet's own prefix
   # length. The five AWS-reserved addresses in every subnet - the network address, the next three,
   # and the last - can never be assigned, so pinning one is always an apply failure. Syntactically
-  # invalid addresses are skipped here and reported by the all_systems IPv4 guard, and an
-  # unparseable subnet_cidr is skipped and reported by the CIDR guard above; every validation on a
-  # variable is evaluated even after another fails, so without both skips a malformed input would
-  # surface a raw cidrhost function error next to the message that actually explains it.
+  # invalid addresses are skipped here and reported by the all_systems IPv4 guard, and a malformed
+  # or unrepresentable subnet_cidr is skipped and reported by the CIDR guard above; every validation
+  # on a variable is evaluated even after another fails, so without these skips an invalid input
+  # would surface a raw cidrhost function error next to the message that actually explains it.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
@@ -1613,7 +1614,9 @@ variable "network_aliases" {
         var.network_aliases[system.subnet_id].subnet_cidr == null ||
         nic.private_ip == null ||
         !can(cidrhost("${nic.private_ip}/32", 0)) ||
+        !can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
         !can(cidrhost(var.network_aliases[system.subnet_id].subnet_cidr, 0)) ||
+        !can(regex("/(1[6-9]|2[0-8])$", var.network_aliases[system.subnet_id].subnet_cidr)) ||
         (
           cidrhost(
             "${nic.private_ip}/${split("/", var.network_aliases[system.subnet_id].subnet_cidr)[1]}",
