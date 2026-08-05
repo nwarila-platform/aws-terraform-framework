@@ -59,8 +59,12 @@ change at minimum.
   and remaining literal references pass through unchanged.
 - `network_aliases` keys MUST NOT begin with `subnet-` or overlap
   `managed_networks` keys, and an alias `vpc_id` MUST NOT equal a
-  `managed_networks` key. These namespace constraints keep subnet and VPC
-  resolution unambiguous.
+  `managed_networks` key. These namespace constraints keep subnet resolution
+  unambiguous and prevent an alias-supplied `vpc_id` from colliding with a
+  `managed_networks` name; however, managed-name resolution can still capture
+  a VPC id returned by the subnet lookup when a `managed_networks` entry is
+  named like a real VPC id, a hazard shared with literal subnet references
+  rather than caused by aliases.
 - Every RDS database MUST attach at least one explicitly supplied VPC security
   group instead of falling back to the VPC default security group.
 - `aws_ec2_instance_state` resources MUST be created only when a system
