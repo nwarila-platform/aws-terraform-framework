@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.1.0...v2.2.0) (2026-08-06)
+
+
+### Features
+
+* **ec2:** allow a stable public address on bring-your-own subnets ([#104](https://github.com/nwarila-platform/aws-terraform-framework/issues/104)) ([2b48b34](https://github.com/nwarila-platform/aws-terraform-framework/commit/2b48b34e65525bacb15330a79ef7eea2417d4572))
+* **variables:** environment is a closed lowercase set (dev, test, prod) ([#102](https://github.com/nwarila-platform/aws-terraform-framework/issues/102)) ([0e25eef](https://github.com/nwarila-platform/aws-terraform-framework/commit/0e25eef80fe4faf4d0e0345380bc99220b29e953))
+
 ## [2.1.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.0.0...v2.1.0) (2026-08-05)
 
 
