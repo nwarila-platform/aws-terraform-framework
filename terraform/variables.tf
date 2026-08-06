@@ -2,13 +2,19 @@
 # AWS-specific configuration and managed-capability maps.
 
 variable "environment" {
-  description = "Deployment environment tag value applied to managed AWS resources."
+  description = "Deployment environment tag value applied to managed AWS resources. Exactly one of dev, test, or prod (lowercase)."
   type        = string
   nullable    = false
 
+  # A closed, case-exact lowercase set rather than a free-form string: the value lands verbatim in
+  # the Environment tag on every managed resource and in the nwarila:management:environment
+  # provider default tag, so accepting spelling or case variants ("Dev", "PROD", "production")
+  # would fragment the estate's tag-based inventory and cost queries. Lowercase matches the pinned
+  # consumer's environment = "dev", keeping this change non-breaking. Bounding the set also
+  # subsumes the former non-empty and 256-character tag-value-length checks.
   validation {
-    condition     = length(trimspace(var.environment)) > 0 && length(var.environment) <= 256
-    error_message = "environment must not be empty and must be at most 256 characters so its framework-generated tag values fit the EC2 tag-value limit."
+    condition     = contains(["dev", "test", "prod"], var.environment)
+    error_message = "environment must be exactly one of \"dev\", \"test\", or \"prod\" (lowercase); the value is stamped verbatim onto every managed resource's Environment tag, so case and spelling variants are rejected."
   }
 }
 
@@ -150,14 +156,6 @@ variable "all_systems" {
     # this pre-created primary ENI is in a subnet with public-IP auto-assignment enabled; that
     # address is not managed by this framework.
     associate_public_ip = bool
-
-    # lifecycle doesn't allow variable declaration.
-    # ?Note: I may be able to get around this using conditional if deployments, but it will make
-    # ?      the resources.tf file super cluttered, but overall that file isn't used for much
-    # ?      so it shouldn't present a large operational challenge for long-term management.
-    # lifecycle = object({
-    #   ignore_changes = list(string)
-    # })
 
   }))
 

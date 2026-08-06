@@ -1,6 +1,7 @@
 # Copy this file to terraform.tfvars and replace every REPLACE_ME value before
 # planning or applying. Values here are placeholders, not deployable IDs.
 
+# Exactly one of dev, test, or prod (lowercase).
 environment = "dev"
 
 # Required for a real apply. The readiness gate uses SSH for both Linux and

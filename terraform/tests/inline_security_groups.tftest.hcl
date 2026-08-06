@@ -10,7 +10,7 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "TEST"
+  environment = "test"
 }
 
 # CASE 1 (renders and attaches): an interface-owned group is created, deterministically named,
@@ -124,7 +124,7 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
   assert {
     condition = alltrue([
       aws_security_group.us_east_1["inline-host-eni-0-sg"].tags["Name"] == "inline-host-eni-0-sg",
-      aws_security_group.us_east_1["inline-host-eni-0-sg"].tags["Environment"] == "TEST",
+      aws_security_group.us_east_1["inline-host-eni-0-sg"].tags["Environment"] == "test",
       aws_security_group.us_east_1["inline-host-eni-0-sg"].tags["Terraform"] == "True",
       aws_security_group.us_east_1["inline-host-eni-0-sg"].tags["Role"] == "wazuh-aio",
     ])

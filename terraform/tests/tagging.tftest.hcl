@@ -3,7 +3,7 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "TEST"
+  environment = "test"
 
   all_systems = [
     {
@@ -72,14 +72,39 @@ run "null_metadata_emits_zero_tags" {
   }
 }
 
-run "rejects_environment_tag_value_over_256_characters" {
+run "rejects_environment_outside_lowercase_set" {
   command = plan
 
   variables {
-    environment = join("", [for index in range(257) : "e"])
+    environment = "staging"
   }
 
   expect_failures = [var.environment]
+}
+
+# Case variants are rejected too: the value reaches the Environment tag verbatim, so "dev" and
+# "DEV" would otherwise be two different values in every tag-based inventory query.
+run "rejects_uppercase_environment_case_variant" {
+  command = plan
+
+  variables {
+    environment = "DEV"
+  }
+
+  expect_failures = [var.environment]
+}
+
+run "accepts_prod_environment" {
+  command = plan
+
+  variables {
+    environment = "prod"
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["tag-host"].tags["Environment"] == "prod"
+    error_message = "A supported environment value must reach the Environment tag verbatim."
+  }
 }
 
 run "full_metadata_stamps_identity_and_provenance" {
@@ -104,7 +129,7 @@ run "full_metadata_stamps_identity_and_provenance" {
   assert {
     condition = alltrue([
       output.deployment_tags["nwarila:management:managed-by"] == "terraform",
-      output.deployment_tags["nwarila:management:environment"] == "TEST",
+      output.deployment_tags["nwarila:management:environment"] == "test",
       output.deployment_tags["nwarila:provenance:commit-sha"] == "0123456789abcdef0123456789abcdef01234567",
       output.deployment_tags["nwarila:provenance:run-id"] == "1234567890",
     ])
