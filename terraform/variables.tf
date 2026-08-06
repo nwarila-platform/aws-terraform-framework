@@ -151,10 +151,9 @@ variable "all_systems" {
     )
 
     # Allocate an Elastic IP and associate it with this system's primary ENI (<hostname>-eni-0).
-    # Requires subnet_id to reference a managed_networks entry with public = true. The EIP provides
-    # a stable public IPv4 address. Independently, AWS assigns a public IPv4 address at launch when
-    # this pre-created primary ENI is in a subnet with public-IP auto-assignment enabled; that
-    # address is not managed by this framework.
+    # When true, subnet_id must be a literal subnet-<identifier>, a network_aliases key, or a
+    # managed_networks key whose entry has public = true; managed_networks entries with
+    # public = false are rejected. The EIP provides a stable public IPv4 address.
     associate_public_ip = bool
 
   }))
@@ -1465,9 +1464,9 @@ variable "managed_networks" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      system.associate_public_ip == null || system.associate_public_ip == false || (contains(keys(var.managed_networks), system.subnet_id) && var.managed_networks[system.subnet_id].public != null && var.managed_networks[system.subnet_id].public)
+      system.associate_public_ip == null || system.associate_public_ip == false || !contains(keys(var.managed_networks), system.subnet_id) || (var.managed_networks[system.subnet_id].public != null && var.managed_networks[system.subnet_id].public)
     ])
-    error_message = "associate_public_ip = true requires subnet_id to reference a managed_networks entry with public = true (explicit-ENI systems cannot use subnet auto-assign, and BYO subnets manage their own public path)."
+    error_message = "associate_public_ip = true requires subnet_id to be a literal subnet-<identifier>, a network_aliases key, or a managed_networks key whose entry has public = true; managed_networks entries with public = false are rejected."
   }
 
   # A pinned address is only checkable against its subnet when the framework owns that subnet, where
