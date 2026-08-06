@@ -617,14 +617,14 @@ run "managed_network_rejects_subnet_outside_vpc" {
   expect_failures = [var.managed_networks]
 }
 
-run "managed_network_rejects_public_ip_without_public_network" {
+run "literal_byo_subnet_plans_eip_and_association" {
   command = plan
 
   variables {
     all_systems = [
       {
         region               = "us_east_1"
-        hostname             = "bad-eip-host"
+        hostname             = "literal-byo-eip-host"
         availability_zone    = "us-east-1a"
         subnet_id            = "subnet-preexisting"
         key_name             = "preexisting-key"
@@ -641,7 +641,7 @@ run "managed_network_rejects_public_ip_without_public_network" {
         set_state      = null
 
         tags = {
-          Function = "Public IP without managed public network"
+          Function = "Public IP on a literal BYO subnet"
           Backup   = true
         }
 
@@ -659,6 +659,211 @@ run "managed_network_rejects_public_ip_without_public_network" {
         network_interfaces = [
           {
             private_ip      = "10.0.0.13"
+            security_groups = ["sg-01234567"]
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  override_resource {
+    target          = aws_eip.us_east_1
+    override_during = plan
+
+    values = {
+      id = "eipalloc-literal-byo-eip-host"
+    }
+  }
+
+  override_resource {
+    target          = aws_network_interface.us_east_1
+    override_during = plan
+
+    values = {
+      id = "eni-literal-byo-eip-host-primary"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      aws_eip.us_east_1["literal-byo-eip-host"].id == "eipalloc-literal-byo-eip-host",
+      aws_eip.us_east_1["literal-byo-eip-host"].domain == "vpc",
+      aws_eip.us_east_1["literal-byo-eip-host"].tags["Name"] == "literal-byo-eip-host",
+      aws_eip.us_east_1["literal-byo-eip-host"].tags["Environment"] == "test",
+      aws_eip.us_east_1["literal-byo-eip-host"].tags["Terraform"] == "True",
+    ])
+    error_message = "A literal BYO subnet with associate_public_ip = true must plan the hostname-keyed VPC EIP with its concrete tags."
+  }
+
+  assert {
+    condition = alltrue([
+      aws_eip_association.us_east_1["literal-byo-eip-host"].allocation_id == "eipalloc-literal-byo-eip-host",
+      aws_eip_association.us_east_1["literal-byo-eip-host"].network_interface_id == "eni-literal-byo-eip-host-primary",
+    ])
+    error_message = "A literal BYO subnet EIP association must plan against that EIP and the system's primary ENI."
+  }
+}
+
+run "network_alias_subnet_plans_eip_and_association" {
+  command = plan
+
+  variables {
+    network_aliases = {
+      "byo-public-alias" = {
+        subnet_id         = "subnet-0123456789abcdef0"
+        vpc_id            = "vpc-0123456789abcdef0"
+        subnet_cidr       = "10.0.0.0/28"
+        availability_zone = "us-east-1a"
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "alias-byo-eip-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "byo-public-alias"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = true
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Public IP on a network alias subnet"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.0.9"
+            security_groups = ["sg-01234567"]
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            tags            = {}
+          }
+        ]
+      }
+    ]
+  }
+
+  override_resource {
+    target          = aws_eip.us_east_1
+    override_during = plan
+
+    values = {
+      id = "eipalloc-alias-byo-eip-host"
+    }
+  }
+
+  override_resource {
+    target          = aws_network_interface.us_east_1
+    override_during = plan
+
+    values = {
+      id = "eni-alias-byo-eip-host-primary"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      aws_eip.us_east_1["alias-byo-eip-host"].id == "eipalloc-alias-byo-eip-host",
+      aws_eip.us_east_1["alias-byo-eip-host"].domain == "vpc",
+      aws_eip.us_east_1["alias-byo-eip-host"].tags["Name"] == "alias-byo-eip-host",
+      aws_eip.us_east_1["alias-byo-eip-host"].tags["Environment"] == "test",
+      aws_eip.us_east_1["alias-byo-eip-host"].tags["Terraform"] == "True",
+    ])
+    error_message = "A network alias subnet with associate_public_ip = true must plan the hostname-keyed VPC EIP with its concrete tags."
+  }
+
+  assert {
+    condition = alltrue([
+      aws_eip_association.us_east_1["alias-byo-eip-host"].allocation_id == "eipalloc-alias-byo-eip-host",
+      aws_eip_association.us_east_1["alias-byo-eip-host"].network_interface_id == "eni-alias-byo-eip-host-primary",
+    ])
+    error_message = "A network alias subnet EIP association must plan against that EIP and the system's primary ENI."
+  }
+}
+
+run "managed_private_network_rejects_public_ip" {
+  command = plan
+
+  variables {
+    managed_networks = {
+      "private-eip-net" = {
+        region            = "us_east_1"
+        availability_zone = "us-east-1a"
+        vpc_cidr          = "10.70.0.0/24"
+        subnet_cidr       = "10.70.0.0/28"
+        vpc_id            = null
+        public            = false
+        tags              = {}
+      }
+    }
+
+    all_systems = [
+      {
+        region               = "us_east_1"
+        hostname             = "managed-private-eip-host"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "private-eip-net"
+        key_name             = "preexisting-key"
+        iam_instance_profile = "preexisting-profile"
+        aws_kms_alias        = "preexisting"
+        ami                  = "test-linux"
+        associate_public_ip  = true
+
+        refresh        = false
+        instance_type  = "m6i.large"
+        readiness_user = null
+        readiness_gate = true
+        imds_hop_limit = 1
+        set_state      = null
+
+        tags = {
+          Function = "Rejected public IP on a managed private subnet"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.70.0.10"
             security_groups = ["sg-01234567"]
             description     = null
             interface_type  = null
