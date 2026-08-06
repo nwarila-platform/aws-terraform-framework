@@ -3,7 +3,7 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "TEST"
+  environment = "test"
 
   all_load_balancers = [
     {
@@ -121,7 +121,7 @@ run "load_balancers_bucket_by_region" {
   }
 
   assert {
-    condition     = local.elastic_load_balancers.us_east_1.west_alb.tags.Environment == "TEST"
+    condition     = local.elastic_load_balancers.us_east_1.west_alb.tags.Environment == "test"
     error_message = "west_alb did not inherit the environment tag."
   }
 

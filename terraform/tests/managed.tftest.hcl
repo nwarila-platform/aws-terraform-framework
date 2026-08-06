@@ -13,7 +13,7 @@ mock_provider "aws" {
 # variables. It is the mechanical guarantee that this explicit pre-created-group path creates no
 # additional resources and preserves existing resource keys.
 variables {
-  environment = "TEST"
+  environment = "test"
 
   all_systems = [
     {

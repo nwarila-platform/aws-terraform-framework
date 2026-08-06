@@ -9,7 +9,7 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "TEST"
+  environment = "test"
 
   all_systems = [
     {

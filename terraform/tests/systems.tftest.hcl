@@ -3,7 +3,7 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "TEST"
+  environment = "test"
 
   all_systems = [
     {
@@ -724,7 +724,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-linux-west"].region == "us_east_1",
       output.aws_instances["inv-linux-west"].function == "Inventory Linux",
       output.aws_instances["inv-linux-west"].os_family == "linux",
-      output.aws_instances["inv-linux-west"].environment == "TEST",
+      output.aws_instances["inv-linux-west"].environment == "test",
     ])
     error_message = "Linux inventory entries should expose plan-known target facts."
   }
@@ -743,7 +743,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-win-east"].region == "us_east_1",
       output.aws_instances["inv-win-east"].function == "Inventory Windows",
       output.aws_instances["inv-win-east"].os_family == "windows",
-      output.aws_instances["inv-win-east"].environment == "TEST",
+      output.aws_instances["inv-win-east"].environment == "test",
     ])
     error_message = "Windows inventory entries should expose plan-known target facts."
   }
@@ -762,7 +762,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
       output.aws_instances["inv-refresh"].region == "us_east_1",
       output.aws_instances["inv-refresh"].function == "Inventory Refresh",
       output.aws_instances["inv-refresh"].os_family == "linux",
-      output.aws_instances["inv-refresh"].environment == "TEST",
+      output.aws_instances["inv-refresh"].environment == "test",
     ])
     error_message = "Refresh inventory entries should expose plan-known target facts."
   }
