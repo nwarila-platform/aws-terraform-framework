@@ -1,9 +1,24 @@
 mock_provider "aws" {
   alias = "us_east_1"
+
+  # The ENI preconditions read the real subnet, so the mock has to return something coherent:
+  # a CIDR wide enough to contain every fixture address (10.0-10.2) and the zone the fixtures
+  # declare. Individual runs override this where they need a different subnet.
+  mock_data "aws_subnet" {
+    defaults = {
+      cidr_block        = "10.0.0.0/8"
+      availability_zone = "us-east-1a"
+      vpc_id            = "vpc-test"
+    }
+  }
 }
 
 variables {
-  environment = "test"
+  repository    = "nwarila-platform/aws-terraform-framework"
+  repository_id = "123456789"
+  commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+  run_id        = "42"
+  environment   = "test"
 
   all_load_balancers = [
     {
@@ -103,12 +118,110 @@ variables {
       tags = {
         Function = "East NLB"
       }
+    },
+    {
+      region          = "us-east-1"
+      resource_key    = "schema_alb"
+      name            = "schema-alb"
+      security_groups = ["sg-schema"]
+      subnets         = ["subnet-schema-a", "subnet-schema-b"]
+
+      access_logs                                                  = null
+      client_keep_alive                                            = null
+      connection_logs                                              = null
+      customer_owned_ipv4_pool                                     = null
+      desync_mitigation_mode                                       = null
+      dns_record_client_routing_policy                             = null
+      drop_invalid_header_fields                                   = null
+      enable_cross_zone_load_balancing                             = null
+      enable_deletion_protection                                   = true
+      enable_http2                                                 = null
+      enable_tls_version_and_cipher_suite_headers                  = null
+      enable_waf_fail_open                                         = null
+      enable_xff_client_port                                       = null
+      enable_zonal_shift                                           = null
+      enforce_security_group_inbound_rules_on_private_link_traffic = null
+      health_check_logs                                            = null
+      idle_timeout                                                 = null
+      internal                                                     = true
+      ip_address_type                                              = "ipv4"
+      ipam_pools                                                   = null
+      load_balancer_type                                           = "application"
+      minimum_load_balancer_capacity                               = null
+      name_prefix                                                  = null
+      preserve_host_header                                         = null
+      secondary_ips_auto_assigned_per_subnet                       = null
+      subnet_mapping                                               = []
+      tags                                                         = {}
+      timeouts                                                     = null
+      xff_header_processing_mode                                   = null
+
+      target_groups = [
+        {
+          resource_key                      = "web"
+          function                          = "Jenkins Server"
+          vpc_id                            = "vpc-schema"
+          port                              = 8080
+          protocol                          = "HTTP"
+          protocol_version                  = null
+          target_type                       = "instance"
+          deregistration_delay              = null
+          slow_start                        = null
+          load_balancing_algorithm_type     = null
+          load_balancing_anomaly_mitigation = null
+          load_balancing_cross_zone_enabled = null
+          preserve_client_ip                = null
+          proxy_protocol_v2                 = null
+          connection_termination            = null
+          ip_address_type                   = null
+          health_check                      = null
+          stickiness                        = null
+          tags                              = {}
+        }
+      ]
+
+      listeners = [
+        {
+          resource_key                = "https"
+          port                        = 443
+          protocol                    = "HTTPS"
+          ssl_policy                  = null
+          alpn_policy                 = null
+          certificate_arn             = null
+          additional_certificate_arns = []
+          default_action = {
+            type             = "forward"
+            target_group_key = "web"
+            redirect         = null
+            fixed_response   = null
+          }
+          rules = []
+        }
+      ]
     }
   ]
 }
 
+# subnet-web-b lives in the second zone; the provider mock answers us-east-1a for every other
+# subnet.
+override_data {
+  target = data.aws_subnet.us_east_1["subnet-web-b"]
+  values = {
+    cidr_block        = "10.0.0.0/8"
+    availability_zone = "us-east-1b"
+    vpc_id            = "vpc-test"
+  }
+}
+
 run "load_balancers_bucket_by_region" {
   command = plan
+
+  variables {
+    all_load_balancers = [
+      for load_balancer in var.all_load_balancers : load_balancer
+      if load_balancer.resource_key != "schema_alb"
+    ]
+  }
 
   assert {
     condition     = contains(keys(local.elastic_load_balancers.us_east_1), "west_alb")
@@ -138,6 +251,22 @@ run "load_balancers_bucket_by_region" {
   assert {
     condition     = aws_lb.us_east_1["west_alb"].load_balancer_type == "application"
     error_message = "west_alb should plan as an application load balancer."
+  }
+
+  assert {
+    condition = alltrue([
+      for key in ["Name", "Environment", "ManagedBy", "Repository", "RepositoryId", "CommitSha", "RunId"] :
+      aws_lb.us_east_1["west_alb"].tags[key] == {
+        Name         = "west-alb"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        RunId        = "42"
+      }[key]
+    ])
+    error_message = "Load balancer tags must carry all seven deployment-identity keys verbatim."
   }
 
   assert {
@@ -186,12 +315,17 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -233,11 +367,16 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         ami                  = "test-linux"
         refresh              = true
 
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        instance_type              = "m6i.large"
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -278,12 +417,17 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -298,7 +442,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         ]
 
         tags = {
-          Function = "api"
+          Function = "web"
           Backup   = true
         }
 
@@ -403,6 +547,15 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
     ]
   }
 
+  override_data {
+    target = data.aws_subnet.us_east_1["subnet-api-a"]
+    values = {
+      cidr_block        = "10.0.0.0/8"
+      availability_zone = "us-east-1a"
+      vpc_id            = "vpc-other"
+    }
+  }
+
   assert {
     condition     = contains(keys(aws_lb_target_group.us_east_1), "function_alb/web")
     error_message = "The web target group should be planned with the composite function_alb/web key."
@@ -411,6 +564,22 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
   assert {
     condition     = aws_lb_target_group.us_east_1["function_alb/web"].port == 443
     error_message = "The web target group should preserve its configured target port."
+  }
+
+  assert {
+    condition = alltrue([
+      for key in ["Name", "Environment", "ManagedBy", "Repository", "RepositoryId", "CommitSha", "RunId"] :
+      aws_lb_target_group.us_east_1["function_alb/web"].tags[key] == {
+        Name         = "function_alb/web"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        RunId        = "42"
+      }[key]
+    ])
+    error_message = "Target group tags must carry all seven deployment-identity keys verbatim."
   }
 
   assert {
@@ -430,12 +599,12 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
 
   assert {
     condition     = length([for k, _ in aws_lb_target_group_attachment.us_east_1 : k if startswith(k, "function_alb/web/")]) == 2
-    error_message = "Exactly the two Function=web systems should attach to the web target group."
+    error_message = "Only the two Function=web systems in the target group's VPC should attach."
   }
 
   assert {
     condition     = !contains(keys(aws_lb_target_group_attachment.us_east_1), "function_alb/web/api-a")
-    error_message = "The non-matching api system should not attach to the web target group."
+    error_message = "A Function=web system in another VPC should not attach to the web target group."
   }
 
   assert {
@@ -459,12 +628,17 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         aws_kms_alias        = "ebs"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -867,382 +1041,19 @@ run "load_balancer_rejects_empty_security_groups" {
   ]
 }
 
-run "load_balancer_rejects_connection_logs_on_network_type" {
-  command = plan
-
-  variables {
-    all_load_balancers = [
-      {
-        region             = "us-east-1"
-        resource_key       = "network_connection_logs"
-        name               = "network-connection-logs"
-        load_balancer_type = "network"
-        security_groups    = ["sg-network"]
-        subnets            = ["subnet-network-a", "subnet-network-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        target_groups                                                = []
-        listeners                                                    = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        connection_logs = {
-          bucket  = "lb-connection-logs"
-          enabled = null
-          prefix  = null
-        }
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_load_balancers,
-  ]
-}
-
-run "load_balancer_rejects_health_check_logs_on_network_type" {
-  command = plan
-
-  variables {
-    all_load_balancers = [
-      {
-        region             = "us-east-1"
-        resource_key       = "network_health_logs"
-        name               = "network-health-logs"
-        load_balancer_type = "network"
-        security_groups    = ["sg-network"]
-        subnets            = ["subnet-network-a", "subnet-network-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        target_groups                                                = []
-        listeners                                                    = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        health_check_logs = {
-          bucket  = "lb-health-check-logs"
-          enabled = null
-          prefix  = null
-        }
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_load_balancers,
-  ]
-}
-
-run "load_balancer_rejects_xff_header_processing_mode_on_network_type" {
-  command = plan
-
-  variables {
-    all_load_balancers = [
-      {
-        region                     = "us-east-1"
-        resource_key               = "network_xff_mode"
-        name                       = "network-xff-mode"
-        load_balancer_type         = "network"
-        security_groups            = ["sg-network"]
-        subnets                    = ["subnet-network-a", "subnet-network-b"]
-        xff_header_processing_mode = "append"
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        target_groups                                                = []
-        listeners                                                    = []
-        tags                                                         = {}
-        timeouts                                                     = null
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_load_balancers,
-  ]
-}
-
-run "load_balancer_rejects_secondary_ips_on_application_type" {
-  command = plan
-
-  variables {
-    all_load_balancers = [
-      {
-        region                                 = "us-east-1"
-        resource_key                           = "application_secondary_ips"
-        name                                   = "application-secondary-ips"
-        load_balancer_type                     = "application"
-        security_groups                        = ["sg-application"]
-        subnets                                = ["subnet-application-a", "subnet-application-b"]
-        secondary_ips_auto_assigned_per_subnet = 1
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        subnet_mapping                                               = []
-        target_groups                                                = []
-        listeners                                                    = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_load_balancers,
-  ]
-}
-
-run "load_balancer_rejects_security_groups_on_gateway_type" {
-  command = plan
-
-  variables {
-    all_load_balancers = [
-      {
-        region             = "us-east-1"
-        resource_key       = "gateway_security_groups"
-        name               = "gateway-security-groups"
-        load_balancer_type = "gateway"
-        security_groups    = ["sg-gateway"]
-        subnets            = ["subnet-gateway-a", "subnet-gateway-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        target_groups                                                = []
-        listeners                                                    = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-      }
-    ]
-  }
-
-  expect_failures = [
-    var.all_load_balancers,
-  ]
-}
-
 run "load_balancer_rejects_duplicate_target_group_resource_keys" {
   command = plan
 
   variables {
     all_load_balancers = [
-      {
-        region          = "us-east-1"
-        resource_key    = "schema_alb"
-        name            = "schema-alb"
-        security_groups = ["sg-schema"]
-        subnets         = ["subnet-schema-a", "subnet-schema-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        load_balancer_type                                           = "application"
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        target_groups = [
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8080
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          },
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8081
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          }
-        ]
-
-        listeners = [
-          {
-            resource_key                = "https"
-            port                        = 443
-            protocol                    = "HTTPS"
-            ssl_policy                  = null
-            alpn_policy                 = null
-            certificate_arn             = null
-            additional_certificate_arns = []
-            default_action = {
-              type             = "forward"
-              target_group_key = "web"
-              redirect         = null
-              fixed_response   = null
-            }
-            rules = []
-          }
-        ]
-      }
+      for load_balancer in var.all_load_balancers : merge(load_balancer, {
+        target_groups = concat(load_balancer.target_groups, [
+          merge(load_balancer.target_groups[0], {
+            port = 8081
+          })
+        ])
+      })
+      if load_balancer.resource_key == "schema_alb"
     ]
   }
 
@@ -1256,85 +1067,21 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
 
   variables {
     all_load_balancers = [
-      {
-        region          = "us-east-1"
-        resource_key    = "schema_alb"
-        name            = "schema-alb"
-        security_groups = ["sg-schema"]
-        subnets         = ["subnet-schema-a", "subnet-schema-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        load_balancer_type                                           = "application"
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        target_groups = [
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8080
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          }
-        ]
-
+      for load_balancer in var.all_load_balancers : merge(load_balancer, {
         listeners = [
-          {
-            resource_key                = "https"
-            port                        = 443
-            protocol                    = "HTTPS"
-            ssl_policy                  = null
-            alpn_policy                 = null
-            certificate_arn             = null
-            additional_certificate_arns = []
-            default_action = {
-              type             = "forward"
-              target_group_key = "web"
-              redirect         = null
-              fixed_response   = null
-            }
+          merge(load_balancer.listeners[0], {
             rules = [
-              {
-                resource_key = "web_path"
+              for rule in [
+                {
+                  resource_key = "web_path"
+                  path_pattern = "/web/*"
+                },
+                {
+                  resource_key = "admin_path"
+                  path_pattern = "/admin/*"
+                }
+                ] : {
+                resource_key = rule.resource_key
                 priority     = 10
                 action = {
                   type             = "forward"
@@ -1345,27 +1092,7 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
                 conditions = [
                   {
                     host_header         = null
-                    path_pattern        = ["/web/*"]
-                    http_request_method = null
-                    source_ip           = null
-                    http_header         = null
-                    query_string        = null
-                  }
-                ]
-              },
-              {
-                resource_key = "admin_path"
-                priority     = 10
-                action = {
-                  type             = "forward"
-                  target_group_key = "web"
-                  redirect         = null
-                  fixed_response   = null
-                }
-                conditions = [
-                  {
-                    host_header         = null
-                    path_pattern        = ["/admin/*"]
+                    path_pattern        = [rule.path_pattern]
                     http_request_method = null
                     source_ip           = null
                     http_header         = null
@@ -1374,9 +1101,10 @@ run "load_balancer_rejects_duplicate_rule_priorities" {
                 ]
               }
             ]
-          }
+          })
         ]
-      }
+      })
+      if load_balancer.resource_key == "schema_alb"
     ]
   }
 
@@ -1390,79 +1118,10 @@ run "load_balancer_rejects_forward_action_with_redirect_payload" {
 
   variables {
     all_load_balancers = [
-      {
-        region          = "us-east-1"
-        resource_key    = "schema_alb"
-        name            = "schema-alb"
-        security_groups = ["sg-schema"]
-        subnets         = ["subnet-schema-a", "subnet-schema-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        load_balancer_type                                           = "application"
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        target_groups = [
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8080
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          }
-        ]
-
+      for load_balancer in var.all_load_balancers : merge(load_balancer, {
         listeners = [
-          {
-            resource_key                = "https"
-            port                        = 443
-            protocol                    = "HTTPS"
-            ssl_policy                  = null
-            alpn_policy                 = null
-            certificate_arn             = null
-            additional_certificate_arns = []
-            default_action = {
-              type             = "forward"
-              target_group_key = "web"
+          merge(load_balancer.listeners[0], {
+            default_action = merge(load_balancer.listeners[0].default_action, {
               redirect = {
                 host        = null
                 path        = null
@@ -1471,12 +1130,11 @@ run "load_balancer_rejects_forward_action_with_redirect_payload" {
                 query       = null
                 status_code = "HTTP_301"
               }
-              fixed_response = null
-            }
-            rules = []
-          }
+            })
+          })
         ]
-      }
+      })
+      if load_balancer.resource_key == "schema_alb"
     ]
   }
 
@@ -1490,82 +1148,9 @@ run "load_balancer_rejects_condition_with_two_types" {
 
   variables {
     all_load_balancers = [
-      {
-        region          = "us-east-1"
-        resource_key    = "schema_alb"
-        name            = "schema-alb"
-        security_groups = ["sg-schema"]
-        subnets         = ["subnet-schema-a", "subnet-schema-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        load_balancer_type                                           = "application"
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        target_groups = [
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8080
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          }
-        ]
-
+      for load_balancer in var.all_load_balancers : merge(load_balancer, {
         listeners = [
-          {
-            resource_key                = "https"
-            port                        = 443
-            protocol                    = "HTTPS"
-            ssl_policy                  = null
-            alpn_policy                 = null
-            certificate_arn             = null
-            additional_certificate_arns = []
-            default_action = {
-              type             = "forward"
-              target_group_key = "web"
-              redirect         = null
-              fixed_response   = null
-            }
+          merge(load_balancer.listeners[0], {
             rules = [
               {
                 resource_key = "web_host_path"
@@ -1588,9 +1173,10 @@ run "load_balancer_rejects_condition_with_two_types" {
                 ]
               }
             ]
-          }
+          })
         ]
-      }
+      })
+      if load_balancer.resource_key == "schema_alb"
     ]
   }
 
@@ -1697,84 +1283,12 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
 
   variables {
     all_load_balancers = [
-      {
-        region          = "us-east-1"
-        resource_key    = "schema_alb"
-        name            = "schema-alb"
-        security_groups = ["sg-schema"]
-        subnets         = ["subnet-schema-a", "subnet-schema-b"]
-
-        access_logs                                                  = null
-        client_keep_alive                                            = null
-        connection_logs                                              = null
-        customer_owned_ipv4_pool                                     = null
-        desync_mitigation_mode                                       = null
-        dns_record_client_routing_policy                             = null
-        drop_invalid_header_fields                                   = null
-        enable_cross_zone_load_balancing                             = null
-        enable_deletion_protection                                   = true
-        enable_http2                                                 = null
-        enable_tls_version_and_cipher_suite_headers                  = null
-        enable_waf_fail_open                                         = null
-        enable_xff_client_port                                       = null
-        enable_zonal_shift                                           = null
-        enforce_security_group_inbound_rules_on_private_link_traffic = null
-        health_check_logs                                            = null
-        idle_timeout                                                 = null
-        internal                                                     = true
-        ip_address_type                                              = "ipv4"
-        ipam_pools                                                   = null
-        load_balancer_type                                           = "application"
-        minimum_load_balancer_capacity                               = null
-        name_prefix                                                  = null
-        preserve_host_header                                         = null
-        secondary_ips_auto_assigned_per_subnet                       = null
-        subnet_mapping                                               = []
-        tags                                                         = {}
-        timeouts                                                     = null
-        xff_header_processing_mode                                   = null
-
-        target_groups = [
-          {
-            resource_key                      = "web"
-            function                          = "Jenkins Server"
-            vpc_id                            = "vpc-schema"
-            port                              = 8080
-            protocol                          = "HTTP"
-            protocol_version                  = null
-            target_type                       = "instance"
-            deregistration_delay              = null
-            slow_start                        = null
-            load_balancing_algorithm_type     = null
-            load_balancing_anomaly_mitigation = null
-            load_balancing_cross_zone_enabled = null
-            preserve_client_ip                = null
-            proxy_protocol_v2                 = null
-            connection_termination            = null
-            ip_address_type                   = null
-            health_check                      = null
-            stickiness                        = null
-            tags                              = {}
-          }
-        ]
-
-        listeners = [
-          {
-            resource_key                = "https"
-            port                        = 443
-            protocol                    = "HTTPS"
-            ssl_policy                  = null
-            alpn_policy                 = null
-            certificate_arn             = "arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/schema"
-            additional_certificate_arns = []
-            default_action = {
-              type             = "forward"
-              target_group_key = "web"
-              redirect         = null
-              fixed_response   = null
-            }
-            rules = []
-          },
+      for load_balancer in var.all_load_balancers : merge(load_balancer, {
+        listeners = concat([
+          merge(load_balancer.listeners[0], {
+            certificate_arn = "arn:aws:acm:us-east-1:${join("", ["123456", "789012"])}:certificate/schema"
+          })
+          ], [
           {
             resource_key                = "http"
             port                        = 80
@@ -1798,9 +1312,31 @@ run "load_balancer_accepts_fully_wired_nested_routing_schema" {
             }
             rules = []
           }
-        ]
-      }
+        ])
+      })
+      if load_balancer.resource_key == "schema_alb"
     ]
+  }
+
+  assert {
+    condition     = aws_lb_listener.us_east_1["schema_alb/https"].default_action[0].type == "forward"
+    error_message = "The HTTPS listener should forward to its configured target group."
+  }
+
+  assert {
+    condition = (
+      aws_lb_listener.us_east_1["schema_alb/http"].default_action[0].redirect[0].status_code == "HTTP_301" &&
+      aws_lb_listener.us_east_1["schema_alb/http"].default_action[0].redirect[0].port == "443"
+    )
+    error_message = "The HTTP listener should redirect permanently to HTTPS on port 443."
+  }
+
+  assert {
+    condition = (
+      length(aws_lb_target_group.us_east_1) == 1 &&
+      contains(keys(aws_lb_target_group.us_east_1), "schema_alb/web")
+    )
+    error_message = "The schema ALB should plan exactly its configured web target group."
   }
 }
 

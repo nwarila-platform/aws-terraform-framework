@@ -1,7 +1,8 @@
 # Documentation
 
 Documentation for this repository follows the [Diataxis framework](https://diataxis.fr/)
-per [org ADR-0002](https://github.com/nwarila-platform/.github/blob/main/docs/decision-records/0002-adopt-diataxis-documentation-framework.md).
+per
+[org ADR-0002](https://github.com/nwarila-platform/.github/blob/main/docs/decision-records/0002-adopt-diataxis-documentation-framework.md).
 
 | Quadrant     | Path                  | Purpose                              |
 | ------------ | --------------------- | ------------------------------------ |
@@ -12,4 +13,24 @@ per [org ADR-0002](https://github.com/nwarila-platform/.github/blob/main/docs/de
 
 ## How-to guides
 
+- [Develop this module](how-to/develop-this-module.md)
 - [Manage EC2 over SSH](how-to/manage-ec2-over-ssh.md)
+
+## Explanation
+
+- [Architecture](explanation/architecture.md)
+- [Testing strategy](explanation/testing-strategy.md)
+- [Threat model](explanation/threat-model.md)
+
+## Reference
+
+- [Invariants](reference/invariants.md)
+- [Mirroring](reference/mirroring.md)
+- [Release gates](reference/release-gates.md)
+- [Runner protocol](reference/runner-protocol.md)
+- [Style guide](reference/style-guide.md)
+- [Terraform reference](reference/terraform.md) (generated)
+
+## Decisions
+
+- [ADR index](decision-records/README.md)

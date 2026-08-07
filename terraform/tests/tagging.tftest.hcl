@@ -1,9 +1,30 @@
 mock_provider "aws" {
   alias = "us_east_1"
+
+  # The ENI preconditions read the real subnet, so the mock has to return something coherent:
+  # a CIDR wide enough to contain every fixture address (10.0-10.2) and the zone the fixtures
+  # declare. Individual runs override this where they need a different subnet.
+  mock_data "aws_subnet" {
+    defaults = {
+      cidr_block        = "10.0.0.0/8"
+      availability_zone = "us-east-1a"
+      vpc_id            = "vpc-00000000000000001"
+    }
+  }
+
+  mock_data "aws_kms_alias" {
+    defaults = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
+    }
+  }
 }
 
 variables {
-  environment = "test"
+  repository    = "nwarila-platform/aws-terraform-framework"
+  repository_id = "123456789"
+  commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+  run_id        = "42"
+  environment   = "test"
 
   all_systems = [
     {
@@ -16,12 +37,15 @@ variables {
       aws_kms_alias        = "preexisting"
       ami                  = "test-linux"
 
-      refresh        = false
-      instance_type  = "m6i.large"
-      readiness_user = null
-      readiness_gate = true
-      imds_hop_limit = 1
-      set_state      = null
+      refresh                    = false
+      instance_type              = "m6i.large"
+      readiness_user             = null
+      readiness_command          = null
+      readiness_script_dir       = null
+      readiness_private_key_path = null
+      readiness_gate             = true
+      imds_hop_limit             = 1
+      set_state                  = null
 
       tags = {
         Function = "tagging test host"
@@ -39,7 +63,21 @@ variables {
         volume_size           = "100"
       }
 
-      ebs_block_devices = []
+      ebs_block_devices = [
+        {
+          resource_key = "data"
+          device_index = 0
+          volume_size  = "10"
+          iops         = null
+          snapshot_id  = null
+          skip_destroy = false
+          tags         = {}
+          throughput   = null
+          volume_type  = "gp3"
+        }
+      ]
+
+      ami_block_device_overrides = []
 
       network_interfaces = [
         {
@@ -56,20 +94,6 @@ variables {
       associate_public_ip = false
     }
   ]
-}
-
-run "null_metadata_emits_zero_tags" {
-  command = plan
-
-  assert {
-    condition     = length(output.deployment_tags) == 0
-    error_message = "deployment_tags must be empty when resource_metadata is unset (zero-diff for non-opted-in consumers)."
-  }
-
-  assert {
-    condition     = !contains(keys(aws_instance.us_east_1["tag-host"].root_block_device[0].tags), "nwarila:management:managed-by")
-    error_message = "Root volumes must carry no nwarila tags when resource_metadata is unset."
-  }
 }
 
 run "rejects_environment_outside_lowercase_set" {
@@ -111,34 +135,74 @@ run "full_metadata_stamps_identity_and_provenance" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "wsus-poc-us-east-1"
-      owner         = "platform-engineering"
-      commit_sha    = "0123456789abcdef0123456789abcdef01234567"
-      run_id        = "1234567890"
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+    run_id        = "1234567890"
   }
 
+  # Identity is written into each tag map rather than exported as a helper value, so the
+  # instance's own tags are the record. All eight keys, on the resource itself.
   assert {
-    condition     = length(output.deployment_tags) == 8
-    error_message = "Six stable keys plus commit-sha and run-id must be emitted when fully populated."
+    condition = alltrue([
+      aws_instance.us_east_1["tag-host"].tags["ManagedBy"] == "Terraform",
+      aws_instance.us_east_1["tag-host"].tags["Name"] == "tag-host",
+      aws_instance.us_east_1["tag-host"].tags["OS"] == data.aws_ami.us_east_1_selfbuilt["test-linux"].platform_details,
+      aws_instance.us_east_1["tag-host"].tags["Repository"] == "nwarila-platform/aws-terraform-framework",
+      aws_instance.us_east_1["tag-host"].tags["RepositoryId"] == "123456789",
+      aws_instance.us_east_1["tag-host"].tags["Environment"] == "test",
+      aws_instance.us_east_1["tag-host"].tags["CommitSha"] == "0123456789abcdef0123456789abcdef01234567",
+      aws_instance.us_east_1["tag-host"].tags["RunId"] == "1234567890",
+    ])
+    error_message = "Instance tags must carry all eight deployment-identity keys verbatim."
   }
 
   assert {
     condition = alltrue([
-      output.deployment_tags["nwarila:management:managed-by"] == "terraform",
-      output.deployment_tags["nwarila:management:environment"] == "test",
-      output.deployment_tags["nwarila:provenance:commit-sha"] == "0123456789abcdef0123456789abcdef01234567",
-      output.deployment_tags["nwarila:provenance:run-id"] == "1234567890",
+      for key in ["Name", "Environment", "ManagedBy", "Repository", "RepositoryId", "CommitSha", "RunId"] :
+      aws_instance.us_east_1["tag-host"].root_block_device[0].tags[key] == {
+        Name         = "tag-host"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        RunId        = "1234567890"
+      }[key]
     ])
-    error_message = "deployment_tags must expose managed-by, the var.environment value, and both provenance pointers verbatim."
+    error_message = "Root volume tags must carry all seven deployment-identity keys verbatim."
   }
 
   assert {
-    condition     = aws_instance.us_east_1["tag-host"].root_block_device[0].tags["nwarila:provenance:commit-sha"] == "0123456789abcdef0123456789abcdef01234567"
-    error_message = "Root volume tags must include the deployment identity (provider default_tags cannot reach root_block_device)."
+    condition = alltrue([
+      for key in ["Name", "Environment", "ManagedBy", "Repository", "RepositoryId", "CommitSha", "RunId"] :
+      aws_network_interface.us_east_1["tag-host-eni-0"].tags[key] == {
+        Name         = "tag-host"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        RunId        = "1234567890"
+      }[key]
+    ])
+    error_message = "Network interface tags must carry all seven deployment-identity keys verbatim."
+  }
+
+  assert {
+    condition = alltrue([
+      for key in ["Name", "Environment", "ManagedBy", "Repository", "RepositoryId", "CommitSha", "RunId"] :
+      aws_ebs_volume.us_east_1["tag-host-ebs-data"].tags[key] == {
+        Name         = "tag-host"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        RunId        = "1234567890"
+      }[key]
+    ])
+    error_message = "EBS volume tags must carry all seven deployment-identity keys verbatim."
   }
 
   assert {
@@ -147,89 +211,35 @@ run "full_metadata_stamps_identity_and_provenance" {
   }
 }
 
-run "stable_only_metadata_omits_provenance_keys" {
-  command = plan
-
-  variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "wazuh-standing-us-east-1"
-      owner         = "platform-engineering"
-      commit_sha    = null
-      run_id        = null
-    }
-  }
-
-  assert {
-    condition     = length(output.deployment_tags) == 6 && !contains(keys(output.deployment_tags), "nwarila:provenance:commit-sha")
-    error_message = "Unset commit_sha/run_id must omit the provenance keys entirely, not emit empty values."
-  }
-}
-
 run "rejects_github_sha_style_uppercase" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = "ABC123"
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    commit_sha    = "ABC123"
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.commit_sha]
 }
 
 run "rejects_non_numeric_repository_id" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "not-a-number"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "not-a-number"
   }
 
-  expect_failures = [var.resource_metadata]
-}
-
-run "rejects_metadata_tag_value_over_256_characters" {
-  command = plan
-
-  variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = join("", [for index in range(257) : "s"])
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
-  }
-
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 run "rejects_reserved_prefix_in_consumer_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
 
     all_systems = [
       {
@@ -242,12 +252,15 @@ run "rejects_reserved_prefix_in_consumer_tags" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
 
         tags = {
           Function = "reserved prefix test"
@@ -256,7 +269,7 @@ run "rejects_reserved_prefix_in_consumer_tags" {
 
         root_block_device = {
           tags = {
-            "nwarila:management:owner-override" = "me"
+            "Repository" = "me"
           }
           delete_on_termination = true
           iops                  = null
@@ -266,6 +279,8 @@ run "rejects_reserved_prefix_in_consumer_tags" {
         }
 
         ebs_block_devices = []
+
+        ami_block_device_overrides = []
 
         network_interfaces = [
           {
@@ -284,21 +299,15 @@ run "rejects_reserved_prefix_in_consumer_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.all_systems]
 }
 
 run "rejects_reserved_prefix_in_load_balancer_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
 
     all_load_balancers = [
       {
@@ -309,7 +318,7 @@ run "rejects_reserved_prefix_in_load_balancer_tags" {
         subnets         = ["subnet-reserved-a", "subnet-reserved-b"]
 
         tags = {
-          "nwarila:management:owner-override" = "me"
+          "Repository" = "me"
         }
         access_logs                                                  = null
         client_keep_alive                                            = null
@@ -345,21 +354,15 @@ run "rejects_reserved_prefix_in_load_balancer_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.all_load_balancers]
 }
 
 run "rejects_reserved_prefix_in_target_group_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
 
     all_load_balancers = [
       {
@@ -378,7 +381,7 @@ run "rejects_reserved_prefix_in_target_group_tags" {
             protocol     = "HTTP"
 
             tags = {
-              "nwarila:operations:owner-override" = "me"
+              "Repository" = "me"
             }
             protocol_version                  = null
             target_type                       = "instance"
@@ -429,5 +432,5 @@ run "rejects_reserved_prefix_in_target_group_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.all_load_balancers]
 }

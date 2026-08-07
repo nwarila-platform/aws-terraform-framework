@@ -15,7 +15,7 @@ Canonical filenames only — no numeric prefixes:
 | --- | --- |
 | `versions.tf` | `terraform { required_version, required_providers }` — exact `=` pins |
 | `backend.tf` | `terraform { backend "..." {} }` (partial config; secrets never in-repo) |
-| `providers.tf` | provider blocks (the supported AWS region uses alias `us_east_1`), `default_tags` |
+| `providers.tf` | provider blocks (the supported AWS region uses alias `us_east_1`) |
 | `variables.tf` | every `variable` block |
 | `data.tf` | every `data` block |
 | `locals.tf` | every `locals` block — the "brain": all shaping happens here |
@@ -27,6 +27,32 @@ keys on `terraform/versions.tf`. Numeric prefixes (`00-`, `10-`, …) are retire
 they disabled that gate and encoded ordering the filenames now carry semantically.
 Tests live in `terraform/tests/*.tftest.hcl`, named by subject
 (`systems`, `managed`, `tagging`, `outputs`, …).
+
+## Packer parity, and its accepted limits
+
+The goal is that a Packer author reads this Terraform without re-learning: the same region
+scaffolding, the same `provider` / `for_each` header, alphabetized properties, and the same
+98-column rule. Function-set parity is a weaker commitment, and the exceptions below are
+deliberate rather than accidental.
+
+Verified against Packer's own registry (`hcl2template/functions.go`), NOT from memory. These
+are present in Packer and carry no restriction here: `alltrue`, `anytrue`, `sum`, `startswith`,
+`endswith`, `strcontains`, `trimspace`, `try`, `can`, and the collection, encoding, filesystem,
+hash and IP-network families. `dynamic`, `validation`, and `provisioner` blocks all exist in
+Packer too.
+
+Absent from Packer and accepted here:
+
+| Construct | Sites | Why it stays |
+|---|---|---|
+| `sensitive` / `nonsensitive` | ~40 | No Packer analogue exists at all - Packer has a `sensitive` variable *attribute*, not functions. Structural to the RDS credential path. |
+| `toset` / `tolist` / `tostring` / `tonumber` | ~14 | Packer exposes a single `convert` function instead of the `to*` family. Several feed `for_each`, which requires a set. |
+| `lifecycle` / `precondition` | 5 | Packer has neither. These carry the plan-time guards, including the AMI block-device encryption check. |
+
+`one()` is also absent from Packer and is NOT used: where a value is null-or-single, carry the
+scalar in locals rather than indexing or unwrapping a list. `local.elastic_network_interfaces`
+carries both `private_ip` (scalar, for the pinned-address precondition) and `private_ips` (list,
+for the resource attribute) for exactly this reason.
 
 ## Value-file-compatible variable surfaces
 
@@ -42,7 +68,8 @@ matching Packer variable declarations for every top-level variable it assigns.
   policy makes one fully explicit value file satisfiable by both parsers: every object
   attribute is required, and consumers express optionality with a value (`null`, `[]`,
   or `{}`), never with a type modifier. The exception, recorded in
-  [repository ADR-0002](../decision-records/repo/0002-allow-optional-for-additive-object-attributes.md),
+  [repository
+  ADR-0002](../decision-records/repo/0002-allow-optional-for-additive-object-attributes.md),
   covers only an attribute *added* to an object type that pinned consumers already
   populate, where requiring it would break their value files: it takes bare
   `optional(T)` with no second argument, so Terraform supplies a typed `null` when an
@@ -76,14 +103,21 @@ matching Packer variable declarations for every top-level variable it assigns.
   are static meta-arguments; adding a region requires provider, data, local,
   resource, output, and test changes. Global resources (IAM) remain single
   un-aliased blocks.
-- Attribute access on shaped locals uses bracket notation
-  (`each.value["name"]`), matching the Proxmox frameworks.
+- Attribute access on shaped locals uses dot notation (`each.value.name`); brackets are
+  reserved for dynamic map lookups.
 - Resource blocks consume locals, not `var.*` directly (except trivially scalar
   wiring); `locals.tf` is the only place shaping logic lives.
-- Every taggable resource merges consumer tags under the non-overwritable
-  framework tags (`Name`, `Environment`, `Terraform`) and inherits the
-  `nwarila:*` identity set via provider `default_tags` (root volumes get the
-  explicit merge `default_tags` cannot deliver).
+- Every taggable resource merges consumer tags under a non-overwritable PascalCase
+  framework set (`Name`, `Environment`, `ManagedBy`, `Repository`, `RepositoryId`,
+  `CommitSha`, `RunId`), composed in `locals.tf`. There is no provider `default_tags`:
+  every tag map is built explicitly, which is also the only way to reach EC2 root
+  volumes.
+- PascalCase holds without exception because AWS recognises `Name` only in that exact
+  casing — it is what the console shows as a resource's display name — so PascalCase is
+  the one convention needing no carve-out. AWS tag keys are case-sensitive, so
+  `Environment` and `environment` would be two separate tags; that is why the
+  reserved-key validation rejects a consumer tag map setting any casing of a
+  framework-owned key rather than only the exact spelling.
 
 ## Comments
 
@@ -93,6 +127,25 @@ matching Packer variable declarations for every top-level variable it assigns.
 - A comment states a constraint the code cannot show (why a value is forced, what
   breaks without it) — never what the next line does. The `?Note:` prefix is
   retired; write plain prose.
+
+## The 98-column rule
+
+The budget binds comments and hand-written Markdown prose. Expression lines are formatted by
+`terraform fmt` and are not rewrapped by hand, because breaking one to fit costs more clarity
+than the long line does.
+
+Four things sit outside the rule, and none of them is an oversight:
+
+- Generated files. `docs/reference/terraform.md` is written by `terraform-docs` and `CHANGELOG.md`
+  by release-please; both are regenerated, so a hand-wrap is reverted on the next run.
+- Mirrored files. `docs/decision-records/org/` and `docs/decision-records/template/` are
+  byte-identity mirrors (see [mirroring](mirroring.md)). Rewrapping them is drift and fails the
+  drift-gate detector.
+- Markdown tables and fenced code blocks, which cannot be wrapped without changing what they mean,
+  and link URLs, which are single unbreakable atoms. Break the line before the link rather than
+  splitting its text.
+- Attribute lines whose provider-defined name alone exhausts the budget, as with
+  `aws_lb.enforce_security_group_inbound_rules_on_private_link_traffic`.
 
 ## Validation and testing
 
