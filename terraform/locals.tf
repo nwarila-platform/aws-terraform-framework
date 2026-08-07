@@ -100,19 +100,19 @@ locals {
 
   # Deployment identity tags. Applied to every taggable AWS resource through provider default_tags
   # (providers.tf) and merged explicitly into EC2 root_block_device tags below, which
-  # provider default_tags cannot reach. Null resource_metadata (the default) emits zero tags so
+  # provider default_tags cannot reach. A null identity (the default) emits zero tags so
   # consumers that have not opted in keep byte-identical plans.
-  deployment_tags = var.resource_metadata == null ? {} : merge(
+  deployment_tags = var.repository_id == null ? {} : merge(
     {
       "nwarila:management:managed-by"    = "terraform"
-      "nwarila:management:repository"    = var.resource_metadata.repository
-      "nwarila:management:repository-id" = var.resource_metadata.repository_id
-      "nwarila:management:stack"         = var.resource_metadata.stack
+      "nwarila:management:repository"    = var.repository
+      "nwarila:management:repository-id" = var.repository_id
+      "nwarila:management:stack"         = var.stack
       "nwarila:management:environment"   = var.environment
-      "nwarila:operations:owner"         = var.resource_metadata.owner
+      "nwarila:operations:owner"         = var.owner
     },
-    var.resource_metadata.commit_sha == null ? {} : { "nwarila:provenance:commit-sha" = var.resource_metadata.commit_sha },
-    var.resource_metadata.run_id == null ? {} : { "nwarila:provenance:run-id" = var.resource_metadata.run_id },
+    var.commit_sha == null ? {} : { "nwarila:provenance:commit-sha" = var.commit_sha },
+    var.run_id == null ? {} : { "nwarila:provenance:run-id" = var.run_id },
   )
 
   # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
