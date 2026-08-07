@@ -68,30 +68,26 @@ commit and workflow run. Actor identity and timestamps deliberately stay OUT
 of tags (plaintext PII, churn); they live in the workflow-run record that
 `run-id` points to.
 
-Deploy workflows export `TF_VAR_resource_metadata` identically for plan and
-apply. Capture the checked-out commit, not `github.sha` (which can be a
-synthetic merge commit):
+Deploy workflows pass the identity as INDIVIDUAL `-var` flags on every plan,
+apply, and destroy — the highest-precedence variable source, so a consumer
+tfvars cannot override who a deployment says it is. Capture the checked-out
+commit, not `github.sha` (which can be a synthetic merge commit):
 
 ```yaml
-- name: Capture deployment identity
+- name: Terraform apply
   shell: bash
   env:
-    GH_REPOSITORY: ${{ github.repository }}
-    GH_REPOSITORY_ID: ${{ github.repository_id }}
-    GH_RUN_ID: ${{ github.run_id }}
     STACK: ${{ vars.TERRAFORM_STACK }}
     OWNER_TEAM: ${{ vars.OWNER_TEAM }}
   run: |
-    commit_sha="$(git rev-parse HEAD)"
-    printf 'TF_VAR_resource_metadata=%s\n' "$(jq -cn \
-      --arg repository "$GH_REPOSITORY" \
-      --arg repository_id "$GH_REPOSITORY_ID" \
-      --arg stack "$STACK" \
-      --arg owner "$OWNER_TEAM" \
-      --arg commit_sha "$commit_sha" \
-      --arg run_id "$GH_RUN_ID" \
-      '{repository: $repository, repository_id: $repository_id, stack: $stack,
-        owner: $owner, commit_sha: $commit_sha, run_id: $run_id}')" >> "$GITHUB_ENV"
+    terraform apply -input=false -auto-approve \
+      -var "environment=test" \
+      -var "repository=${GITHUB_REPOSITORY}" \
+      -var "repository_id=${GITHUB_REPOSITORY_ID}" \
+      -var "stack=${STACK}" \
+      -var "owner=${OWNER_TEAM}" \
+      -var "commit_sha=$(git rev-parse HEAD)" \
+      -var "run_id=${GITHUB_RUN_ID}"
 ```
 
 Resulting tag keys: `nwarila:management:managed-by` / `repository` /
@@ -101,7 +97,7 @@ Resulting tag keys: `nwarila:management:managed-by` / `repository` /
 reserved; consumer tag maps may not use it (validated). Because `commit-sha`
 and `run-id` change per deployment, standing estates see two in-place tag
 updates per deploy; ephemeral deploy-and-destroy stacks see none. Leaving
-`resource_metadata` unset emits zero tags and keeps plans byte-identical -
+The identity unset emits zero tags and keeps plans byte-identical -
 native Terraform tests verify set-completeness on resources that carry the
 `managed-by` marker.
 

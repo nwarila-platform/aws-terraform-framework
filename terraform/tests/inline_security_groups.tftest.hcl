@@ -20,14 +20,10 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
   command = apply
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "inline-sg-us-east-1"
-      owner         = "platform-engineering"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "inline-sg-us-east-1"
+    owner         = "platform-engineering"
 
 
     all_systems = [
@@ -1346,14 +1342,10 @@ run "inline_group_tags_reject_the_reserved_namespace" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "s"
+    owner         = "o"
 
     all_systems = [
       {
@@ -1409,14 +1401,13 @@ run "inline_group_tags_reject_the_reserved_namespace" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 run "inline_group_tags_reject_the_reserved_namespace_with_null_metadata" {
   command = plan
 
   variables {
-    resource_metadata = null
 
     all_systems = [
       {
@@ -1471,7 +1462,7 @@ run "inline_group_tags_reject_the_reserved_namespace_with_null_metadata" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 # Positive control for the rule above: the CIDR-prefix ban is ingress-only, so an inline group may
