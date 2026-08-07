@@ -34,6 +34,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -132,6 +133,7 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -227,6 +229,7 @@ run "literal_byo_subnet_plans_eip_and_association" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

@@ -39,6 +39,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -90,6 +91,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -150,6 +152,7 @@ variables {
 
       refresh                    = true
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -278,6 +281,7 @@ run "override_rejects_standalone_volume_device_collision" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -361,6 +365,7 @@ run "override_rejects_duplicate_device_names" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

@@ -30,6 +30,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -124,6 +125,7 @@ run "front_insert_preserves_existing_rule_keys" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -225,6 +227,7 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -523,6 +526,7 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

@@ -317,6 +317,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -367,7 +368,9 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         ami                  = "test-linux"
         refresh              = true
 
-        instance_type              = "m6i.large"
+        instance_type = "m6i.large"
+
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -419,6 +422,7 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -630,6 +634,7 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

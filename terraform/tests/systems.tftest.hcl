@@ -34,6 +34,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -85,6 +86,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -136,7 +138,9 @@ variables {
       ami                  = "test-linux"
       refresh              = true
 
-      instance_type              = "m6i.large"
+      instance_type = "m6i.large"
+
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -190,6 +194,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -328,6 +333,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -380,6 +386,7 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -589,7 +596,9 @@ run "instance_state_includes_refresh_instances_after_readiness" {
         refresh              = true
         set_state            = "stopped"
 
-        instance_type              = "m6i.large"
+        instance_type = "m6i.large"
+
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -665,6 +674,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -717,6 +727,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -768,7 +779,9 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         ami                  = "test-linux"
         refresh              = true
 
-        instance_type              = "m6i.large"
+        instance_type = "m6i.large"
+
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -935,6 +948,7 @@ run "refresh_serial_baseline" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -980,6 +994,7 @@ run "refresh_serial_baseline" {
         ami                        = "test-linux"
         refresh                    = true
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1036,6 +1051,7 @@ run "refresh_serial_replaces_only_refresh_instances" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1081,6 +1097,7 @@ run "refresh_serial_replaces_only_refresh_instances" {
         ami                        = "test-linux"
         refresh                    = true
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1152,6 +1169,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1237,7 +1255,9 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ami                  = "test-linux"
         refresh              = true
 
-        instance_type              = "m6i.large"
+        instance_type = "m6i.large"
+
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1302,6 +1322,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1366,6 +1387,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1430,6 +1452,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1695,6 +1718,7 @@ run "systems_reject_more_than_23_ebs_block_devices" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1772,6 +1796,7 @@ run "systems_reject_duplicate_ebs_device_indexes" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1860,6 +1885,7 @@ run "systems_reject_duplicate_hostnames" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1912,6 +1938,7 @@ run "systems_reject_duplicate_hostnames" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1977,6 +2004,7 @@ run "systems_reject_regions_outside_aws_config" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2072,6 +2100,7 @@ run "systems_reject_invalid_ami_identifiers" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2138,6 +2167,7 @@ run "systems_reject_invalid_set_state" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2215,6 +2245,7 @@ run "systems_accept_windows_server_2025_base_ami" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2281,6 +2312,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2333,6 +2365,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2385,6 +2418,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2532,6 +2566,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2584,6 +2619,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2754,6 +2790,7 @@ run "systems_reject_windows_hostnames_over_15_characters" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2826,6 +2863,7 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2898,6 +2936,7 @@ run "systems_reject_all_numeric_windows_hostnames" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -2970,6 +3009,7 @@ run "systems_accept_valid_windows_hostnames" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3043,6 +3083,7 @@ run "systems_default_linux_readiness_script_dir" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3120,6 +3161,7 @@ run "systems_override_linux_readiness_script_dir" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = "/opt/terraform"
@@ -3197,6 +3239,7 @@ run "systems_reject_relative_readiness_script_dir" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = "opt/terraform"
@@ -3268,6 +3311,7 @@ run "systems_reject_trailing_slash_readiness_script_dir" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = "/opt/terraform/"
@@ -3339,6 +3383,7 @@ run "readiness_gate_allows_a_null_private_key_path" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3414,6 +3459,7 @@ run "readiness_gate_rejects_a_missing_private_key_file" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3488,11 +3534,12 @@ run "readiness_targets_thread_per_system_readiness_user" {
         readiness_script_dir       = null
         readiness_private_key_path = null
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh         = false
+        instance_type   = "m6i.large"
+        connection_type = null
+        readiness_gate  = true
+        imds_hop_limit  = 1
+        set_state       = null
 
         tags = {
           Function = "Linux readiness override"
@@ -3538,6 +3585,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3592,11 +3640,12 @@ run "readiness_targets_thread_per_system_readiness_user" {
         readiness_script_dir       = null
         readiness_private_key_path = null
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_gate = true
-        imds_hop_limit = 1
-        set_state      = null
+        refresh         = false
+        instance_type   = "m6i.large"
+        connection_type = null
+        readiness_gate  = true
+        imds_hop_limit  = 1
+        set_state       = null
 
         tags = {
           Function = "Windows readiness override"
@@ -3642,6 +3691,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3767,6 +3817,7 @@ run "systems_render_readiness_user_data_per_os" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3819,6 +3870,7 @@ run "systems_render_readiness_user_data_per_os" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -3954,6 +4006,7 @@ run "systems_reject_kms_alias_prefix" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4019,6 +4072,7 @@ run "systems_reject_empty_network_interface_security_groups" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4084,6 +4138,7 @@ run "systems_reject_empty_network_interfaces" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4648,6 +4703,7 @@ run "readiness_gate_optout_creates_no_gate" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4702,6 +4758,7 @@ run "readiness_gate_optout_creates_no_gate" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4770,6 +4827,7 @@ run "all_systems_rejects_null_root_block_device" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4820,6 +4878,7 @@ run "all_systems_rejects_null_instance_type" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = null
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4917,6 +4976,7 @@ run "all_systems_threads_imds_hop_limit_two" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -4963,6 +5023,7 @@ run "all_systems_threads_imds_hop_limit_two" {
         ami                        = "test-linux"
         refresh                    = true
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5038,6 +5099,7 @@ run "all_systems_rejects_imds_hop_limit_zero" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5095,6 +5157,7 @@ run "all_systems_rejects_imds_hop_limit_three" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5152,6 +5215,7 @@ run "all_systems_rejects_null_imds_hop_limit" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5216,6 +5280,7 @@ run "network_interface_rejects_availability_zone_mismatching_its_subnet" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5281,6 +5346,7 @@ run "network_interface_rejects_aws_reserved_private_ip" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5346,6 +5412,7 @@ run "network_interface_rejects_private_ip_outside_its_subnet" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5411,6 +5478,7 @@ run "all_systems_rejects_duplicate_private_ip_on_one_system" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5477,6 +5545,7 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5523,6 +5592,7 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5580,6 +5650,7 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5626,6 +5697,7 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -5691,6 +5763,7 @@ run "all_systems_allows_auto_assigned_private_ip_in_a_preexisting_subnet" {
         ami                        = "test-linux"
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

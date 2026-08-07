@@ -90,6 +90,7 @@ run "uncovered_ami_mapping_fails_the_instance_precondition" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -156,6 +157,7 @@ run "covering_every_mapping_satisfies_the_precondition" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -232,6 +234,7 @@ run "refresh_instances_are_guarded_on_the_same_terms" {
 
         refresh                    = true
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

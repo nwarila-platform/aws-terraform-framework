@@ -183,6 +183,31 @@ Prefer `windows_server_2025_base` for new deployments; Windows Server 2022 mains
 ends on 2026-10-13. The public Windows AMI owner is hardcoded to `amazon` and is not a consumer
 input. Mirror those images into another account only by changing the module.
 
+## Choosing a transport
+
+`connection_type` selects how the readiness gate reaches a system, and which bootstrap
+`user_data` renders to match. Null takes `ssh`, which is the default for every platform.
+
+`winrm` is Windows-only and exists for images that cannot install the OpenSSH
+Feature-on-Demand. Every stock Windows AMI needs Windows Update egress to install it, so in an
+egress-restricted network the SSH gate cannot connect at all. WS-Management is in-box, so it
+works there.
+
+Choosing `winrm` changes three things:
+
+- `user_data` configures a WinRM HTTPS listener on 5986 bound to a certificate the instance
+  generates for itself, removes the HTTP listener, and disables the stock WinRM firewall group.
+  5985 is never opened: Terraform's WinRM client authenticates with NTLM but does not seal
+  messages, so an unencrypted listener would be refused by the service anyway.
+- `get_password_data` turns on, because WinRM authenticates as Administrator with the launch
+  password. The gate decrypts it in flight with `readiness_private_key_path`; only the encrypted
+  blob reaches Terraform state.
+- The gate connects with `https`, `insecure` and `use_ntlm` set. `insecure` is required because
+  the certificate is self-signed and no client can verify it.
+
+Setting `winrm` on a Linux system fails at plan time. The operating system comes from the AMI
+lookup, so the guard is a precondition on the instance rather than a variable validation.
+
 This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
 belongs in the Ansible job.

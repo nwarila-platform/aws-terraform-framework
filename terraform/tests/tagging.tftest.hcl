@@ -39,6 +39,7 @@ variables {
 
       refresh                    = false
       instance_type              = "m6i.large"
+      connection_type            = null
       readiness_user             = null
       readiness_command          = null
       readiness_script_dir       = null
@@ -254,6 +255,7 @@ run "rejects_reserved_prefix_in_consumer_tags" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

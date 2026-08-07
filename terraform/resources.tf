@@ -695,7 +695,7 @@ resource "aws_instance" "us_east_1" {
   # Define the Elastic Compute Cloud Instance Properties
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   availability_zone           = each.value.availability_zone
-  get_password_data           = false
+  get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
   key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
@@ -797,7 +797,7 @@ resource "aws_instance" "us_east_1_refresh" {
   # Define the Elastic Compute Cloud Instance Properties
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
   availability_zone           = each.value.availability_zone
-  get_password_data           = false
+  get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
   key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
@@ -927,6 +927,17 @@ resource "terraform_data" "readiness_gate" {
 
   lifecycle {
     precondition {
+      condition = each.value.connection_type != "winrm" || each.value.target_platform == "windows"
+      error_message = format(
+        join(" ", [
+          "System %s sets connection_type = \"winrm\", but its AMI resolves to a non-Windows",
+          "platform. WinRM is Windows-only; use \"ssh\" or null on Linux systems.",
+        ]),
+        each.key,
+      )
+    }
+
+    precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."
     }
@@ -939,11 +950,16 @@ resource "terraform_data" "readiness_gate" {
 
     connection {
       host            = each.value.private_ip
-      private_key     = each.value.private_key_path == null ? null : file(each.value.private_key_path)
+      https           = each.value.use_winrm
+      insecure        = each.value.use_winrm
+      password        = each.value.password
+      port            = each.value.use_winrm ? each.value.winrm_port : null
+      private_key     = each.value.use_winrm || each.value.private_key_path == null ? null : file(each.value.private_key_path)
       script_path     = each.value.script_path
       target_platform = each.value.target_platform
       timeout         = "10m"
-      type            = "ssh"
+      type            = each.value.use_winrm ? "winrm" : "ssh"
+      use_ntlm        = each.value.use_winrm
       user            = each.value.readiness_user
     }
   }

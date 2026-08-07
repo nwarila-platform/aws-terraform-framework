@@ -43,6 +43,7 @@ run "inline_group_is_created_named_tagged_and_auto_attached" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -205,6 +206,7 @@ run "interface_group_alone_satisfies_the_empty_list_assert" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -274,6 +276,7 @@ run "multiple_interfaces_get_distinct_groups_rules_and_attachments" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -410,6 +413,7 @@ run "nic_with_no_group_at_all_is_still_rejected" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -474,6 +478,7 @@ run "interface_group_does_not_cover_another_interface" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -546,6 +551,7 @@ run "inline_group_rejects_world_open_ipv4_ingress" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -620,6 +626,7 @@ run "inline_group_rejects_zero_padded_world_open_ipv4_ingress" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -694,6 +701,7 @@ run "inline_group_rejects_noncanonical_world_open_ipv4_ingress" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -768,6 +776,7 @@ run "inline_group_rejects_whitespace_ipv4_ingress_prefix" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -842,6 +851,7 @@ run "inline_group_rejects_hex_ipv4_ingress_prefix" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -916,6 +926,7 @@ run "inline_group_rejects_all_protocol_with_ports" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -992,6 +1003,7 @@ run "inline_group_tags_reject_the_reserved_namespace" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1061,6 +1073,7 @@ run "inline_group_allows_world_open_egress" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1144,6 +1157,7 @@ run "inline_group_rejects_an_sg_prefixed_hostname" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1212,6 +1226,7 @@ run "inline_group_rejects_a_hostname_over_the_246_character_budget" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1278,6 +1293,7 @@ run "naming_an_inline_group_in_a_security_groups_list_is_rejected" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1342,6 +1358,7 @@ run "naming_an_inline_group_with_different_case_is_rejected" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1405,6 +1422,7 @@ run "inline_group_rejects_a_null_rule_collection" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1471,6 +1489,7 @@ run "inline_group_rejects_an_uppercase_sg_prefixed_hostname" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1537,6 +1556,7 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1590,6 +1610,7 @@ run "inline_group_names_differing_only_by_case_are_rejected" {
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1662,6 +1683,7 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null
@@ -1715,6 +1737,7 @@ run "inline_group_names_differing_only_by_case_in_different_regions_do_not_colli
 
         refresh                    = false
         instance_type              = "m6i.large"
+        connection_type            = null
         readiness_user             = null
         readiness_command          = null
         readiness_script_dir       = null

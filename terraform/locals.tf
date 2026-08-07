@@ -82,6 +82,36 @@ locals {
     </powershell>
   WINDOWS_USER_DATA
 
+  # WinRM is the transport for Windows images that cannot install the OpenSSH Feature-on-Demand:
+  # WS-Management is in-box, so it works with no Windows Update egress and no local source, which
+  # is exactly where the SSH path fails. Selected per system by connection_type = "winrm".
+  #
+  # HTTPS/5986 only, never HTTP/5985. Terraform's WinRM client does NTLM authentication but no
+  # WinRM message sealing, so AllowUnencrypted = false rejects unencrypted SOAP with a 401; TLS
+  # supplies the encryption instead. The listener therefore binds a certificate generated in-box,
+  # the default HTTP listener is removed, and the stock WinRM firewall group is disabled, leaving
+  # 5986 as the only exposed port.
+  windows_winrm_user_data = <<-WINDOWS_WINRM_USER_DATA
+    <powershell>
+    $ErrorActionPreference = "Stop"
+
+    $certificate = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
+
+    Get-ChildItem -Path WSMan:\localhost\Listener | Where-Object { $_.Keys -contains "Transport=HTTP" } | Remove-Item -Recurse -Force
+    New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $certificate.Thumbprint -Force
+
+    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $false
+    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $false
+    Set-Item -Path WSMan:\localhost\Service\Auth\Negotiate -Value $true
+
+    Disable-NetFirewallRule -DisplayGroup "Windows Remote Management"
+    New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow
+
+    Set-Service -Name WinRM -StartupType Automatic
+    Restart-Service -Name WinRM
+    </powershell>
+  WINDOWS_WINRM_USER_DATA
+
   # sshd.service on RHEL-family images, ssh.service on Debian-family ones.
   linux_ssh_user_data = <<-LINUX_USER_DATA
     #cloud-config
@@ -110,6 +140,7 @@ locals {
 
 # Dynamically Configured LOCALS
 locals {
+
   #region ------ [ EC2 Key Pairs ] ------------------------------------------------------------- #
 
   # Every referenced key pair is pre-existing: this framework consumes key pairs, it never
@@ -443,9 +474,26 @@ locals {
         refresh                    = system.refresh
         region                     = region
         set_state                  = system.set_state
+        # Null selects SSH, the default transport. WinRM is only meaningful on Windows; a Linux
+        # system asking for it is rejected by a precondition on the instance, because the OS is
+        # data-resolved and a variable validation cannot see it.
+        connection_type = coalesce(system.connection_type, "ssh")
+
+        # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
+        # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
+        # password to become available, and the SSH path has no use for it.
+        get_password_data = (
+          local.amazon_machine_images[system.ami][region].platform == "windows" &&
+          coalesce(system.connection_type, "ssh") == "winrm"
+        )
+
         user_data = trimspace(
           local.amazon_machine_images[system.ami][region].platform == "windows"
-          ? local.windows_ssh_user_data
+          ? (
+            coalesce(system.connection_type, "ssh") == "winrm"
+            ? local.windows_winrm_user_data
+            : local.windows_ssh_user_data
+          )
           : local.linux_ssh_user_data
         )
 
@@ -571,6 +619,21 @@ locals {
           ))
         )
         private_key_path = local.systems_by_hostname[hostname].readiness_private_key_path
+
+        # WinRM reaches 5986 over TLS with a certificate the instance generated for itself, so the
+        # client cannot verify it and insecure has to be true. NTLM carries the authentication.
+        connection_type = local.systems_by_hostname[hostname].connection_type
+        use_winrm       = local.systems_by_hostname[hostname].connection_type == "winrm"
+        winrm_port      = 5986
+
+        # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
+        # gate already requires. Only the ciphertext ever reaches state.
+        password = (
+          local.systems_by_hostname[hostname].connection_type == "winrm" &&
+          local.systems_by_hostname[hostname].readiness_private_key_path != null
+          ? rsadecrypt(instance.password_data, file(local.systems_by_hostname[hostname].readiness_private_key_path))
+          : null
+        )
       }
       if local.systems_by_hostname[hostname].readiness_gate &&
       local.systems_by_hostname[hostname].region == region

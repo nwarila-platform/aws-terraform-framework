@@ -77,6 +77,12 @@ variable "all_systems" {
     # Opt-out: still mandatory in the object type, because optional() is banned
     # (ADR repo/0002). Set null, [] or {} to decline one.
     instance_type = string
+    # Transport the readiness gate uses, and the bootstrap user_data rendered to match. Null
+    # selects "ssh". "winrm" is Windows-only and exists for images that cannot install the
+    # OpenSSH Feature-on-Demand, which is every stock Windows AMI with no Windows Update egress:
+    # WS-Management is in-box, so it works where SSH cannot be installed at all. Choosing it also
+    # turns on get_password_data, because WinRM authenticates with the launch password.
+    connection_type = string
     # SSH login user for the readiness gate. Null selects the OS default: ec2-user on Linux,
     # Administrator on Windows. Override for images with a different default user (for example,
     # ubuntu, rocky, or admin).
@@ -207,6 +213,18 @@ variable "all_systems" {
   # An omitted attribute is already rejected by the type checker, so this only fires on an
   # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
   # null there silently produces zero volumes instead of failing.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.connection_type == null || contains(["ssh", "winrm"], system.connection_type)
+    ])
+    error_message = join(" ", [
+      "Each all_systems connection_type must be \"ssh\", \"winrm\", or null to take the SSH",
+      "default. WinRM is Windows-only; a Linux system asking for it is rejected at plan time,",
+      "because the operating system is data-resolved and not visible to this validation.",
+    ])
+  }
+
   validation {
     condition = alltrue([
       for system in var.all_systems :
