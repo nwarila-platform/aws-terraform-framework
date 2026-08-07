@@ -63,12 +63,12 @@ run "null_metadata_emits_zero_tags" {
 
   assert {
     condition     = length(output.deployment_tags) == 0
-    error_message = "deployment_tags must be empty when resource_metadata is unset (zero-diff for non-opted-in consumers)."
+    error_message = "deployment_tags must be empty when the deployment identity is unset (zero-diff for non-opted-in consumers)."
   }
 
   assert {
     condition     = !contains(keys(aws_instance.us_east_1["tag-host"].root_block_device[0].tags), "nwarila:management:managed-by")
-    error_message = "Root volumes must carry no nwarila tags when resource_metadata is unset."
+    error_message = "Root volumes must carry no nwarila tags when the deployment identity is unset."
   }
 }
 
@@ -111,14 +111,12 @@ run "full_metadata_stamps_identity_and_provenance" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "wsus-poc-us-east-1"
-      owner         = "platform-engineering"
-      commit_sha    = "0123456789abcdef0123456789abcdef01234567"
-      run_id        = "1234567890"
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "wsus-poc-us-east-1"
+    owner         = "platform-engineering"
+    commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+    run_id        = "1234567890"
   }
 
   assert {
@@ -151,14 +149,10 @@ run "stable_only_metadata_omits_provenance_keys" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "wazuh-standing-us-east-1"
-      owner         = "platform-engineering"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "wazuh-standing-us-east-1"
+    owner         = "platform-engineering"
   }
 
   assert {
@@ -171,65 +165,50 @@ run "rejects_github_sha_style_uppercase" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = "ABC123"
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "s"
+    owner         = "o"
+    commit_sha    = "ABC123"
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.commit_sha]
 }
 
 run "rejects_non_numeric_repository_id" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "not-a-number"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "not-a-number"
+    stack         = "s"
+    owner         = "o"
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 run "rejects_metadata_tag_value_over_256_characters" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = join("", [for index in range(257) : "s"])
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = join("", [for index in range(257) : "s"])
+    owner         = "o"
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.stack]
 }
 
 run "rejects_reserved_prefix_in_consumer_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "s"
+    owner         = "o"
 
     all_systems = [
       {
@@ -284,21 +263,17 @@ run "rejects_reserved_prefix_in_consumer_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 run "rejects_reserved_prefix_in_load_balancer_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "s"
+    owner         = "o"
 
     all_load_balancers = [
       {
@@ -345,21 +320,17 @@ run "rejects_reserved_prefix_in_load_balancer_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
 }
 
 run "rejects_reserved_prefix_in_target_group_tags" {
   command = plan
 
   variables {
-    resource_metadata = {
-      repository    = "nwarila-platform/aws-terraform-framework"
-      repository_id = "123456789"
-      stack         = "s"
-      owner         = "o"
-      commit_sha    = null
-      run_id        = null
-    }
+    repository    = "nwarila-platform/aws-terraform-framework"
+    repository_id = "123456789"
+    stack         = "s"
+    owner         = "o"
 
     all_load_balancers = [
       {
@@ -429,5 +400,16 @@ run "rejects_reserved_prefix_in_target_group_tags" {
     ]
   }
 
-  expect_failures = [var.resource_metadata]
+  expect_failures = [var.repository_id]
+}
+
+# Half-identities are rejected: the four stable fields travel together.
+run "rejects_partial_identity" {
+  command = plan
+
+  variables {
+    repository = "nwarila-platform/aws-terraform-framework"
+  }
+
+  expect_failures = [var.repository_id]
 }

@@ -549,62 +549,60 @@ variable "all_databases" {
   }
 }
 
-variable "resource_metadata" {
-  description = "Deployment identity stamped onto every taggable AWS resource through provider default_tags (plus EC2 root volumes, which default_tags cannot reach). Stable fields answer who owns and manages a resource; commit_sha and run_id trace it to the exact commit and workflow run (the run record holds actors, timestamps, and approvals - those stay in deployment evidence, not tags). The deploy workflow populates this (see docs/reference/runner-protocol.md); the null default emits zero tags, so existing consumers and local plans are byte-identical until they opt in."
+# Deployment identity, passed as INDIVIDUAL -var flags by the deploy workflow (highest
+# precedence — a consumer tfvars cannot override who a deployment says it is). The four stable
+# fields declare identity together (all set, or none); commit_sha and run_id are optional
+# provenance pointers on top. All-null (the default) emits zero tags, so existing consumers
+# and local plans stay byte-identical until they opt in. See docs/reference/runner-protocol.md.
 
-  type = object({
-    repository    = string
-    repository_id = string
-    stack         = string
-    owner         = string
-    commit_sha    = string
-    run_id        = string
-  })
-
-  default  = null
-  nullable = true
+variable "repository" {
+  description = "GitHub owner/name slug of the deploying repository, stamped as nwarila:management:repository."
+  type        = string
+  default     = null
+  nullable    = true
 
   validation {
-    condition     = var.resource_metadata == null ? true : can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.resource_metadata.repository))
-    error_message = "resource_metadata.repository must be an owner/name slug (e.g. nwarila-platform/aws-terraform-framework)."
+    condition     = var.repository == null ? true : can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.repository))
+    error_message = "repository must be an owner/name slug (e.g. nwarila-platform/aws-terraform-framework)."
   }
 
   validation {
-    condition     = var.resource_metadata == null ? true : can(regex("^[0-9]+$", var.resource_metadata.repository_id))
-    error_message = "resource_metadata.repository_id must be the numeric, rename-stable GitHub repository id."
+    condition     = var.repository == null ? true : length(var.repository) <= 256
+    error_message = "repository must be at most 256 characters so its tag value fits the EC2 tag-value limit."
+  }
+}
+
+variable "repository_id" {
+  description = "Numeric, rename-stable GitHub repository id — the anchor of the deployment identity, stamped as nwarila:management:repository-id."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.repository_id == null ? true : can(regex("^[0-9]+$", var.repository_id))
+    error_message = "repository_id must be the numeric, rename-stable GitHub repository id."
   }
 
   validation {
-    condition     = var.resource_metadata == null ? true : (length(trimspace(var.resource_metadata.stack)) > 0 && length(trimspace(var.resource_metadata.owner)) > 0)
-    error_message = "resource_metadata.stack and owner must be non-empty (owner is a team, not a person)."
+    condition     = var.repository_id == null ? true : length(var.repository_id) <= 256
+    error_message = "repository_id must be at most 256 characters so its tag value fits the EC2 tag-value limit."
   }
 
+  # The four stable identity fields travel together: a deployment that names its repository
+  # but not its owner (or vice versa) is a half-identity no tag consumer can rely on.
   validation {
-    condition     = var.resource_metadata == null ? true : (var.resource_metadata.commit_sha == null ? true : can(regex("^[0-9a-f]{40}$", var.resource_metadata.commit_sha)))
-    error_message = "resource_metadata.commit_sha must be the lowercase 40-character checked-out commit SHA (git rev-parse HEAD after checkout, not github.sha)."
-  }
-
-  validation {
-    condition     = var.resource_metadata == null ? true : (var.resource_metadata.run_id == null ? true : can(regex("^[0-9]+$", var.resource_metadata.run_id)))
-    error_message = "resource_metadata.run_id must be the numeric GitHub Actions run id."
-  }
-
-  validation {
-    condition = var.resource_metadata == null ? true : alltrue([
-      length(var.resource_metadata.repository) <= 256,
-      length(var.resource_metadata.repository_id) <= 256,
-      length(var.resource_metadata.stack) <= 256,
-      length(var.resource_metadata.owner) <= 256,
-      var.resource_metadata.commit_sha == null ? true : length(var.resource_metadata.commit_sha) <= 256,
-      var.resource_metadata.run_id == null ? true : length(var.resource_metadata.run_id) <= 256,
+    condition = alltrue([
+      (var.repository == null) == (var.repository_id == null),
+      (var.stack == null) == (var.repository_id == null),
+      (var.owner == null) == (var.repository_id == null),
     ])
-    error_message = "Each resource_metadata value must be at most 256 characters so its provider-default tag value fits the EC2 tag-value limit."
+    error_message = "repository, repository_id, stack, and owner declare the deployment identity together — set all four or none."
   }
 
+  # The tautological first term binds this cross-variable invariant to its declared variable;
+  # the tag namespace remains reserved whether the identity is null or populated.
   validation {
-    # The tautological first term binds this cross-variable invariant to its declared variable;
-    # the tag namespace remains reserved whether metadata is null or populated.
-    condition = (var.resource_metadata == null || var.resource_metadata != null) && alltrue([
+    condition = (var.repository_id == null || var.repository_id != null) && alltrue([
       for tags in concat(
         [for system in var.all_systems : try(system.root_block_device.tags == null ? {} : system.root_block_device.tags, {})],
         flatten([for system in var.all_systems : system.ebs_block_devices == null ? [] : [for volume in system.ebs_block_devices : volume.tags == null ? {} : volume.tags]]),
@@ -615,7 +613,65 @@ variable "resource_metadata" {
         [for name, network in var.managed_networks : network.tags == null ? {} : network.tags],
       ) : alltrue([for key in keys(tags) : !startswith(lower(key), "nwarila:")])
     ])
-    error_message = "The nwarila: tag namespace is reserved for resource_metadata-derived tags; consumer-supplied tag maps must not use it."
+    error_message = "The nwarila: tag namespace is reserved for deployment-identity tags; consumer-supplied tag maps must not use it."
+  }
+}
+
+variable "stack" {
+  description = "Logical stack name for this deployment (e.g. aws-poc), stamped as nwarila:management:stack."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.stack == null ? true : (length(trimspace(var.stack)) > 0 && length(var.stack) <= 256)
+    error_message = "stack must be non-empty and at most 256 characters."
+  }
+}
+
+variable "owner" {
+  description = "Owning team (a team, not a person), stamped as nwarila:operations:owner."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.owner == null ? true : (length(trimspace(var.owner)) > 0 && length(var.owner) <= 256)
+    error_message = "owner must be non-empty (a team, not a person) and at most 256 characters."
+  }
+}
+
+variable "commit_sha" {
+  description = "Checked-out commit (git rev-parse HEAD after checkout, not github.sha), stamped as nwarila:provenance:commit-sha. Optional provenance on top of the stable identity."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.commit_sha == null ? true : can(regex("^[0-9a-f]{40}$", var.commit_sha))
+    error_message = "commit_sha must be the lowercase 40-character checked-out commit SHA (git rev-parse HEAD after checkout, not github.sha)."
+  }
+
+  validation {
+    condition     = var.commit_sha == null || var.repository_id != null
+    error_message = "commit_sha is provenance on top of the deployment identity — set repository/repository_id/stack/owner with it."
+  }
+}
+
+variable "run_id" {
+  description = "Numeric GitHub Actions run id, stamped as nwarila:provenance:run-id. Optional provenance on top of the stable identity."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.run_id == null ? true : can(regex("^[0-9]+$", var.run_id))
+    error_message = "run_id must be the numeric GitHub Actions run id."
+  }
+
+  validation {
+    condition     = var.run_id == null || var.repository_id != null
+    error_message = "run_id is provenance on top of the deployment identity — set repository/repository_id/stack/owner with it."
   }
 }
 
