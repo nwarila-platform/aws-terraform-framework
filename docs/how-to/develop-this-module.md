@@ -6,9 +6,11 @@ Install the same pinned tools that the `CI` workflow installs before running
 `make ci`:
 
 - Terraform 1.15.1
+- actionlint 1.7.12
+- markdownlint-cli2 0.22.1
 - TFLint 0.62.0
 - terraform-docs 0.23.0
-- Python 3.12 with `pyyaml`, `ruff`, `yamllint`, `zizmor`
+- Python 3 (standard library only, for `tools/check_docs_layout.py`)
 
 ## The development loop
 

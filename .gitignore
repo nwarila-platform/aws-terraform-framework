@@ -29,6 +29,11 @@
 !/.github/workflows/security.yaml
 !/.github/workflows/template-sync.yaml
 
+# Editor configuration
+!/.vscode/
+!/.vscode/extensions.json
+!/.vscode/settings.json
+
 # Terraform module sources and tests
 !/terraform/
 !/terraform/.terraform.lock.hcl

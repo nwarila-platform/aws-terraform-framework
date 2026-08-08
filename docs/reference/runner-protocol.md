@@ -1,167 +1,86 @@
 # Terraform Runner Protocol
 
-Runner repositories call
-`.github/workflows/reusable-terraform-deploy.yaml` to plan and (optionally)
-apply runner-owned Terraform input against a SHA-pinned framework. The runner
-owns scheduling, environment approval, backend secrets, and apply-gating. The
-framework owns the reusable deploy contract, policy, overlay validation, state
-backend wiring, and release evidence shape.
+This repository supplies a Terraform root module under `terraform/`. It does not publish a
+reusable deployment workflow, an overlay utility, or a release-evidence workflow. A deployment
+runner integrates with the framework through the Terraform CLI and owns checkout, authentication,
+deployment inputs, approval gates, and evidence collection.
 
-## Required Inputs
+The workflows under `.github/workflows/` maintain this repository. They are not deployment
+interfaces for consumers.
 
-Callers MUST pass `framework_ref` as a lowercase 40-character commit SHA for
-`NWarila/terraform-framework-template` or a derived framework repository. The
-reusable workflow rejects floating refs before checkout via
-`tools/ci/validate_framework_ref.sh`.
+## Framework Checkout
 
-`consumer_repo` identifies the repository that supplies runner-owned input
-files. When omitted, it defaults to the calling repository
-(`github.repository`). `consumer_ref` identifies the commit to read from
-`consumer_repo`; it defaults to `github.sha`.
+Production runners should check out this repository at a reviewed, immutable commit SHA. Updating
+that pin is a consumer change and should pass the consumer's normal dependency-review process.
 
-## Pin Management
+The framework has no second `framework_ref` input to validate after checkout. The checked-out
+commit is the framework version that Terraform evaluates.
 
-Runner repositories should let Renovate update `framework_ref` instead of
-hand-bumping SHAs. The shared Renovate regex manager reads comments in workflow
-YAML using the `git-refs` datasource. Put the annotation directly above the
-input it manages:
+## Backend Configuration
 
-```yaml
-with:
-  # renovate: depName=NWarila/terraform-framework-template packageName=NWarila/terraform-framework-template currentValue=main
-  framework_ref: 0123456789abcdef0123456789abcdef01234567
+The framework declares a partial S3 backend in `terraform/backend.tf`. The runner supplies the
+deployment-specific bucket, key, and region through a backend configuration file. Start from
+`terraform/backend.hcl.example`; `terraform/backend.hcl` is ignored so credentials and deployment
+state settings do not enter source control.
+
+```shell
+cp terraform/backend.hcl.example terraform/backend.hcl
+terraform -chdir=terraform init -backend-config=backend.hcl
 ```
 
-Keep the reusable workflow `uses:` SHA and the body `framework_ref` under review
-together. The exact Renovate policy comes from org ADR-0004 and the template's
-`.github/renovate.json5` custom manager.
+The runner owns AWS authentication and access to the selected state bucket. Backend encryption and
+S3-native locking are framework invariants declared in `terraform/backend.tf`.
 
-## Overlay Destinations
+## Terraform Inputs
 
-`overlay_paths` is a newline-separated list of
-`<consumer-src>=><framework-dst>` entries. Sources are relative to the
-consumer checkout. Destinations are relative to the framework checkout and are
-allowlisted to:
+Start deployment values from `terraform/terraform.tfvars.example`. The resulting
+`terraform/terraform.tfvars` is ignored and is loaded automatically by Terraform. A runner may
+instead generate another value file and pass its path with `-var-file`.
 
-- `terraform/repos/`
-- `terraform/fixtures/runtime/`
+There is no framework overlay format or allowlisted landing-zone contract. If a runner copies or
+generates files in the checkout, it owns path validation and must place the final backend and
+variable data where the Terraform CLI invocation expects them.
 
-Those are the only runner-owned landing zones. The allowlist prevents a runner
-overlay from replacing framework `.tf` files, policy, or workflow definitions.
-`tools/ci/apply_overlay.sh` rejects absolute paths, `..` traversal,
-destinations outside the allowlist, missing sources, and symlinks.
+## Deployment Identity
 
-## Variable Files
+Every plan requires these four command-line variables:
 
-`tfvars_file` accepts an optional path relative to the consumer checkout.
-`tools/ci/terraform_tfvars_args.sh` emits the ordered Terraform `-var-file`
-argument used by `terraform plan` and `terraform apply`. Absolute paths and
-`..` traversal segments are rejected.
+- `repository`: the source repository as an `owner/name` slug.
+- `repository_id`: the numeric, rename-stable GitHub repository ID.
+- `commit_sha`: the lowercase SHA of the checked-out commit.
+- `run_id`: the numeric GitHub Actions run ID, or another numeric run identifier for local use.
 
-## Deployment Identity Tags
+Pass them as command-line `-var` arguments so they outrank values from all variable files. Capture
+the checked-out commit with `git rev-parse HEAD`; on pull requests, `github.sha` may identify a
+synthetic merge commit instead.
 
-The framework stamps deployment identity onto every taggable AWS resource
-through provider `default_tags`, and merges the same keys into EC2 root
-volume tags (which `default_tags` cannot reach). Stable keys answer who owns
-and manages a resource; `commit-sha` and `run-id` trace it to the exact
-commit and workflow run. Actor identity and timestamps deliberately stay OUT
-of tags (plaintext PII, churn); they live in the workflow-run record that
-`run-id` points to.
+```shell
+identity=(
+  -var="repository=<owner>/<repo>"
+  -var="repository_id=<numeric repository id>"
+  -var="commit_sha=$(git rev-parse HEAD)"
+  -var="run_id=<numeric run id>"
+)
 
-Deploy workflows pass the identity as INDIVIDUAL `-var` flags on every plan,
-apply, and destroy — the highest-precedence variable source, so a consumer
-tfvars cannot override who a deployment says it is. Capture the checked-out
-commit, not `github.sha` (which can be a synthetic merge commit):
-
-```yaml
-- name: Terraform apply
-  shell: bash
-  env:
-    STACK: ${{ vars.TERRAFORM_STACK }}
-    OWNER_TEAM: ${{ vars.OWNER_TEAM }}
-  run: |
-    terraform apply -input=false -auto-approve \
-      -var "environment=test" \
-      -var "repository=${GITHUB_REPOSITORY}" \
-      -var "repository_id=${GITHUB_REPOSITORY_ID}" \
-      -var "stack=${STACK}" \
-      -var "owner=${OWNER_TEAM}" \
-      -var "commit_sha=$(git rev-parse HEAD)" \
-      -var "run_id=${GITHUB_RUN_ID}"
+terraform -chdir=terraform plan "${identity[@]}"
+terraform -chdir=terraform apply "${identity[@]}"
 ```
 
-Resulting tag keys: `nwarila:management:managed-by` / `repository` /
-`repository-id` / `stack` / `environment` (from `var.environment`) and
-`nwarila:operations:owner`, plus `nwarila:provenance:commit-sha` and
-`nwarila:provenance:run-id` when supplied. The `nwarila:` namespace is
-reserved; consumer tag maps may not use it (validated). Because `commit-sha`
-and `run-id` change per deployment, standing estates see two in-place tag
-updates per deploy; ephemeral deploy-and-destroy stacks see none. Leaving
-The identity unset emits zero tags and keeps plans byte-identical -
-native Terraform tests verify set-completeness on resources that carry the
-`managed-by` marker.
+The framework adds `ManagedBy`, `Repository`, `RepositoryId`, `Environment`, `CommitSha`, and
+`RunId` to every taggable resource it creates. Actor identity, timestamps, and approvals belong in
+the runner's evidence rather than in resource tags.
 
-## Backend Selection
+## Runner Responsibilities
 
-`backend_mode` is `local` or `s3`. `local` keeps PR validation
-credential-free. `s3` generates a partial S3 backend block from the caller's
-OIDC + bucket secrets and verifies remote state after apply. Trusted deploy
-callers (typically `push` to `main`) set `backend_mode: s3` and pass the
-secrets listed in the reusable workflow definition; PR callers should leave
-the default.
+A deployment runner is responsible for:
 
-## Apply Gating
+- checking out a reviewed framework commit;
+- providing AWS credentials and partial S3 backend values;
+- supplying deployment variables and the four identity arguments;
+- running Terraform initialization, planning, and any approved apply;
+- protecting apply environments and restricting which events may deploy; and
+- retaining plans, workflow records, approvals, and any other required release evidence.
 
-`apply` is `false` by default. The reusable workflow always runs `terraform
-plan` against the assembled tree. Callers should gate `apply: true` to
-specific branches or events (typically `push` to `main` plus environment
-approval). The reusable workflow does not assert who can trigger apply; the
-caller's workflow conditions and environment protection rules are the gate.
-
-## Plan Status Output
-
-The reusable deploy exposes `plan_status`:
-
-- `no-changes`: plan succeeded with no drift.
-- `has-changes`: plan succeeded and proposed changes.
-- `failed`: plan exited non-zero.
-
-Runners use this output to decide whether to upload an artifact, post a
-comment, or trigger a follow-on apply job.
-
-## Release Evidence
-
-Runner repositories call
-`.github/workflows/reusable-release-evidence.yaml` with `repo_type: runner`.
-Runner-shaped release evidence snapshots `terraform/repos/`, records
-`terraform/fixtures/runtime/` inventory if present, and captures the pinned
-`framework_ref` from the calling workflow. Runner evidence does not run
-`terraform plan` or `apply`.
-
-Framework repositories use `repo_type: framework`, which runs Terraform
-validation, native framework tests, docs-diff, and reference snapshots.
-Runner-template repositories use `repo_type: template` until they are forked
-into real runner repositories.
-
-## Example
-
-```yaml
-jobs:
-  deploy:
-    uses: NWarila/terraform-framework-template/.github/workflows/reusable-terraform-deploy.yaml@0123456789abcdef0123456789abcdef01234567
-    with:
-      # renovate: depName=NWarila/terraform-framework-template packageName=NWarila/terraform-framework-template currentValue=main
-      framework_ref: 0123456789abcdef0123456789abcdef01234567
-      overlay_paths: |
-        repos/public=>terraform/repos/public
-        repos/private=>terraform/repos/private
-      tfvars_file: terraform/repos/public/prod.tfvars
-      terraform_version: "1.15.4"
-      backend_mode: s3
-      apply: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    secrets:
-      aws_role_arn: ${{ secrets.AWS_DEPLOY_ROLE }}
-      aws_region: ${{ secrets.AWS_REGION }}
-      backend_bucket: ${{ secrets.TF_STATE_BUCKET }}
-      backend_key_prefix: ${{ secrets.TF_STATE_KEY_PREFIX }}
-```
+This framework does not expose a `plan_status` workflow output. A runner that needs structured
+plan status can use Terraform's `-detailed-exitcode` option and map its documented exit codes in
+the consumer workflow.

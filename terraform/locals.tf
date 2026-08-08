@@ -3,16 +3,21 @@
 
 # Statically Configured LOCALS
 locals {
-  public_ami_aliases = toset([
-    "windows_server_2022_base",
-    "windows_server_2025_base",
-  ])
+  #region ------ [ Amazon Machine Image Resolution ] ------------------------------------------- #
+
+  # The public images this framework recognises, and the name each resolves by. Adding one
+  # is an entry here, not another data source.
+  public_ami_name_regex = {
+    windows_server_2022_base = "^Windows_Server-2022-English-Full-Base-[\\d.]+$"
+    windows_server_2025_base = "^Windows_Server-2025-English-Full-Base-[\\d.]+$"
+  }
+
+  public_ami_aliases = toset(keys(local.public_ami_name_regex))
 
   ami_specs = {
     for ami in toset([for system in var.all_systems : system.ami]) : ami => {
       is_direct_id    = can(regex("^ami-[0-9a-f]{8,17}$", ami))
       is_public_alias = contains(local.public_ami_aliases, ami)
-      is_versioned    = can(regex(":", ami))
       family          = split(":", ami)[0]
       version         = can(regex(":", ami)) ? split(":", ami)[1] : null
       glob            = can(regex(":", ami)) ? "${split(":", ami)[0]}_v${split(":", ami)[1]}_*" : "${ami}_v*"
@@ -22,11 +27,8 @@ locals {
 
   amazon_machine_images = merge(
     {
-      "windows_server_2022_base" = {
-        us_east_1 = try(data.aws_ami.us_east_1_windows_server_2022_base[0], null)
-      }
-      "windows_server_2025_base" = {
-        us_east_1 = try(data.aws_ami.us_east_1_windows_server_2025_base[0], null)
+      for alias in local.public_ami_aliases : alias => {
+        us_east_1 = try(data.aws_ami.us_east_1_public[alias], null)
       }
     },
     {
@@ -43,123 +45,143 @@ locals {
     }
   )
 
-  # SSH bootstrap user_data.
-  # Windows: self-contained, idempotent, version-aware OpenSSH bootstrap. It (1) installs the
-  #   OpenSSH.Server capability only if not already Present (WS2025 ships it; WS2019/2022 install it
-  #   as a Feature-on-Demand), preferring a local -Source when var.windows_openssh_source is set and
-  #   otherwise pulling from Windows Update; (2) VERIFIES the capability is Installed and fails loudly
-  #   (exit 1) if not, because the FoD install fails silently with no egress; (3) installs the launch
-  #   key-pair public key from IMDSv2 for administrator SSH with the documented ACLs. The OpenSSH
-  #   default shell is intentionally left as cmd; setting it to PowerShell breaks Terraform
-  #   remote-exec SCP upload when this dormant SSH bootstrap is re-activated.
-  # Linux: cloud-init enables sshd, then best-effort ensures the SSM agent — enabled in place if the
-  #   AMI already ships it, else the region's RPM is fetched from S3 (reachable via an S3 gateway
-  #   endpoint on private subnets, or the IGW/NAT otherwise) and installed. This makes non-Amazon
-  #   AMIs that omit the agent (CIS/STIG RHEL) SSM-reachable without a public IP. The __AWS_REGION__
-  #   sentinel is substituted with the hyphenated region per-system in local.elastic_compute_cloud.
+  #endregion --- [ Amazon Machine Image Resolution ] ------------------------------------------- #
+
+
+  #region ------ [ SSH Bootstrap User Data ] --------------------------------------------------- #
+
+  # user_data covers two things only: making sure sshd is actually running, and installing the
+  # launch key. Installing OpenSSH, the SSM agent and cloud-init is the AMI's job and is assumed
+  # done - in-house images ship them by default. Both steps below are idempotent, so an image
+  # that already has sshd enabled pays nothing for them.
+  #
+  # The enable-and-start guard stays because "installed but not enabled" is the plausible failure
+  # mode on a hardened or third-party image, and it strands the box with no way in. On Windows,
+  # Start-Service runs LAST, after the key is on disk: starting the listener first would accept
+  # connections it cannot yet authenticate. Set-Service is only registry config, so it stays up
+  # top with the rest of the configuration.
+  #
+  # Windows additionally needs the key install: EC2Launch populates the Administrator password
+  # path, not administrators_authorized_keys. The OpenSSH default shell is deliberately left as
+  # cmd; setting it to PowerShell breaks the remote-exec SCP upload the readiness gate uses.
+  # Linux needs no key step at all - cloud-init installs the launch key into the login user's
+  # authorized_keys by itself.
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
-    $source = "${var.windows_openssh_source}"
 
-    # 1. Ensure the OpenSSH Server capability is present (idempotent + version-aware).
-    $capability = Get-WindowsCapability -Online -Name "OpenSSH.Server*"
-    if ($capability.State -ne "Installed") {
-      if ($source) {
-        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -Source $source -LimitAccess
-      } else {
-        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-      }
-      $capability = Get-WindowsCapability -Online -Name "OpenSSH.Server*"
-      if ($capability.State -ne "Installed") {
-        Write-Error "OpenSSH.Server is still NotPresent after install (no Windows Update egress and no -Source supplied?). Aborting SSH bootstrap."
-        exit 1
-      }
-    }
-
-    # 2. Enable and start the sshd service.
     Set-Service -Name sshd -StartupType Automatic
-    Start-Service -Name sshd
 
-    # 3. Install the launch key-pair public key (from IMDSv2) for administrator SSH.
     $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
     $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }
     $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
     Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
     icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
+
+    Start-Service -Name sshd
     </powershell>
   WINDOWS_USER_DATA
 
+  # WinRM is the transport for Windows images that cannot install the OpenSSH Feature-on-Demand:
+  # WS-Management is in-box, so it works with no Windows Update egress and no local source, which
+  # is exactly where the SSH path fails. Selected per system by connection_type = "winrm".
+  #
+  # HTTPS/5986 only, never HTTP/5985. Terraform's WinRM client does NTLM authentication but no
+  # WinRM message sealing, so AllowUnencrypted = false rejects unencrypted SOAP with a 401; TLS
+  # supplies the encryption instead. The listener therefore binds a certificate generated in-box,
+  # the default HTTP listener is removed, and the stock WinRM firewall group is disabled, leaving
+  # 5986 as the only exposed port.
+  windows_winrm_user_data = <<-WINDOWS_WINRM_USER_DATA
+    <powershell>
+    $ErrorActionPreference = "Stop"
+
+    $certificate = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
+
+    Get-ChildItem -Path WSMan:\localhost\Listener | Where-Object { $_.Keys -contains "Transport=HTTP" } | Remove-Item -Recurse -Force
+    New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $certificate.Thumbprint -Force
+
+    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $false
+    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $false
+    Set-Item -Path WSMan:\localhost\Service\Auth\Negotiate -Value $true
+
+    Disable-NetFirewallRule -DisplayGroup "Windows Remote Management"
+    New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow
+
+    Set-Service -Name WinRM -StartupType Automatic
+    Restart-Service -Name WinRM
+    </powershell>
+  WINDOWS_WINRM_USER_DATA
+
+  # sshd.service on RHEL-family images, ssh.service on Debian-family ones.
   linux_ssh_user_data = <<-LINUX_USER_DATA
     #cloud-config
     runcmd:
       - systemctl enable --now sshd || systemctl enable --now ssh
-      - systemctl enable --now amazon-ssm-agent 2>/dev/null || curl -sSL -o /root/amazon-ssm-agent.rpm https://s3.__AWS_REGION__.amazonaws.com/amazon-ssm-__AWS_REGION__/latest/linux_amd64/amazon-ssm-agent.rpm
-      - test -f /root/amazon-ssm-agent.rpm && rpm -Uvh --replacepkgs /root/amazon-ssm-agent.rpm && systemctl enable --now amazon-ssm-agent
   LINUX_USER_DATA
 
-  # Deployment identity tags. Applied to every taggable AWS resource through provider default_tags
-  # (providers.tf) and merged explicitly into EC2 root_block_device tags below, which
-  # provider default_tags cannot reach. A null identity (the default) emits zero tags so
-  # consumers that have not opted in keep byte-identical plans.
-  deployment_tags = var.repository_id == null ? {} : merge(
-    {
-      "nwarila:management:managed-by"    = "terraform"
-      "nwarila:management:repository"    = var.repository
-      "nwarila:management:repository-id" = var.repository_id
-      "nwarila:management:stack"         = var.stack
-      "nwarila:management:environment"   = var.environment
-      "nwarila:operations:owner"         = var.owner
-    },
-    var.commit_sha == null ? {} : { "nwarila:provenance:commit-sha" = var.commit_sha },
-    var.run_id == null ? {} : { "nwarila:provenance:run-id" = var.run_id },
-  )
+  #endregion --- [ SSH Bootstrap User Data ] --------------------------------------------------- #
+
+
+  #region ------ [ Readiness Gate Wait Commands ] ---------------------------------------------- #
 
   # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
-  # over SSH. Each blocks until the OS launch/provisioning agent reports completion after Terraform
-  # has first connected.
+  # over SSH. Each blocks until the OS launch/provisioning agent reports completion after
+  # Terraform has first connected.
   windows_readiness_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
   linux_readiness_command   = "cloud-init status --wait"
+
+  # Default upload directory for the Linux remote-exec script. The login user's home is
+  # the usual escape hatch on images that mount /tmp noexec.
+  linux_readiness_script_dir = "/home/ec2-user"
+
+  #endregion --- [ Readiness Gate Wait Commands ] ---------------------------------------------- #
 }
 
 
 # Dynamically Configured LOCALS
 locals {
 
-  # Resolve each referenced key-pair name to its source: the framework-managed aws_key_pair when
-  # the name matches a managed_keypairs entry, otherwise the pre-existing key-pair data lookup.
-  # Same keys the EC2 resources already use, so managed adoption never re-keys any resource.
+  #region ------ [ EC2 Key Pairs ] ------------------------------------------------------------- #
+
+  # Every referenced key pair is pre-existing: this framework consumes key pairs, it never
+  # creates them, so the data lookup is the only source.
   key_pair_names = {
-    us_east_1 = merge(
-      { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name },
-      { for name, keypair in aws_key_pair.us_east_1 : name => keypair.key_name },
-    )
+    us_east_1 = { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name }
   }
+
+  #endregion --- [ EC2 Key Pairs ] ------------------------------------------------------------- #
+
+
+  #region ------ [ Interface-Owned Security Groups ] ------------------------------------------- #
 
   # Each interface with non-null rule collections declares one group at its raw interface index.
   # Its "<hostname>-eni-<index>-sg" name pairs it visibly with the corresponding ENI. The region
   # and VPC come from the parent system because every interface already uses that system's subnet.
-  # Description and tags come from the interface itself; a null description uses a stable framework
-  # string.
+  # Description and tags come from the interface itself; a null description uses a stable
+  # framework string.
   network_interface_security_groups = merge(concat([{}], [
     for system in var.all_systems : {
       for interface_index, network_interface in system.network_interfaces :
       "${system.hostname}-eni-${interface_index}-sg" => {
-        name   = "${system.hostname}-eni-${interface_index}-sg"
-        region = replace(system.region, "-", "_")
-        vpc_id = (
-          contains(keys(var.managed_networks), system.subnet_id)
-          ? system.subnet_id
-          : lookup(
-            local.alias_vpc_ids,
-            system.subnet_id,
-            data.aws_subnet.us_east_1_inline_security_group[system.subnet_id].vpc_id
-          )
-        )
+        region      = replace(system.region, "-", "_")
+        vpc_id      = data.aws_subnet.us_east_1[system.subnet_id].vpc_id
         description = network_interface.description != null ? network_interface.description : "Managed by aws-terraform-framework."
         ingress     = network_interface.ingress
         egress      = network_interface.egress
-        tags        = network_interface.tags
+
+        tags = merge(
+          network_interface.tags,
+          # Non-Overwritable Default Tags
+          {
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Name         = "${system.hostname}-eni-${interface_index}-sg"
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
+          }
+        )
       }
       if network_interface.ingress != null && network_interface.egress != null
     }
@@ -174,72 +196,73 @@ locals {
     }
   }
 
-  # Normalize every interface-owned rule into its AWS identity. Description is deliberately absent:
-  # AWS duplicate detection and resource replacement are determined by direction, protocol, ports,
-  # and destination. Field values in the readable prefix are lowercased, sanitized to alphanumerics
-  # and hyphens, and bounded; the digest preserves the full normalized identity when sanitization or
-  # truncation makes two readable prefixes alike.
-  network_interface_security_group_rule_entries = {
+  # Tag each interface-owned rule with its direction and its single source/destination before
+  # normalizing. This framework is IPv4-only, so that source is exactly one of cidr_ipv4,
+  # prefix_list_id, or referenced_security_group_id - "missing" records a rule that names none
+  # of them, which then collides with any other such rule and surfaces at plan time.
+  network_interface_security_group_rule_targets = {
     for region in var.aws_config.regions : region => flatten([
-      for name, group in local.network_interface_security_groups_by_region[region] : concat(
-        [
-          for rule in group.ingress : {
-            direction = "ingress"
-            identity = jsonencode([
-              "ingress",
-              lower(rule.ip_protocol),
-              rule.from_port,
-              rule.to_port,
-              rule.cidr_ipv4 != null ? "cidr_ipv4" : rule.cidr_ipv6 != null ? "cidr_ipv6" : rule.prefix_list_id != null ? "prefix_list_id" : rule.referenced_security_group_id != null ? "referenced_security_group_id" : "missing",
-              lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"),
-            ])
-            readable_identity = join("-", [
-              "ingress",
-              "protocol",
-              substr(replace(lower(rule.ip_protocol), "/[^0-9a-z]+/", "-"), 0, 32),
-              "ports",
-              rule.from_port == null ? "none" : tostring(rule.from_port),
-              rule.to_port == null ? "none" : tostring(rule.to_port),
-              rule.cidr_ipv4 != null ? "cidr-ipv4" : rule.cidr_ipv6 != null ? "cidr-ipv6" : rule.prefix_list_id != null ? "prefix-list-id" : rule.referenced_security_group_id != null ? "referenced-security-group-id" : "missing",
-              substr(replace(lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"), "/[^0-9a-z]+/", "-"), 0, 64),
-            ])
-            rule   = rule
-            sg_key = name
-          }
-        ],
-        [
-          for rule in group.egress : {
-            direction = "egress"
-            identity = jsonencode([
-              "egress",
-              lower(rule.ip_protocol),
-              rule.from_port,
-              rule.to_port,
-              rule.cidr_ipv4 != null ? "cidr_ipv4" : rule.cidr_ipv6 != null ? "cidr_ipv6" : rule.prefix_list_id != null ? "prefix_list_id" : rule.referenced_security_group_id != null ? "referenced_security_group_id" : "missing",
-              lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"),
-            ])
-            readable_identity = join("-", [
-              "egress",
-              "protocol",
-              substr(replace(lower(rule.ip_protocol), "/[^0-9a-z]+/", "-"), 0, 32),
-              "ports",
-              rule.from_port == null ? "none" : tostring(rule.from_port),
-              rule.to_port == null ? "none" : tostring(rule.to_port),
-              rule.cidr_ipv4 != null ? "cidr-ipv4" : rule.cidr_ipv6 != null ? "cidr-ipv6" : rule.prefix_list_id != null ? "prefix-list-id" : rule.referenced_security_group_id != null ? "referenced-security-group-id" : "missing",
-              substr(replace(lower(rule.cidr_ipv4 != null ? rule.cidr_ipv4 : rule.cidr_ipv6 != null ? rule.cidr_ipv6 : rule.prefix_list_id != null ? rule.prefix_list_id : rule.referenced_security_group_id != null ? rule.referenced_security_group_id : "missing"), "/[^0-9a-z]+/", "-"), 0, 64),
-            ])
-            rule   = rule
-            sg_key = name
-          }
-        ],
-      )
+      for name, group in local.network_interface_security_groups_by_region[region] : [
+        for tagged in concat(
+          [for rule in group.ingress : { direction = "ingress", rule = rule }],
+          [for rule in group.egress : { direction = "egress", rule = rule }],
+          ) : {
+          direction = tagged.direction
+          rule      = tagged.rule
+          sg_key    = name
+          target = (
+            tagged.rule.cidr_ipv4 != null
+            ? { kind = "cidr_ipv4", value = tagged.rule.cidr_ipv4 }
+            : tagged.rule.prefix_list_id != null
+            ? { kind = "prefix_list_id", value = tagged.rule.prefix_list_id }
+            : tagged.rule.referenced_security_group_id != null
+            ? { kind = "referenced_security_group_id", value = tagged.rule.referenced_security_group_id }
+            : { kind = "missing", value = "missing" }
+          )
+        }
+      ]
     ])
   }
 
+  # Normalize every interface-owned rule into its AWS identity. Description is deliberately
+  # absent: AWS duplicate detection and resource replacement are determined by direction,
+  # protocol, ports, and destination. Field values in the readable prefix are lowercased,
+  # sanitized to alphanumerics and hyphens, and bounded; the digest preserves the full normalized
+  # identity when sanitization or truncation makes two readable prefixes alike. The readable
+  # target kind is the identity kind with underscores swapped for hyphens, so the two can never
+  # drift apart.
+  network_interface_security_group_rule_entries = {
+    for region in var.aws_config.regions : region => [
+      for entry in local.network_interface_security_group_rule_targets[region] : {
+        direction = entry.direction
+        identity = jsonencode([
+          entry.direction,
+          lower(entry.rule.ip_protocol),
+          entry.rule.from_port,
+          entry.rule.to_port,
+          entry.target.kind,
+          lower(entry.target.value),
+        ])
+        readable_identity = join("-", [
+          entry.direction,
+          "protocol",
+          substr(replace(lower(entry.rule.ip_protocol), "/[^0-9a-z]+/", "-"), 0, 32),
+          "ports",
+          entry.rule.from_port == null ? "none" : tostring(entry.rule.from_port),
+          entry.rule.to_port == null ? "none" : tostring(entry.rule.to_port),
+          replace(entry.target.kind, "_", "-"),
+          substr(replace(lower(entry.target.value), "/[^0-9a-z]+/", "-"), 0, 64),
+        ])
+        rule   = entry.rule
+        sg_key = entry.sg_key
+      }
+    ]
+  }
+
   # Stable rule address:
-  # "<sg>/<direction>-protocol-<protocol>-ports-<from>-<to>-<destination kind>-<destination>-<digest>".
-  # An exact identity collision raises Terraform's duplicate-object-key error at plan time rather
-  # than silently losing a rule.
+  # "<sg>/<direction>-protocol-<protocol>-ports-<from>-<to>-<destination
+  # kind>-<destination>-<digest>". An exact identity collision raises Terraform's
+  # duplicate-object-key error at plan time rather than silently losing a rule.
   network_interface_security_group_rules = {
     for region in var.aws_config.regions : region => {
       for entry in local.network_interface_security_group_rule_entries[region] :
@@ -248,6 +271,16 @@ locals {
         {
           direction = entry.direction
           sg_key    = entry.sg_key
+
+          # A rule declares no consumer tags, so this map is wholly framework-owned.
+          tags = {
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
+          }
         },
       )
     }
@@ -258,83 +291,265 @@ locals {
     us_east_1 = { for name, group in aws_security_group.us_east_1 : name => group.id }
   }
 
-  # Managed networks partitioned per region (same normalization rule the systems use).
-  managed_networks_by_region = {
+  # aws_vpc_security_group_ingress_rule and _egress_rule are separate resources, so the
+  # direction split belongs here rather than in a for_each filter.
+  network_interface_security_group_ingress_rules = {
     for region in var.aws_config.regions : region => {
-      for name, network in var.managed_networks : name => network
-      if replace(network.region, "-", "_") == region
+      for key, rule in local.network_interface_security_group_rules[region] : key => rule
+      if rule.direction == "ingress"
     }
   }
 
-  # Network key -> VPC id (framework-created VPC, or the BYO vpc_id passthrough).
-  managed_vpc_ids = {
-    us_east_1 = {
-      for name, network in local.managed_networks_by_region.us_east_1 :
-      name => network.vpc_id != null ? network.vpc_id : aws_vpc.us_east_1[name].id
+  network_interface_security_group_egress_rules = {
+    for region in var.aws_config.regions : region => {
+      for key, rule in local.network_interface_security_group_rules[region] : key => rule
+      if rule.direction == "egress"
     }
   }
 
-  # Network key -> created subnet id, used to resolve managed names in all_systems[*].subnet_id.
-  managed_subnet_ids = {
-    us_east_1 = { for name, subnet in aws_subnet.us_east_1 : name => subnet.id }
+  #endregion --- [ Interface-Owned Security Groups ] ------------------------------------------- #
+
+
+  #region ------ [ Runner Ingress Security Group ] --------------------------------------------- #
+
+  # One group, attached to every interface the framework builds, so a CI runner can reach the
+  # fleet for the life of a single run. var.runner_ip == null collapses every map below to {},
+  # so the resources plan to nothing and no ENI gains a group.
+  #
+  # The name has to be unique per VPC: several repositories deploy into one shared subnet and
+  # all of them use environment = "dev", so environment alone would collide. repository_id is
+  # numeric, rename-stable, and required, which makes it the stable half of the identity.
+  runner_ingress_name = "runner-ingress-${var.repository_id}-${var.environment}"
+
+  # tcp/22 carries SSH-direct, tcp/5986 carries WinRM-direct, and ICMP carries reachability
+  # checks. Module-owned literals rather than a consumer list: a list invites 0-65535, and these
+  # are exactly the transports this exists to serve.
+  #
+  # ICMP has no ports - the rule encodes type and code in from_port/to_port, and -1/-1 means
+  # every type and code. That is scoped to one /32 here, so it grants ping and the PMTUD and
+  # unreachable messages that make a failed connection diagnosable rather than a silent hang.
+  runner_ingress_rules = {
+    ssh = {
+      description = "Run-scoped CI runner SSH ingress."
+      ip_protocol = "tcp"
+      from_port   = 22
+      to_port     = 22
+    }
+    winrm = {
+      description = "Run-scoped CI runner WinRM ingress."
+      ip_protocol = "tcp"
+      from_port   = 5986
+      to_port     = 5986
+    }
+    icmp = {
+      description = "Run-scoped CI runner ICMP ingress for reachability checks."
+      ip_protocol = "icmp"
+      from_port   = -1
+      to_port     = -1
+    }
   }
 
-  # Alias key -> caller-supplied subnet id.
-  alias_subnet_ids = { for name, alias in var.network_aliases : name => alias.subnet_id }
-
-  # Alias key -> caller-supplied VPC id when present.
-  alias_vpc_ids = {
-    for name, alias in var.network_aliases : name => alias.vpc_id
-    if alias.vpc_id != null
+  # Every distinct VPC the fleet resolves to. One security group cannot span VPCs, so a length
+  # other than 1 is a hard error, raised by a precondition on the group itself.
+  runner_ingress_vpc_ids = {
+    for region in var.aws_config.regions : region => distinct([
+      for system in var.all_systems :
+      data.aws_subnet.us_east_1[system.subnet_id].vpc_id
+      if replace(system.region, "-", "_") == region
+    ])
   }
+
+  # Empty when runner_ip is null, and also when a region declares no systems: with nothing to
+  # attach to there is no group to build, and indexing an empty VPC list would fail.
+  runner_ingress_security_groups = {
+    for region in var.aws_config.regions : region => (
+      var.runner_ip == null || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
+        (local.runner_ingress_name) = {
+
+          # AWS Security Group Properties
+          description = "Run-scoped CI runner ingress. Managed by aws-terraform-framework."
+          name        = local.runner_ingress_name
+          # [0] rather than one(): one() is absent from Packer and unused here by style. A list
+          # longer than 1 is caught by the single-VPC precondition on the group resource.
+          vpc_id = local.runner_ingress_vpc_ids[region][0]
+
+          # The group declares no consumer tags, so this map is wholly framework-owned.
+          tags = {
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Name         = local.runner_ingress_name
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
+          }
+        }
+      }
+    )
+  }
+
+  runner_ingress_security_group_rules = {
+    for region in var.aws_config.regions : region => (
+      var.runner_ip == null || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
+        for transport, rule in local.runner_ingress_rules :
+        "${local.runner_ingress_name}-${transport}" => {
+
+          # AWS Security Group Ingress Rule Properties
+          cidr_ipv4                    = "${var.runner_ip}/32"
+          description                  = rule.description
+          from_port                    = rule.from_port
+          ip_protocol                  = rule.ip_protocol
+          prefix_list_id               = null
+          referenced_security_group_id = null
+          sg_key                       = local.runner_ingress_name
+          to_port                      = rule.to_port
+
+          # A rule declares no consumer tags, so this map is wholly framework-owned.
+          tags = {
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
+          }
+        }
+      }
+    )
+  }
+
+  # Name -> runner-ingress SG id, mirroring network_interface_security_group_ids.
+  runner_ingress_security_group_ids = {
+    us_east_1 = { for name, group in aws_security_group.runner_ingress_us_east_1 : name => group.id }
+  }
+
+  #endregion --- [ Runner Ingress Security Group ] --------------------------------------------- #
+
+
+  #region ------ [ Elastic IPs ] --------------------------------------------------------------- #
 
   # Systems that requested a stable public IPv4: an EIP is allocated and associated with the
   # primary ENI.
   eip_systems = {
     for region in var.aws_config.regions : region => {
-      for system in var.all_systems : system.hostname => system
+      for system in var.all_systems : system.hostname => {
+
+        # An Elastic IP declares no consumer tags, so this map is wholly framework-owned.
+        tags = {
+          CommitSha    = var.commit_sha
+          Environment  = var.environment
+          ManagedBy    = "Terraform"
+          Name         = system.hostname
+          Repository   = var.repository
+          RepositoryId = var.repository_id
+          RunId        = var.run_id
+        }
+      }
       if replace(system.region, "-", "_") == region && system.associate_public_ip
     }
   }
+
+  #endregion --- [ Elastic IPs ] --------------------------------------------------------------- #
+
+
+  #region ------ [ Elastic Compute Cloud (EC2s) ] ---------------------------------------------- #
 
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
       for system in var.all_systems : system.hostname => {
 
-        region               = region
-        ami                  = system.ami
-        availability_zone    = system.availability_zone
-        is_windows           = local.amazon_machine_images[system.ami][region].platform == "windows"
-        key_name             = system.key_name
-        iam_instance_profile = system.iam_instance_profile
-        user_data            = trimspace(local.amazon_machine_images[system.ami][region].platform == "windows" ? local.windows_ssh_user_data : replace(local.linux_ssh_user_data, "__AWS_REGION__", replace(region, "_", "-")))
-        hostname             = system.hostname
-        instance_type        = system.instance_type
-        readiness_user       = system.readiness_user
-        readiness_gate       = system.readiness_gate
-        refresh              = system.refresh
-        set_state            = system.set_state
-        imds_hop_limit       = system.imds_hop_limit
+        ami                        = system.ami
+        availability_zone          = system.availability_zone
+        hostname                   = system.hostname
+        iam_instance_profile       = system.iam_instance_profile
+        imds_hop_limit             = system.imds_hop_limit
+        instance_type              = system.instance_type
+        is_windows                 = local.amazon_machine_images[system.ami][region].platform == "windows"
+        key_name                   = system.key_name
+        readiness_command          = system.readiness_command
+        readiness_gate             = system.readiness_gate
+        readiness_private_key_path = system.readiness_private_key_path
+        readiness_script_dir       = system.readiness_script_dir
+        readiness_user             = system.readiness_user
+        refresh                    = system.refresh
+        region                     = region
+        set_state                  = system.set_state
+        # Null selects SSH, the default transport. WinRM is only meaningful on Windows; a Linux
+        # system asking for it is rejected by a precondition on the instance, because the OS is
+        # data-resolved and a variable validation cannot see it.
+        connection_type = coalesce(system.connection_type, "ssh")
+
+        # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
+        # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
+        # password to become available, and the SSH path has no use for it.
+        get_password_data = (
+          local.amazon_machine_images[system.ami][region].platform == "windows" &&
+          coalesce(system.connection_type, "ssh") == "winrm"
+        )
+
+        user_data = trimspace(
+          local.amazon_machine_images[system.ami][region].platform == "windows"
+          ? (
+            coalesce(system.connection_type, "ssh") == "winrm"
+            ? local.windows_winrm_user_data
+            : local.windows_ssh_user_data
+          )
+          : local.linux_ssh_user_data
+        )
 
         root_block_device = {
-          volume_size           = system.root_block_device.volume_size
-          volume_type           = system.root_block_device.volume_type
-          encrypted             = true
+          delete_on_termination = system.root_block_device.delete_on_termination
           iops                  = system.root_block_device.iops
           kms_key_id            = system.aws_kms_alias
-          delete_on_termination = system.root_block_device.delete_on_termination
           throughput            = system.root_block_device.throughput
+          volume_size           = system.root_block_device.volume_size
+          volume_type           = system.root_block_device.volume_type
 
           tags = merge(
             system.root_block_device.tags,
+            # Non-Overwritable Default Tags
             {
-              index       = 0
-              Name        = system.hostname
-              Environment = var.environment
-            },
-            local.deployment_tags
+              CommitSha    = var.commit_sha
+              Environment  = var.environment
+              Index        = 0
+              ManagedBy    = "Terraform"
+              Name         = system.hostname
+              Repository   = var.repository
+              RepositoryId = var.repository_id
+              RunId        = var.run_id
+            }
           )
         }
+
+        ami_block_device_overrides = [
+          for override in system.ami_block_device_overrides : {
+            delete_on_termination = override.delete_on_termination
+            device_name           = override.device_name
+            iops                  = override.iops
+            kms_key_id            = system.aws_kms_alias
+            throughput            = override.throughput
+            volume_size           = override.volume_size
+            volume_type           = override.volume_type
+          }
+        ]
+
+        # Non-root EBS mappings the AMI itself declares that no override covers. RunInstances
+        # creates each one with the source snapshot's own encryption state, so an uncovered
+        # mapping silently lands outside the module's encryption invariant - the CIS RHEL 8 STIG
+        # /dev/sdf case in docs/reference/invariants.md. The instance precondition rejects a
+        # non-empty list. This cannot live in a variable validation: block_device_mappings is a
+        # data lookup, and validations run before data is read.
+        # Skipped: instance-store mappings (virtual_name, no EBS volume to encrypt) and
+        # suppression entries (no_device, which removes the mapping instead of creating it).
+        uncovered_ami_block_devices = sort([
+          for mapping in try(local.amazon_machine_images[system.ami][region].block_device_mappings, []) :
+          mapping.device_name
+          if length(try(mapping.ebs, {})) > 0 &&
+          try(mapping.no_device, "") == "" &&
+          try(mapping.virtual_name, "") == "" &&
+          mapping.device_name != try(local.amazon_machine_images[system.ami][region].root_device_name, "") &&
+          !contains([for override in system.ami_block_device_overrides : override.device_name], mapping.device_name)
+        ])
 
         tags = merge(
           system.tags,
@@ -344,11 +559,14 @@ locals {
           },
           # Non-Overwritable Default Tags
           {
-            Name        = system.hostname
-            Environment = var.environment
-            Terraform   = "True"
-            ManagedBy   = "Terraform"
-            OS          = local.amazon_machine_images[system.ami][region].platform_details
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Name         = system.hostname
+            OS           = local.amazon_machine_images[system.ami][region].platform_details
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
           }
         )
       }
@@ -358,9 +576,9 @@ locals {
   }
 
   # The ONLY place the physical instance resources are enumerated. Two resources exist because
-  # `lifecycle` is a static meta-argument (base/refresh); HCL cannot
-  # iterate resource addresses, so they are merged here once. Hostnames are validated-unique and
-  # each system lives in exactly one region, so this merge is a disjoint union.
+  # `lifecycle` is a static meta-argument (base/refresh); HCL cannot iterate resource addresses,
+  # so they are merged here once. Hostnames are validated-unique and each system lives in exactly
+  # one region, so this merge is a disjoint union.
   all_ec2_instances = merge(
     aws_instance.us_east_1,
     aws_instance.us_east_1_refresh,
@@ -375,15 +593,99 @@ locals {
   # public key for Administrator); WinRM is decommissioned. Systems that set
   # readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded entirely.
   readiness_targets = {
-    for hostname, instance in local.all_ec2_instances : hostname => {
-      id             = instance.id
-      private_ip     = instance.private_ip
-      key_name       = instance.key_name
-      is_windows     = local.systems_by_hostname[hostname].is_windows
-      readiness_user = local.systems_by_hostname[hostname].readiness_user
+    for region in var.aws_config.regions : region => {
+      for hostname, instance in local.all_ec2_instances : hostname => {
+        id         = instance.id
+        private_ip = instance.private_ip
+        # Everything the gate needs is decided here: the connection mechanics and both
+        # OS-specific fallbacks, so the resource reads fields and makes no choices.
+        readiness_user = coalesce(
+          local.systems_by_hostname[hostname].readiness_user,
+          local.systems_by_hostname[hostname].is_windows ? "Administrator" : "ec2-user",
+        )
+        readiness_command = coalesce(
+          local.systems_by_hostname[hostname].readiness_command,
+          local.systems_by_hostname[hostname].is_windows
+          ? local.windows_readiness_command
+          : local.linux_readiness_command,
+        )
+        target_platform = local.systems_by_hostname[hostname].is_windows ? "windows" : "unix"
+        script_path = (
+          local.systems_by_hostname[hostname].is_windows
+          ? null
+          : format("%s/terraform_%%RAND%%.sh", coalesce(
+            local.systems_by_hostname[hostname].readiness_script_dir,
+            local.linux_readiness_script_dir,
+          ))
+        )
+        private_key_path = local.systems_by_hostname[hostname].readiness_private_key_path
+
+        # WinRM reaches 5986 over TLS with a certificate the instance generated for itself, so the
+        # client cannot verify it and insecure has to be true. NTLM carries the authentication.
+        connection_type = local.systems_by_hostname[hostname].connection_type
+        use_winrm       = local.systems_by_hostname[hostname].connection_type == "winrm"
+        winrm_port      = 5986
+
+        # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
+        # gate already requires. Only the ciphertext ever reaches state.
+        password = (
+          local.systems_by_hostname[hostname].connection_type == "winrm" &&
+          local.systems_by_hostname[hostname].readiness_private_key_path != null
+          ? rsadecrypt(instance.password_data, file(local.systems_by_hostname[hostname].readiness_private_key_path))
+          : null
+        )
+      }
+      if local.systems_by_hostname[hostname].readiness_gate &&
+      local.systems_by_hostname[hostname].region == region
     }
-    if local.systems_by_hostname[hostname].readiness_gate
   }
+
+  # refresh = true instances live in their own resource so refresh_serial can replace the
+  # fleet without touching everything else. That split is a property of the data, not of
+  # the resource block, so it is made here.
+  elastic_compute_cloud_stable = {
+    for region in var.aws_config.regions : region => {
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => system
+      if system.refresh == false
+    }
+  }
+
+  elastic_compute_cloud_refresh = {
+    for region in var.aws_config.regions : region => {
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => system
+      if system.refresh == true
+    }
+  }
+
+  # Each instance's own interfaces, keyed by hostname, so the aws_instance dynamic block
+  # iterates a ready-made list instead of filtering every ENI on every instance.
+  instance_network_interfaces = {
+    for region in var.aws_config.regions : region => {
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => [
+        for eni_key, network_interface in aws_network_interface.us_east_1 : {
+          id    = network_interface.id
+          index = local.elastic_network_interfaces[region][eni_key].index
+        }
+        if local.elastic_network_interfaces[region][eni_key].hostname == hostname
+      ]
+    }
+  }
+
+  # Only systems that explicitly asked for a power state get an aws_ec2_instance_state.
+  ec2_instance_states = {
+    for region in var.aws_config.regions : region => {
+      for hostname, instance in local.all_ec2_instances : hostname => {
+        instance_id = instance.id
+        state       = local.elastic_compute_cloud[region][hostname].set_state
+      }
+      if local.elastic_compute_cloud[region][hostname].set_state != null
+    }
+  }
+
+  #endregion --- [ Elastic Compute Cloud (EC2s) ] ---------------------------------------------- #
+
+
+  #region ------ [ Elastic Network Interfaces (ENIs) ] ----------------------------------------- #
 
   elastic_network_interfaces = {
     for region in var.aws_config.regions : region => merge([
@@ -392,16 +694,20 @@ locals {
         "${system.hostname}-eni-${index}" => {
 
           # AWS Network Interface Properties
-          description    = system.network_interfaces[index].description
-          hostname       = system.hostname
-          index          = index
-          interface_type = system.network_interfaces[index].interface_type
-          # Null lets AWS pick a free address from the subnet CIDR.
+          availability_zone = system.availability_zone
+          description       = system.network_interfaces[index].description
+          hostname          = system.hostname
+          index             = index
+          interface_type    = system.network_interfaces[index].interface_type
+          # Null lets AWS pick a free address from the subnet CIDR. Carried both ways: the
+          # scalar is what the pinned-address precondition reasons about, the list is what
+          # the aws_network_interface attribute takes.
+          private_ip  = system.network_interfaces[index].private_ip
           private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
-          # The pre-existing security-group ids the consumer listed plus this interface's own group
-          # when its rule collections are non-null. The same per-interface predicate guards both
-          # validation and attachment, so an interface can never silently receive the VPC default
-          # allow-all group.
+          # The pre-existing security-group ids the consumer listed plus this interface's own
+          # group when its rule collections are non-null. The same per-interface predicate guards
+          # both validation and attachment, so an interface can never silently receive the VPC
+          # default allow-all group.
           security_groups = concat(
             system.network_interfaces[index].security_groups,
             (
@@ -409,18 +715,25 @@ locals {
               system.network_interfaces[index].egress != null
             ) ? [local.network_interface_security_group_ids[region]["${system.hostname}-eni-${index}-sg"]]
             : [],
+            # Attached here, at ENI creation, rather than modified onto the interface afterwards:
+            # creation-time attachment stays inside a consumer's existing IAM grants, where
+            # ec2:ModifyNetworkInterfaceAttribute would force every consumer to widen its policy.
+            var.runner_ip == null ? [] : [local.runner_ingress_security_group_ids[region][local.runner_ingress_name]],
           )
-          subnet_id = lookup(local.managed_subnet_ids[region], system.subnet_id, lookup(local.alias_subnet_ids, system.subnet_id, system.subnet_id))
+          subnet_id = system.subnet_id
 
-          # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
-          # ?      calculated tags. The default tags cannot be overwritten, if the user provides
-          # ?      tags with the same name, the default tags will take precedence.
           tags = merge(
             system.network_interfaces[index].tags,
+            # Non-Overwritable Default Tags
             {
-              Index       = index
-              Name        = system.hostname
-              Environment = var.environment
+              CommitSha    = var.commit_sha
+              Environment  = var.environment
+              Index        = index
+              ManagedBy    = "Terraform"
+              Name         = system.hostname
+              Repository   = var.repository
+              RepositoryId = var.repository_id
+              RunId        = var.run_id
             }
           )
         }
@@ -430,49 +743,57 @@ locals {
     ]...)
   }
 
+  #endregion --- [ Elastic Network Interfaces (ENIs) ] ----------------------------------------- #
+
+
+  #region ------ [ Elastic Block Store (EBS) ] ------------------------------------------------- #
+
   ebs_block_devices = {
     for region in var.aws_config.regions : region => merge([
       for system in var.all_systems : {
-        for index in range(length(system.ebs_block_devices)) :
-        "${system.hostname}-ebs-${index}" => {
+        for volume in system.ebs_block_devices :
+        "${system.hostname}-ebs-${volume.resource_key}" => {
 
           # AWS Elastic Block Store Properties
           availability_zone = system.availability_zone
-          # Device suffixes deliberately start at d and run d..z for up to 23 EBS volumes.
-          device_name = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
-            "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+          hostname          = system.hostname
+          index             = volume.device_index
+          iops              = volume.iops
+          kms_key_id        = system.aws_kms_alias
+          refresh           = system.refresh
+          resource_key      = volume.resource_key
+          skip_destroy      = volume.skip_destroy
+          snapshot_id       = volume.snapshot_id
+          throughput        = volume.throughput
+          volume_size       = volume.volume_size
+          volume_type       = volume.volume_type
+
+          device_name = (
+            local.elastic_compute_cloud[region][system.hostname].is_windows
+            ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+            : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
           )
-          encrypted    = true
-          hostname     = system.hostname
-          index        = index
-          iops         = system.ebs_block_devices[index].iops
-          refresh      = system.refresh
-          snapshot_id  = system.ebs_block_devices[index].snapshot_id
-          skip_destroy = system.ebs_block_devices[index].skip_destroy
-          throughput   = system.ebs_block_devices[index].throughput
-          volume_size  = system.ebs_block_devices[index].volume_size
-          volume_type  = system.ebs_block_devices[index].volume_type
 
-          # ?Note: This is property relies on a data lookup, which is region specific, so its
-          # ?  final value is actually calculated in the 'aws_ebs_volume' resource.
-          kms_key_id = system.aws_kms_alias
-
-          # ?Note: Merges all of the defined user tags (if any) with the 'default' automatically
-          # ?      calculated tags. The default tags cannot be overwritten, if the user provides
-          # ?      tags with the same name, the default tags will take precedence.
           tags = merge(
-            try(system.ebs_block_devices[index].tags, {}),
+            try(volume.tags, {}),
+            # Non-Overwritable Default Tags
             {
-              Name        = system.hostname
-              Index       = index
-              Environment = var.environment
-              # ?Note: Dynamically assign a predictable device name by using the index to increment
-              # ?      a [char] lookup. Unicode character set is used in the conversion, so
-              # ?      [INT]100 converted to Unicode [CHAR] is 'd', then each index increment after
-              # ?      that will iterate through next characters (I.E. e, f, g, h, etc.) up to z.
-              DeviceName = local.elastic_compute_cloud[region][system.hostname].is_windows ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + index))}" : (
-                "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + index))}"
+              CommitSha    = var.commit_sha
+              Environment  = var.environment
+              Index        = volume.device_index
+              ManagedBy    = "Terraform"
+              Name         = system.hostname
+              Repository   = var.repository
+              RepositoryId = var.repository_id
+              RunId        = var.run_id
+
+              # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
+              DeviceName = (
+                local.elastic_compute_cloud[region][system.hostname].is_windows
+                ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
               )
+
             }
           )
         }
@@ -481,6 +802,27 @@ locals {
       if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
     ]...)
   }
+
+  # Attachments follow their instance's refresh setting. Volumes do not consume this split so
+  # changing refresh never changes a standalone data volume's resource address.
+  ebs_block_devices_stable = {
+    for region in var.aws_config.regions : region => {
+      for key, volume in local.ebs_block_devices[region] : key => volume
+      if volume.refresh == false
+    }
+  }
+
+  ebs_block_devices_refresh = {
+    for region in var.aws_config.regions : region => {
+      for key, volume in local.ebs_block_devices[region] : key => volume
+      if volume.refresh == true
+    }
+  }
+
+  #endregion --- [ Elastic Block Store (EBS) ] ------------------------------------------------- #
+
+
+  #region ------ [ Elastic Load Balancers (ELBs) ] --------------------------------------------- #
 
   elastic_load_balancers = {
     for region in var.aws_config.regions : region => {
@@ -520,10 +862,15 @@ locals {
 
         tags = merge(
           load_balancer.tags,
+          # Non-Overwritable Default Tags
           {
-            Name        = coalesce(load_balancer.name, load_balancer.name_prefix, load_balancer.resource_key)
-            Environment = var.environment
-            Terraform   = "True"
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Name         = coalesce(load_balancer.name, load_balancer.name_prefix, load_balancer.resource_key)
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
           }
         )
       }
@@ -538,32 +885,34 @@ locals {
         for target_group in load_balancer.target_groups :
         "${load_balancer.resource_key}/${target_group.resource_key}" => {
 
-          lb_key                            = load_balancer.resource_key
-          tg_key                            = target_group.resource_key
-          function                          = target_group.function
-          vpc_id                            = target_group.vpc_id
-          port                              = target_group.port
-          protocol                          = target_group.protocol
-          protocol_version                  = target_group.protocol_version
-          target_type                       = target_group.target_type
+          connection_termination            = target_group.connection_termination
           deregistration_delay              = target_group.deregistration_delay
-          slow_start                        = target_group.slow_start
+          health_check                      = target_group.health_check
+          ip_address_type                   = target_group.ip_address_type
           load_balancing_algorithm_type     = target_group.load_balancing_algorithm_type
           load_balancing_anomaly_mitigation = target_group.load_balancing_anomaly_mitigation
           load_balancing_cross_zone_enabled = target_group.load_balancing_cross_zone_enabled
+          port                              = target_group.port
           preserve_client_ip                = target_group.preserve_client_ip
+          protocol                          = target_group.protocol
+          protocol_version                  = target_group.protocol_version
           proxy_protocol_v2                 = target_group.proxy_protocol_v2
-          connection_termination            = target_group.connection_termination
-          ip_address_type                   = target_group.ip_address_type
-          health_check                      = target_group.health_check
+          slow_start                        = target_group.slow_start
           stickiness                        = target_group.stickiness
+          target_type                       = target_group.target_type
+          vpc_id                            = target_group.vpc_id
 
           tags = merge(
             target_group.tags,
+            # Non-Overwritable Default Tags
             {
-              Name        = "${load_balancer.resource_key}/${target_group.resource_key}"
-              Environment = var.environment
-              Terraform   = "True"
+              CommitSha    = var.commit_sha
+              Environment  = var.environment
+              ManagedBy    = "Terraform"
+              Name         = "${load_balancer.resource_key}/${target_group.resource_key}"
+              Repository   = var.repository
+              RepositoryId = var.repository_id
+              RunId        = var.run_id
             }
           )
         }
@@ -579,11 +928,17 @@ locals {
         for target_group in load_balancer.target_groups : {
           for system in var.all_systems :
           "${load_balancer.resource_key}/${target_group.resource_key}/${system.hostname}" => {
-            tg_key   = "${load_balancer.resource_key}/${target_group.resource_key}"
+
             hostname = system.hostname
             port     = target_group.port
+            tg_key   = "${load_balancer.resource_key}/${target_group.resource_key}"
+
           }
-          if replace(system.region, "-", "_") == region && system.tags.Function == target_group.function
+          if(
+            replace(system.region, "-", "_") == region &&
+            system.tags.Function == target_group.function &&
+            data.aws_subnet.us_east_1[system.subnet_id].vpc_id == target_group.vpc_id
+          )
         }
       ]
       # Normalize 'region' variable input to align with Terraform best practices.
@@ -597,13 +952,13 @@ locals {
         for listener in load_balancer.listeners :
         "${load_balancer.resource_key}/${listener.resource_key}" => {
 
+          alpn_policy     = listener.alpn_policy
+          certificate_arn = listener.certificate_arn
           lb_key          = load_balancer.resource_key
           listener_key    = listener.resource_key
           port            = listener.port
           protocol        = listener.protocol
           ssl_policy      = listener.ssl_policy
-          alpn_policy     = listener.alpn_policy
-          certificate_arn = listener.certificate_arn
 
           default_action = {
             type             = listener.default_action.type
@@ -625,6 +980,7 @@ locals {
           for rule in listener.rules :
           "${load_balancer.resource_key}/${listener.resource_key}/${rule.resource_key}" => {
 
+            conditions   = rule.conditions
             listener_key = "${load_balancer.resource_key}/${listener.resource_key}"
             priority     = rule.priority
 
@@ -635,7 +991,6 @@ locals {
               fixed_response   = rule.action.fixed_response
             }
 
-            conditions = rule.conditions
           }
         }
       ]
@@ -661,35 +1016,43 @@ locals {
     ])...)
   }
 
+  #endregion --- [ Elastic Load Balancers (ELBs) ] --------------------------------------------- #
 
+
+  #region ------ [ Relational Database Service (RDS) ] ----------------------------------------- #
+
+  # final_snapshot_identifier carries var.run_id because AWS keeps a final snapshot after the
+  # instance is gone and rejects a destroy whose snapshot name already exists. A name fixed to
+  # db_name alone therefore makes the SECOND destroy of a database fail. run_id is unique per
+  # deployment run and, unlike uuid() or timestamp(), leaves the plan deterministic. Repeated
+  # local destroys must pass a different run_id.
   relational_database_service = {
     for region in var.aws_config.regions : region => nonsensitive({
       for database in var.all_databases : nonsensitive(database.db_name) => {
 
-        allocated_storage           = nonsensitive(database.allocated_storage)
-        availability_zone           = nonsensitive(database.availability_zone)
-        backup_retention_period     = nonsensitive(database.backup_retention_period)
-        backup_window               = nonsensitive(database.backup_window)
-        blue_green_update           = nonsensitive(database.blue_green_update)
-        ca_cert_identifier          = nonsensitive(database.ca_cert_identifier)
-        db_name                     = nonsensitive(database.db_name)
-        db_subnet_group_name        = nonsensitive(database.db_subnet_group_name)
-        dedicated_log_volume        = nonsensitive(database.dedicated_log_volume)
-        delete_automated_backups    = nonsensitive(database.delete_automated_backups)
-        deletion_protection         = nonsensitive(database.deletion_protection)
-        engine                      = nonsensitive(database.engine)
-        engine_version              = nonsensitive(database.engine_version)
-        final_snapshot_identifier   = "${nonsensitive(database.db_name)}-FINAL"
-        identifier                  = lower(nonsensitive(database.db_name))
-        instance_class              = nonsensitive(database.instance_class)
-        kms_key_id                  = nonsensitive(database.aws_kms_alias)
-        manage_master_user_password = nonsensitive(database.manage_master_user_password)
-        max_allocated_storage       = nonsensitive(database.max_allocated_storage)
-        #region                     = < This is set statically >
-        skip_final_snapshot    = nonsensitive(database.skip_final_snapshot)
-        storage_encrypted      = true
-        storage_type           = nonsensitive(database.storage_type)
-        vpc_security_group_ids = nonsensitive(database.vpc_security_group_ids)
+        allocated_storage                   = nonsensitive(database.allocated_storage)
+        availability_zone                   = nonsensitive(database.availability_zone)
+        backup_retention_period             = nonsensitive(database.backup_retention_period)
+        backup_window                       = nonsensitive(database.backup_window)
+        blue_green_update                   = nonsensitive(database.blue_green_update)
+        ca_cert_identifier                  = nonsensitive(database.ca_cert_identifier)
+        db_name                             = nonsensitive(database.db_name)
+        db_subnet_group_name                = nonsensitive(database.db_subnet_group_name)
+        dedicated_log_volume                = nonsensitive(database.dedicated_log_volume)
+        delete_automated_backups            = nonsensitive(database.delete_automated_backups)
+        deletion_protection                 = nonsensitive(database.deletion_protection)
+        engine                              = nonsensitive(database.engine)
+        engine_version                      = nonsensitive(database.engine_version)
+        final_snapshot_identifier           = "${lower(nonsensitive(database.db_name))}-final-${var.run_id}"
+        iam_database_authentication_enabled = nonsensitive(database.iam_database_authentication_enabled)
+        identifier                          = lower(nonsensitive(database.db_name))
+        instance_class                      = nonsensitive(database.instance_class)
+        kms_key_id                          = nonsensitive(database.aws_kms_alias)
+        manage_master_user_password         = nonsensitive(database.manage_master_user_password)
+        max_allocated_storage               = nonsensitive(database.max_allocated_storage)
+        skip_final_snapshot                 = nonsensitive(database.skip_final_snapshot)
+        storage_type                        = nonsensitive(database.storage_type)
+        vpc_security_group_ids              = nonsensitive(database.vpc_security_group_ids)
 
         tags = merge(
           nonsensitive(database.tags),
@@ -699,9 +1062,13 @@ locals {
           },
           # Non-Overwritable Default Tags
           {
-            Name        = nonsensitive(database.db_name)
-            Environment = var.environment
-            Terraform   = "True"
+            CommitSha    = var.commit_sha
+            Environment  = var.environment
+            ManagedBy    = "Terraform"
+            Name         = nonsensitive(database.db_name)
+            Repository   = var.repository
+            RepositoryId = var.repository_id
+            RunId        = var.run_id
           }
         )
       }
@@ -713,12 +1080,13 @@ locals {
   relational_database_service_credentials = {
     for region in var.aws_config.regions : region => {
       for database in var.all_databases : nonsensitive(database.db_name) => {
-        password = database.password == null ? null : sensitive(database.password)
         username = sensitive(database.username)
       }
       # Normalize 'region' variable input to align with Terraform best practices.
       if replace(nonsensitive(database.region), "-", "_") == region
     }
   }
+
+  #endregion --- [ Relational Database Service (RDS) ] ----------------------------------------- #
 
 }
