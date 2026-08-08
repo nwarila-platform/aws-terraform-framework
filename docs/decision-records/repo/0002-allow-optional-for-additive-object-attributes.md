@@ -73,14 +73,12 @@ Inline names now use `<hostname>-eni-<index>-sg`, with the raw zero-based index
 derived from the group's position. The current nullable object normalizes to a
 zero-or-one-element sequence and therefore produces `0`; retaining the position
 in the derivation lets a future list produce additional stable names without
-replacing the naming rule. This is the module's native convention: other
-position-derived resource keys in the same local use
-`<hostname>-eni-<index>`, `<hostname>-ebs-<index>`, and
-other indexed resources, all with raw zero-based indices. Security-group rule
-resources are the exception because insertions into a rule list must not replace
-unrelated rules. This change is deliberately confined to inline groups. Keys
-supplied through the now-removed top-level `managed_security_groups` map were
-explicit consumer names and were not rewritten.
+replacing the naming rule. This follows the module's deliberate ENI convention;
+standalone EBS volumes and security-group rules instead use stable keys that do
+not depend on list position. This change is deliberately confined to inline
+groups. Keys supplied through the now-removed top-level
+`managed_security_groups` map were explicit consumer names and were not
+rewritten.
 
 ## Decision Drivers
 

@@ -4,7 +4,8 @@ This directory holds the Architecture Decision Records (ADRs) governing this
 repository, split into three scopes per [ADR-0001](org/0001-use-architecture-decision-records.md):
 
 - [`org/`](org/) - byte-identical mirrors of the org-baseline ADRs whose
-  master copies live in [`nwarila-platform/.github`](https://github.com/nwarila-platform/.github/tree/main/docs/decision-records).
+  master copies live in
+  [`nwarila-platform/.github`](https://github.com/nwarila-platform/.github/tree/main/docs/decision-records).
 - [`template/`](template/) - byte-identical mirrors of Terraform framework
   template ADRs inherited from `NWarila/terraform-framework-template`.
 - [`repo/`](repo/) - repository-specific ADRs that apply only to this repo.
@@ -35,6 +36,7 @@ repository, split into three scopes per [ADR-0001](org/0001-use-architecture-dec
 | # | Title | Status | Date | Summary |
 | --- | --- | --- | --- | --- |
 | [repo/0001](repo/0001-hardcode-first-security-baseline.md) | Adopt a Hardcode-First Security Baseline | Accepted | 2026-07-22 | Hard-code module-owned security invariants and reserve Terraform validations for unhardcodeable footguns. |
+| [repo/0002](repo/0002-allow-optional-for-additive-object-attributes.md) | Allow `optional()` for Additive Object Attributes | Accepted | 2026-07-25 | Bounded exception permitting bare `optional(T)` only for attributes added to object types pinned consumers already populate. |
 
 ## Authoring Rules
 

@@ -16,7 +16,31 @@ settings. Zero-inbound systems reached only through SSM set
 
 This repository stops at creating reachable instances, gating initial readiness,
 and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
-roles, create networking, or create security group rules.
+roles, create networking, or create shared/cross-system security groups.
+
+All four readiness inputs are per-system and fall back by OS when left null:
+
+| Input | Null resolves to |
+|---|---|
+| `readiness_user` | `ec2-user` on Linux, `Administrator` on Windows |
+| `readiness_command` | `cloud-init status --wait` on Linux, `EC2Launch.exe status -b` on Windows |
+| `readiness_script_dir` | `/home/ec2-user` on Linux; unused on Windows, which needs no upload directory |
+| `readiness_private_key_path` | no key, which is the plan/CI posture |
+
+Override `readiness_command` for images whose provisioning completes on a different
+signal, and `readiness_user` for images with a different default login (ubuntu, rocky,
+admin). Each falls back independently, so overriding one leaves the others on their
+defaults.
+
+Set `readiness_script_dir` when the image mounts `/home` `noexec` - the gate uploads a
+script there and a `noexec` mount fails the upload rather than the command. `/tmp`,
+`/var/tmp` and `/dev/shm` are commonly `noexec` on hardened images, which is why the login
+user's home is the default rather than `/tmp`.
+
+`readiness_private_key_path` is per system rather than per key pair, so two systems sharing
+a key pair may still read it from different paths. A plan-time precondition rejects a path
+that does not exist on the machine running Terraform, instead of letting the gate fail after
+its ten-minute connection timeout.
 
 ## Configure the instance profile
 
@@ -31,29 +55,81 @@ Choose the least-privilege policies that match those instance responsibilities.
 ```hcl
 all_systems = [
   {
-    region               = "us_east_1"
-    hostname             = "app01"
-    availability_zone    = "us-east-1a"
-    subnet_id            = "subnet-0123456789abcdef0"
-    key_name             = "app-ssh-key"
-    iam_instance_profile = "ec2-base-profile"
-    aws_kms_alias        = "ebs-default"
-    ami                  = "app-linux"
+    region                     = "us_east_1"
+    hostname                   = "app01"
+    availability_zone          = "us-east-1a"
+    subnet_id                  = "subnet-replace-me"
+    key_name                   = "app-linux-key"
+    iam_instance_profile       = "ec2-REPLACE_ME-profile"
+    aws_kms_alias              = "ebs-REPLACE_ME"
+    ami                        = "app-linux"
+    refresh                    = false
+    instance_type              = "m6i.large"
+    readiness_user             = null
+    readiness_command          = null
+    readiness_script_dir       = null
+    readiness_private_key_path = "/secure/path/REPLACE_ME-app-linux-key.pem"
+    readiness_gate             = true
+    imds_hop_limit             = 1
+    set_state                  = null
 
     tags = {
       Function = "app"
+      Backup   = true
     }
+
+    root_block_device = {
+      delete_on_termination = true
+      iops                  = null
+      tags                  = {}
+      throughput            = null
+      volume_type           = "gp3"
+      volume_size           = "100"
+    }
+
+    ebs_block_devices = []
+
+    ami_block_device_overrides = []
 
     network_interfaces = [
       {
-        # Null lets AWS pick a free address from the subnet CIDR. Prefer it: the readiness gate
-        # and the Ansible inventory both read the resolved address back out of the
-        # aws_instances output, so nothing downstream needs the address up front. Pin an
-        # address only when something outside this framework points at it.
+        # Null lets AWS pick a free address from the subnet CIDR, and the aws_instances output
+        # reports whichever address it picked. Prefer this: a generated Ansible inventory reads
+        # the address back after apply, so nothing needs it hand-allocated up front.
         private_ip      = null
-        security_groups = ["sg-0123456789abcdef0"]
+        security_groups = ["sg-REPLACE_ME"]
+        # Non-null ingress and egress declare this interface's own "app01-eni-0-sg" group. Its
+        # description and tags come from this same interface, and the framework attaches it only
+        # here. security_groups remains exclusively for pre-created group IDs.
+        description    = "app01 inbound firewall."
+        interface_type = null
+        ingress = [
+          {
+            description                  = "HTTPS from the internal load-balancer subnet"
+            ip_protocol                  = "tcp"
+            from_port                    = 443
+            to_port                      = 443
+            cidr_ipv4                    = "10.0.0.0/16"
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          }
+        ]
+        egress = [
+          {
+            description                  = "All outbound"
+            ip_protocol                  = "-1"
+            from_port                    = null
+            to_port                      = null
+            cidr_ipv4                    = "0.0.0.0/0"
+            prefix_list_id               = null
+            referenced_security_group_id = null
+          }
+        ]
+        tags = {}
       }
     ]
+
+    associate_public_ip = false
   }
 ]
 ```
@@ -79,22 +155,57 @@ latest means most recently built, not highest semantic version. A direct
 
 Windows systems may use `windows_server_2022_base` or
 `windows_server_2025_base`. The framework resolves those keys to the public
-Amazon Windows Server 2022/2025 Base AMIs. Windows `user_data` ensures the
-OpenSSH Server capability is present (Windows Server 2025 ships it in-box;
-2022 installs it as a Feature-on-Demand from Windows Update, or from
-`var.windows_openssh_source` in no-egress environments), starts `sshd`, and
-installs the launch key pair's public key to
-`administrators_authorized_keys` from IMDSv2. On Windows Server 2022 without
-egress, set `windows_openssh_source` or the bootstrap fails loudly rather
-than leaving an unreachable box.
+Amazon Windows Server 2022/2025 Base AMIs.
+
+The image is expected to arrive complete: OpenSSH, cloud-init and the SSM agent
+installed. Bake that into the AMI - `user_data` installs nothing.
+
+What it does cover is the two things an image cannot carry. First, it enables and
+starts `sshd`, because "installed but not enabled" is a plausible state on a
+hardened or third-party image and it strands the box with no way in; both forms
+are idempotent, so an image that already has it running pays nothing. Second, on
+Windows only, it reads the launch key pair's public key from IMDSv2 into
+`administrators_authorized_keys` with the ACLs OpenSSH requires, because
+EC2Launch populates the Administrator password path rather than that file.
+`Start-Service` runs after that write, so the listener never accepts a connection
+it cannot yet authenticate. Linux needs no key step: cloud-init installs the
+launch key into the login user's `authorized_keys` by itself.
+
+If OpenSSH is genuinely absent, `Set-Service` fails and `user_data` aborts, so an
+unreachable image fails loudly rather than silently.
 
 Runtime verification beyond the Terraform readiness gate is outside this
 repository. The pipeline should check that each emitted target is reachable
 before it runs configuration management.
 
-Prefer `windows_server_2025_base` for new deployments; Windows Server 2022
-mainstream support ends on 2026-10-13. Set `var.windows_ami_owners` only when
-mirroring the public Amazon Windows Server Base AMIs into another account.
+Prefer `windows_server_2025_base` for new deployments; Windows Server 2022 mainstream support
+ends on 2026-10-13. The public Windows AMI owner is hardcoded to `amazon` and is not a consumer
+input. Mirror those images into another account only by changing the module.
+
+## Choosing a transport
+
+`connection_type` selects how the readiness gate reaches a system, and which bootstrap
+`user_data` renders to match. Null takes `ssh`, which is the default for every platform.
+
+`winrm` is Windows-only and exists for images that cannot install the OpenSSH
+Feature-on-Demand. Every stock Windows AMI needs Windows Update egress to install it, so in an
+egress-restricted network the SSH gate cannot connect at all. WS-Management is in-box, so it
+works there.
+
+Choosing `winrm` changes three things:
+
+- `user_data` configures a WinRM HTTPS listener on 5986 bound to a certificate the instance
+  generates for itself, removes the HTTP listener, and disables the stock WinRM firewall group.
+  5985 is never opened: Terraform's WinRM client authenticates with NTLM but does not seal
+  messages, so an unencrypted listener would be refused by the service anyway.
+- `get_password_data` turns on, because WinRM authenticates as Administrator with the launch
+  password. The gate decrypts it in flight with `readiness_private_key_path`; only the encrypted
+  blob reaches Terraform state.
+- The gate connects with `https`, `insecure` and `use_ntlm` set. `insecure` is required because
+  the certificate is self-signed and no client can verify it.
+
+Setting `winrm` on a Linux system fails at plan time. The operating system comes from the AMI
+lookup, so the guard is a precondition on the instance rather than a variable validation.
 
 This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
@@ -102,14 +213,15 @@ belongs in the Ansible job.
 
 ## Open readiness access from the controller
 
-Attach consumer-supplied security groups through each network interface. The
-framework references those security groups and does not create security group
-rules.
+Interfaces reference pre-created, consumer-owned groups by ID through `security_groups`.
+Setting non-null `ingress` and `egress` additionally creates a framework-owned
+`<hostname>-eni-<index>-sg` group with those rules, attached only to that interface.
 
 Use this network posture:
 
-- Allow inbound TCP 22 from the Terraform apply host and management or
-  controller source for readiness and SSH management on both platforms.
+- Allow inbound TCP 22 from the Terraform apply host and management or controller
+  source in either a pre-created group or the interface-owned group's `ingress`
+  list for readiness and SSH management on both platforms.
 - Ensure private subnet instances are reachable from the Ansible controller
   through routing, VPN, a bastion path, or another consumer-managed path.
 - RDP on 3389 and WinRM remain consumer opt-in and are not the management
@@ -175,12 +287,11 @@ OS-native launch-agent wait:
 The Terraform step does not complete, and its duration captures the wait, until
 each instance is provisioned and reachable.
 
-Both platforms authenticate with the instance key pair using
-`var.readiness_private_key_paths`; on Windows the bootstrap has installed the
-matching public key for Administrator, so no password decryption occurs and
-`password_data` is never fetched. Leave the map empty for plan and CI; a real
-apply must populate a filesystem path for every `key_name` used by gated
-systems.
+Both platforms authenticate with the instance key pair using each system's
+`readiness_private_key_path`; on Windows the bootstrap has installed the matching
+public key for Administrator, so no password decryption occurs and `password_data`
+is never fetched. Leave it null for plan and CI; a real apply must give every gated
+system a readable path.
 
 ## Treat the key pair as the readiness credential
 
@@ -204,6 +315,40 @@ EC2 instance, so data volumes do not delete automatically when an instance is
 terminated. That is why data-volume entries do not have
 `delete_on_termination`; use `skip_destroy` instead.
 
+Give every data volume a unique, durable `resource_key` and `device_index`.
+Terraform addresses the volume and attachment as
+`<hostname>-ebs-<resource_key>`, while `device_index` 0 through 22 selects the
+stable `sdd`/`xvdd` through `sdz`/`xvdz` device name. Do not change either value
+during the volume's lifetime. List order has no effect on either identity.
+
+When upgrading an existing deployment, set each volume's `resource_key` to its
+former zero-based list index as a string (for example, `"0"` or `"1"`) and set
+`device_index` to that same integer. This preserves both the existing Terraform
+resource address and device name while making later list edits safe.
+
+To adopt a descriptive key instead, move both existing state addresses before
+planning. Use the attachment resource matching the system's `refresh` value:
+
+```console
+terraform -chdir=terraform state mv \
+  'aws_ebs_volume.us_east_1["HOSTNAME-ebs-0"]' \
+  'aws_ebs_volume.us_east_1["HOSTNAME-ebs-data"]'
+terraform -chdir=terraform state mv \
+  'aws_volume_attachment.us_east_1["HOSTNAME-ebs-0"]' \
+  'aws_volume_attachment.us_east_1["HOSTNAME-ebs-data"]'
+```
+
+For a system with `refresh = true`, the attachment address is
+`aws_volume_attachment.us_east_1_refresh[...]`. Run `terraform plan` after every
+migration and verify that it creates or destroys no EBS volume or attachment.
+
+AMI-defined non-root devices use a separate path. Add each such mapping to
+`ami_block_device_overrides` with the exact `device_name` from the AMI. The
+framework then renders an encrypted inline `ebs_block_device` that replaces the
+AMI mapping at launch. Do not copy the AMI's `snapshot_id` into the override;
+the AMI mapping supplies it. Use `ami_block_device_overrides = []` only when the
+AMI defines no device beyond its root mapping.
+
 `skip_destroy` defaults to `false`. With the default, Terraform detaches the
 volume when destroying the attachment. When `skip_destroy = true`, Terraform
 leaves the attachment in place while removing it from state.
@@ -225,6 +370,6 @@ These responsibilities stay outside this repository:
 - Windows management methods beyond the OpenSSH readiness bootstrap.
 - Ansible execution.
 - Controller IAM for the Ansible job.
-- Networking, NAT, VPC endpoints, and security group rule creation.
+- Networking, NAT, VPC endpoints, and shared/cross-system security groups.
 - IAM role, policy, and instance-profile creation.
 - OS hostname setting.
