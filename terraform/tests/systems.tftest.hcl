@@ -1,6 +1,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   # The ENI preconditions read the real subnet, so the mock has to return something coherent:
   # a CIDR wide enough to contain every fixture address (10.0-10.2) and the zone the fixtures
   # declare. Individual runs override this where they need a different subnet.
@@ -497,8 +505,9 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000012"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -728,7 +737,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         key_name             = "east-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "east"
-        ami                  = "windows_server_2025_base"
+        ami                  = "windows@2025"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -831,8 +840,9 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000001"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -840,8 +850,9 @@ run "aws_instances_output_exposes_non_secret_inventory" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2025_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2025"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000002"
       platform         = "windows"
       platform_details = "Windows"
@@ -852,6 +863,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_instance.us_east_1["inv-linux-west"]
     override_during = plan
     values = {
+      state       = "available"
       id          = "i-inventory-linux"
       private_dns = "inv-linux-west.internal"
     }
@@ -861,6 +873,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_network_interface.us_east_1["inv-linux-west-eni-0"]
     override_during = plan
     values = {
+      state      = "available"
       private_ip = "10.0.91.10"
     }
   }
@@ -869,6 +882,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_instance.us_east_1["inv-win-east"]
     override_during = plan
     values = {
+      state       = "available"
       id          = "i-inventory-windows"
       private_dns = "inv-win-east.internal"
     }
@@ -878,6 +892,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_network_interface.us_east_1["inv-win-east-eni-0"]
     override_during = plan
     values = {
+      state      = "available"
       private_ip = "10.1.91.10"
     }
   }
@@ -886,6 +901,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_instance.us_east_1_refresh["inv-refresh"]
     override_during = plan
     values = {
+      state       = "available"
       id          = "i-inventory-refresh"
       private_dns = "inv-refresh.internal"
     }
@@ -895,6 +911,7 @@ run "aws_instances_output_exposes_non_secret_inventory" {
     target          = aws_network_interface.us_east_1["inv-refresh-eni-0"]
     override_during = plan
     values = {
+      state      = "available"
       private_ip = "10.0.91.11"
     }
   }
@@ -1507,7 +1524,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -1579,8 +1596,9 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000003"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -1588,8 +1606,9 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000017"
       platform         = "windows"
       platform_details = "Windows"
@@ -1600,7 +1619,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
     target          = aws_instance.us_east_1["west-ebs"]
     override_during = plan
     values = {
-      id = "i-west-ebs"
+      state = "available"
+      id    = "i-west-ebs"
     }
   }
 
@@ -2287,7 +2307,7 @@ run "environment_rejects_blank_value" {
   ]
 }
 
-run "systems_accept_windows_server_2025_base_ami" {
+run "systems_accept_a_windows_catalog_selector" {
   command = plan
 
   variables {
@@ -2300,7 +2320,7 @@ run "systems_accept_windows_server_2025_base_ami" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2025_base"
+        ami                  = "windows@2025"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -2473,7 +2493,7 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "ttc-win22-sql19:1.2"
+        ami                  = "ttc-win22-sql19@1.2"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -2522,8 +2542,9 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000009"
       platform         = ""
       platform_details = "Windows"
@@ -2531,8 +2552,9 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["prod-rhel8"]
+    target = data.aws_ami.us_east_1_verified["prod-rhel8"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000010"
       platform         = ""
       platform_details = "Windows"
@@ -2540,8 +2562,9 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["ttc-win22-sql19:1.2"]
+    target = data.aws_ami.us_east_1_verified["ttc-win22-sql19@1.2"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000011"
       platform         = "windows"
       platform_details = "Linux/UNIX"
@@ -2549,34 +2572,33 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   }
 
   assert {
-    condition     = contains(keys(data.aws_ami.us_east_1_selfbuilt), "test-linux") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "ttc-win22-sql19:1.2") && contains(keys(data.aws_ami.us_east_1_selfbuilt), "prod-rhel8")
+    condition     = contains(keys(data.aws_ami.us_east_1_verified), "test-linux") && contains(keys(data.aws_ami.us_east_1_verified), "ttc-win22-sql19@1.2") && contains(keys(data.aws_ami.us_east_1_verified), "prod-rhel8")
     error_message = "Self-built name and name:version inputs should instantiate regional self-owned AMI data lookups."
   }
 
+  # The selector-to-key transform is the entire resolution rule: a bare family addresses its
+  # floating "latest" pointer, and "@" becomes a path separator so a pinned version addresses
+  # the matching key. There is nothing else to get wrong, which is the point of the design.
   assert {
     condition = alltrue([
-      local.ami_specs["test-linux"].family == "test-linux",
-      local.ami_specs["test-linux"].version == null,
-      local.ami_specs["test-linux"].glob == "test-linux_v*",
-      local.ami_specs["test-linux"].name_regex == "^test-linux_v[0-9]",
-      local.ami_specs["prod-rhel8"].family == "prod-rhel8",
-      local.ami_specs["prod-rhel8"].glob == "prod-rhel8_v*",
-      local.ami_specs["ttc-win22-sql19:1.2"].family == "ttc-win22-sql19",
-      local.ami_specs["ttc-win22-sql19:1.2"].version == "1.2",
-      local.ami_specs["ttc-win22-sql19:1.2"].glob == "ttc-win22-sql19_v1.2_*",
-      local.ami_specs["ttc-win22-sql19:1.2"].name_regex == "^ttc-win22-sql19_v1\\.2_",
+      local.ami_parameter_name["test-linux"] == "/nwarila/ami/test-linux/latest",
+      local.ami_parameter_name["prod-rhel8"] == "/nwarila/ami/prod-rhel8/latest",
+      local.ami_parameter_name["ttc-win22-sql19@1.2"] == "/nwarila/ami/ttc-win22-sql19/1.2",
     ])
-    error_message = "AMI specs should preserve caller-provided families and build anchored glob/regex selectors in one local."
+    error_message = "A bare family must address its floating latest pointer; an @-suffixed selector must address the matching versioned key."
   }
 
+  # Resolution is scoped to the selectors this configuration actually uses. The previous design
+  # instantiated a lookup for every known public alias whether or not anything referenced it;
+  # the catalog resolves exactly what is asked for and nothing else.
   assert {
     condition = alltrue([
-      contains(keys(local.amazon_machine_images), "windows_server_2025_base"),
       contains(keys(local.amazon_machine_images), "test-linux"),
       contains(keys(local.amazon_machine_images), "prod-rhel8"),
-      contains(keys(local.amazon_machine_images), "ttc-win22-sql19:1.2"),
+      contains(keys(local.amazon_machine_images), "ttc-win22-sql19@1.2"),
+      length(local.amazon_machine_images) == 3,
     ])
-    error_message = "The unified AMI map should be keyed by public aliases and full self-built input strings."
+    error_message = "The resolved image map must hold exactly the selectors in use, so an unreferenced family is never looked up."
   }
 
   assert {
@@ -2723,8 +2745,9 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_direct["ami-0123456789abcdef0"]
+    target = data.aws_ami.us_east_1_verified["ami-0123456789abcdef0"]
     values = {
+      state            = "available"
       id               = "ami-0123456789abcdef0"
       platform         = "windows"
       platform_details = "Linux/UNIX"
@@ -2732,8 +2755,9 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_direct["ami-0fedcba9876543210"]
+    target = data.aws_ami.us_east_1_verified["ami-0fedcba9876543210"]
     values = {
+      state            = "available"
       id               = "ami-0fedcba9876543210"
       platform         = ""
       platform_details = "Windows"
@@ -2741,7 +2765,7 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
   }
 
   assert {
-    condition     = contains(keys(data.aws_ami.us_east_1_direct), "ami-0123456789abcdef0") && contains(keys(data.aws_ami.us_east_1_direct), "ami-0fedcba9876543210")
+    condition     = contains(keys(data.aws_ami.us_east_1_verified), "ami-0123456789abcdef0") && contains(keys(data.aws_ami.us_east_1_verified), "ami-0fedcba9876543210")
     error_message = "Raw AMI IDs should instantiate exact image-id data lookups in their target regions."
   }
 
@@ -2782,7 +2806,7 @@ run "systems_reject_long_hostname_for_data_resolved_windows_ami" {
     all_systems = [
       merge(var.all_systems[0], {
         hostname       = "host-name-123456"
-        ami            = "ttc-win22-sql19:1.2"
+        ami            = "ttc-win22-sql19@1.2"
         readiness_gate = false
         set_state      = null
       })
@@ -2790,8 +2814,9 @@ run "systems_reject_long_hostname_for_data_resolved_windows_ami" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["ttc-win22-sql19:1.2"]
+    target = data.aws_ami.us_east_1_verified["ttc-win22-sql19@1.2"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000011"
       platform         = "windows"
       platform_details = "Windows"
@@ -2810,7 +2835,7 @@ run "refresh_systems_reject_long_hostname_for_data_resolved_windows_ami" {
     all_systems = [
       merge(var.all_systems[0], {
         hostname       = "host-name-654321"
-        ami            = "ttc-win22-sql19:1.2"
+        ami            = "ttc-win22-sql19@1.2"
         refresh        = true
         readiness_gate = false
         set_state      = null
@@ -2819,8 +2844,9 @@ run "refresh_systems_reject_long_hostname_for_data_resolved_windows_ami" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["ttc-win22-sql19:1.2"]
+    target = data.aws_ami.us_east_1_verified["ttc-win22-sql19@1.2"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000011"
       platform         = "windows"
       platform_details = "Windows"
@@ -2845,7 +2871,7 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -2894,8 +2920,9 @@ run "systems_reject_windows_hostnames_over_15_characters" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       platform = "windows"
     }
   }
@@ -2918,7 +2945,7 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -2967,8 +2994,9 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       platform = "windows"
     }
   }
@@ -2991,7 +3019,7 @@ run "systems_reject_all_numeric_windows_hostnames" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -3040,8 +3068,9 @@ run "systems_reject_all_numeric_windows_hostnames" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       platform = "windows"
     }
   }
@@ -3064,7 +3093,7 @@ run "systems_accept_valid_windows_hostnames" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -3113,8 +3142,9 @@ run "systems_accept_valid_windows_hostnames" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       platform = "windows"
     }
   }
@@ -3186,8 +3216,9 @@ run "systems_default_linux_readiness_script_dir" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3264,8 +3295,9 @@ run "systems_override_linux_readiness_script_dir" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3342,8 +3374,9 @@ run "systems_reject_relative_readiness_script_dir" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3414,8 +3447,9 @@ run "systems_reject_trailing_slash_readiness_script_dir" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3486,8 +3520,9 @@ run "readiness_gate_allows_a_null_private_key_path" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3562,8 +3597,9 @@ run "readiness_gate_rejects_a_missing_private_key_file" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000013"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3693,7 +3729,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         key_name                   = "west-key"
         iam_instance_profile       = "example-instance-profile"
         aws_kms_alias              = "west"
-        ami                        = "windows_server_2022_base"
+        ami                        = "windows@2022"
         readiness_user             = "ReadinessAdmin"
         readiness_command          = "powershell -Command \"Wait-Provisioning\""
         readiness_script_dir       = null
@@ -3746,7 +3782,7 @@ run "readiness_targets_thread_per_system_readiness_user" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -3795,8 +3831,9 @@ run "readiness_targets_thread_per_system_readiness_user" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000015"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3804,8 +3841,9 @@ run "readiness_targets_thread_per_system_readiness_user" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000016"
       platform         = "windows"
       platform_details = "Windows"
@@ -3820,14 +3858,15 @@ run "readiness_targets_thread_per_system_readiness_user" {
     error_message = "Readiness targets should preserve per-system readiness_user overrides for Linux and Windows."
   }
 
-  # Only the alias this config references is looked up. Both public images share one
-  # data source now, so nothing else stops it fanning out to every known alias.
+  # Only the selectors this config references are looked up, one entry each. Nothing enumerates
+  # a list of known families, so an unreferenced image can never be fetched.
   assert {
     condition = alltrue([
-      length(data.aws_ami.us_east_1_public) == 1,
-      contains(keys(data.aws_ami.us_east_1_public), "windows_server_2022_base"),
+      length(data.aws_ami.us_east_1_verified) == 2,
+      contains(keys(data.aws_ami.us_east_1_verified), "windows@2022"),
+      contains(keys(data.aws_ami.us_east_1_verified), "test-linux"),
     ])
-    error_message = "Referencing one public alias must look up that image only, not every known public alias."
+    error_message = "Each referenced selector must be verified exactly once, and no unreferenced family may be looked up."
   }
 
   # The OS fallback resolves here rather than in the resource, so an unset readiness_user
@@ -3925,7 +3964,7 @@ run "systems_render_readiness_user_data_per_os" {
         key_name             = "west-key"
         iam_instance_profile = "example-instance-profile"
         aws_kms_alias        = "west"
-        ami                  = "windows_server_2022_base"
+        ami                  = "windows@2022"
 
         refresh                    = false
         instance_type              = "m6i.large"
@@ -3974,8 +4013,9 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000005"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -3983,8 +4023,9 @@ run "systems_render_readiness_user_data_per_os" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000006"
       platform         = "windows"
       platform_details = "Windows"
@@ -4686,8 +4727,9 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   command = plan
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000007"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"

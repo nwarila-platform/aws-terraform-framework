@@ -210,6 +210,43 @@ variable "all_systems" {
   default  = []
   nullable = false
 
+  # Image selector grammar. Either the literal-id escape hatch, or a catalog address: a lowercase
+  # family, optionally suffixed with "@" and up to three dot-separated numeric segments. Leading
+  # segments are 1-4 digit vendor version components; a build date is atomic YYYYMMDD and may
+  # appear only last. Every omitted trailing segment is drift the consumer accepts, so "rhel@8"
+  # takes minor and patch drift, "rhel@8.10" takes patch drift, and "rhel@8.10.20260808" is exact.
+  #
+  # Rejecting the near-misses here is the point. A 6-digit month ("rhel@8.10.202608") looks like a
+  # pin but behaves like a floating pointer until the month ends and then becomes a stale one, so
+  # it matches nothing. Uppercase is rejected rather than folded, because the selector is used
+  # verbatim as an SSM key and two spellings would address two different parameters.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems : (
+        can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) ||
+        (
+          can(regex("^[a-z][a-z0-9-]+(@[0-9][0-9.]*)?$", system.ami)) &&
+          length(try(split(".", split("@", system.ami)[1]), [])) <= 3 &&
+          alltrue([
+            for index, segment in try(split(".", split("@", system.ami)[1]), []) :
+            can(regex("^[0-9]{1,4}$", segment)) ||
+            (
+              can(regex("^[0-9]{8}$", segment)) &&
+              index == length(try(split(".", split("@", system.ami)[1]), [])) - 1
+            )
+          ])
+        )
+      )
+    ])
+    error_message = join(" ", [
+      "Each all_systems ami must be a literal \"ami-<hex>\" id, a lowercase family such as",
+      "\"rhel\", or a catalog address such as \"rhel@8.10.20260808\" - at most three numeric",
+      "segments, where only the last may be an 8-digit YYYYMMDD build date. Month prefixes like",
+      "\"8.10.202608\" are invalid by design: they cannot freeze a patch level and go stale",
+      "silently.",
+    ])
+  }
+
   # An omitted attribute is already rejected by the type checker, so this only fires on an
   # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
   # null there silently produces zero volumes instead of failing.
@@ -434,20 +471,6 @@ variable "all_systems" {
         ]
       ]))),
     )
-  }
-
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      contains(["windows_server_2022_base", "windows_server_2025_base"], system.ami) ||
-      can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) ||
-      can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*(:[0-9]+(\\.[0-9]+)*)?$", system.ami))
-    ])
-    error_message = join(" ", [
-      "Each all_systems entry ami must be windows_server_2022_base, windows_server_2025_base, a",
-      "raw AMI ID matching ami-[0-9a-f]{8,17}, or a self-built AMI family optionally pinned as",
-      "family:version.",
-    ])
   }
 
   validation {

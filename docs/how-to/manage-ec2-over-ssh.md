@@ -146,16 +146,34 @@ and starts whichever SSH unit the distro provides at boot:
 systemctl enable --now sshd || systemctl enable --now ssh
 ```
 
-Self-built AMIs can be selected by family name, such as `app-linux`, or by a
-version pin, such as `app-linux:8.10`. The framework resolves non-versioned
-families against self-owned AMI names shaped `<family>_v<number>...`; version
-pins resolve `<family>_v<version>_...`. In both cases `most_recent = true`;
-latest means most recently built, not highest semantic version. A direct
-`ami-...` ID remains an exact pin.
+Images are addressed, never discovered. Write a selector such as `rhel@8.10` and
+the framework turns it into one exact key in the image catalog, reads the AMI ID
+stored there, and verifies that image before launching it. There is no name
+filter and no `most_recent` anywhere, so a plan resolves to the same image every
+time until the catalog itself changes.
 
-Windows systems may use `windows_server_2022_base` or
-`windows_server_2025_base`. The framework resolves those keys to the public
-Amazon Windows Server 2022/2025 Base AMIs.
+How much drift a selector accepts is decided by how much of it you write. Each
+omitted trailing segment floats:
+
+| Selector | Resolves to | Drift accepted |
+| --- | --- | --- |
+| `rhel` | the family's floating `latest` pointer | any new publish |
+| `rhel@8` | the major-version pointer | minor and build drift within 8 |
+| `rhel@8.10` | the minor-version pointer | build drift within 8.10 |
+| `rhel@8.10.20260808` | that day's immutable entry | none - bit-exact forever |
+
+The build date is atomic: it is a full `YYYYMMDD` and may appear only as the last
+segment. A month prefix such as `rhel@8.10.202608` is rejected at
+`terraform validate`, because it reads as a pin but behaves like a floating
+pointer until the month ends and a stale one after that. Selectors are lowercase
+and used verbatim as catalog keys, so case is rejected rather than folded.
+
+A selector naming a family or version that was never published fails the plan
+rather than falling back to anything approximate.
+
+A direct `ami-...` ID remains an exact pin and bypasses the catalog, but is still
+verified. Every image the framework launches - addressed or pinned - must be
+owned by the deploying account.
 
 The image is expected to arrive complete: OpenSSH, cloud-init and the SSM agent
 installed. Bake that into the AMI - `user_data` installs nothing.
@@ -178,9 +196,11 @@ Runtime verification beyond the Terraform readiness gate is outside this
 repository. The pipeline should check that each emitted target is reachable
 before it runs configuration management.
 
-Prefer `windows_server_2025_base` for new deployments; Windows Server 2022 mainstream support
-ends on 2026-10-13. The public Windows AMI owner is hardcoded to `amazon` and is not a consumer
-input. Mirror those images into another account only by changing the module.
+Prefer `windows@2025` over `windows@2022` for new deployments; Windows Server 2022 mainstream
+support ends on 2026-10-13. Windows selectors are two-deep - an LTSC year and a build date - and
+no minor segment is invented for them. The image owner is hardcoded to the deploying account and
+is not a consumer input, so publishing a Windows image into the catalog is what makes it
+selectable.
 
 ## Choosing a transport
 

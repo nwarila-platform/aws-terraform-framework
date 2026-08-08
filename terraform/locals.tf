@@ -5,45 +5,35 @@
 locals {
   #region ------ [ Amazon Machine Image Resolution ] ------------------------------------------- #
 
-  # The public images this framework recognises, and the name each resolves by. Adding one
-  # is an entry here, not another data source.
-  public_ami_name_regex = {
-    windows_server_2022_base = "^Windows_Server-2022-English-Full-Base-[\\d.]+$"
-    windows_server_2025_base = "^Windows_Server-2025-English-Full-Base-[\\d.]+$"
+  # Images are addressed, never discovered. A selector is either the literal-id escape hatch
+  # (ami-<hex>) or a catalog address: a bare family floats on every publish, and each "@"-suffixed
+  # segment pins one level further until an atomic build date freezes it exactly. The grammar is
+  # enforced on var.all_systems, so everything below may assume a well-formed lowercase selector.
+  #
+  # Deduplicated to the distinct selectors actually in play: twenty systems sharing one image cost
+  # one parameter read and one image lookup, not twenty of each.
+  ami_selectors = toset([for system in var.all_systems : system.ami])
+
+  # A literal id bypasses the catalog; every other selector resolves through it.
+  catalog_selectors = toset([for ami in local.ami_selectors : ami if !startswith(ami, "ami-")])
+
+  # Selector to exact SSM key: "@" becomes a path separator, and a bare family addresses the
+  # floating "latest" pointer. This is a pure string transformation - no name filter, no
+  # most_recent, no discovery of any kind. An address that was never published fails the plan
+  # instead of silently resolving to the closest thing available.
+  ami_parameter_name = {
+    for ami in local.catalog_selectors : ami =>
+    "/nwarila/ami/${strcontains(ami, "@") ? replace(ami, "@", "/") : "${ami}/latest"}"
   }
 
-  public_ami_aliases = toset(keys(local.public_ami_name_regex))
-
-  ami_specs = {
-    for ami in toset([for system in var.all_systems : system.ami]) : ami => {
-      is_direct_id    = can(regex("^ami-[0-9a-f]{8,17}$", ami))
-      is_public_alias = contains(local.public_ami_aliases, ami)
-      family          = split(":", ami)[0]
-      version         = can(regex(":", ami)) ? split(":", ami)[1] : null
-      glob            = can(regex(":", ami)) ? "${split(":", ami)[0]}_v${split(":", ami)[1]}_*" : "${ami}_v*"
-      name_regex      = can(regex(":", ami)) ? "^${replace(split(":", ami)[0], ".", "\\.")}_v${replace(split(":", ami)[1], ".", "\\.")}_" : "^${replace(ami, ".", "\\.")}_v[0-9]"
+  # One verified image object per selector, keyed the way the rest of the plan already keys
+  # images. Consumers read .id, .platform, .platform_details, .root_device_name and
+  # .block_device_mappings from here and never learn whether the id was pinned or resolved.
+  amazon_machine_images = {
+    for ami in local.ami_selectors : ami => {
+      us_east_1 = try(data.aws_ami.us_east_1_verified[ami], null)
     }
   }
-
-  amazon_machine_images = merge(
-    {
-      for alias in local.public_ami_aliases : alias => {
-        us_east_1 = try(data.aws_ami.us_east_1_public[alias], null)
-      }
-    },
-    {
-      for ami, spec in local.ami_specs : ami => {
-        us_east_1 = try(data.aws_ami.us_east_1_direct[ami], null)
-      }
-      if spec.is_direct_id
-    },
-    {
-      for ami, spec in local.ami_specs : ami => {
-        us_east_1 = try(data.aws_ami.us_east_1_selfbuilt[ami], null)
-      }
-      if !spec.is_direct_id && !spec.is_public_alias
-    }
-  )
 
   #endregion --- [ Amazon Machine Image Resolution ] ------------------------------------------- #
 

@@ -7,6 +7,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   # The ENI preconditions read the real subnet, so the mock has to return something coherent:
   # a CIDR wide enough to contain every fixture address (10.0-10.2) and the zone the fixtures
   # declare. Individual runs override this where they need a different subnet.
@@ -35,8 +43,9 @@ variables {
 
 # A CIS/STIG-shaped AMI: an encrypted root plus a second mapping the image ships unencrypted.
 override_data {
-  target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+  target = data.aws_ami.us_east_1_verified["test-linux"]
   values = {
+    state            = "available"
     id               = "ami-00000000000000042"
     platform         = ""
     platform_details = "Red Hat Enterprise Linux"

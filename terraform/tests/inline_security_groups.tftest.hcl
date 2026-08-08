@@ -1,6 +1,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   # Interface-group VPC derivation reads the parent system's subnet when subnet_id is a literal
   # id.
   mock_data "aws_subnet" {
