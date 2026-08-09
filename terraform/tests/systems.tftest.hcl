@@ -4032,17 +4032,40 @@ run "systems_render_readiness_user_data_per_os" {
     }
   }
 
-  # Linux only enables and starts sshd. It installs nothing: the SSM agent and OpenSSH itself
-  # are AMI responsibility, and cloud-init installs the launch key without help.
+  # Linux enables sshd and the SSM agent. OpenSSH and cloud-init stay AMI responsibility; the
+  # agent does not, because every image launched today is a vendor one and CIS RHEL ships the
+  # agent disabled, so without this the host is created healthy and never becomes manageable.
+  #
+  # Both steps are idempotent by construction: each is an `enable --now`, which is a no-op on a
+  # unit that is already enabled and running, and the install only runs when enabling failed.
   assert {
     condition = alltrue([
       aws_instance.us_east_1["linux-ssh"].user_data != null,
       strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "systemctl enable --now sshd || systemctl enable --now ssh"),
-      !strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "amazon-ssm-agent"),
-      !strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "rpm -Uvh"),
+      strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "systemctl enable --now amazon-ssm-agent"),
+      strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "rpm -Uvh --replacepkgs /root/amazon-ssm-agent.rpm"),
+    ])
+    error_message = "Linux user_data must enable sshd with the ssh.service fallback, and enable the SSM agent, installing it only if enabling fails."
+  }
+
+  # The region sentinel has to be substituted, or the agent is fetched from a bucket that does
+  # not exist and the failure only shows up in a boot log.
+  assert {
+    condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm"),
       !strcontains(local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data, "__AWS_REGION__"),
     ])
-    error_message = "Linux user_data must enable and start sshd with the ssh.service fallback, and install nothing."
+    error_message = "The __AWS_REGION__ sentinel must be substituted with the hyphenated region, so the agent is fetched from the region the instance boots into."
+  }
+
+  # Amazon's Windows images register with SSM on their own. Adding a step there would be
+  # symmetry for its own sake, and one more thing to fail at boot.
+  assert {
+    condition = alltrue([
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "amazon-ssm-agent"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "AmazonSSMAgent"),
+    ])
+    error_message = "Windows user_data must not gain an SSM bootstrap; those images register on their own."
   }
 
   assert {
