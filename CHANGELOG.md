@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.1...v3.1.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ec2:** make the EIP association wait for the instance to leave pending ([#120](https://github.com/nwarila-platform/aws-terraform-framework/issues/120)) ([c1ea7f3](https://github.com/nwarila-platform/aws-terraform-framework/commit/c1ea7f3b5c30c80c08eb28fda34327feff61f44e))
+
 ## [3.1.1](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.0...v3.1.1) (2026-08-09)
 
 
