@@ -206,6 +206,25 @@ resource "aws_eip_association" "us_east_1" {
   allocation_id        = aws_eip.us_east_1[each.key].id
   network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
 
+  # Associating by interface rather than by instance is deliberate: the interface outlives an
+  # OS swap, so the replacement instance inherits the address with no association churn and no
+  # window without a public IP. The cost is that this resource's only real dependencies are the
+  # address and the interface, both of which exist before the instance does - so nothing stops
+  # AssociateAddress being called while the instance is still pending-instance-creation, which
+  # AWS rejects with IncorrectInstanceState and the provider does not retry.
+  #
+  # The edge is therefore stated rather than derived. It is coarse - every association waits for
+  # every instance rather than its own, because depends_on cannot be computed per key - and that
+  # is acceptable: association is fast, and the alternative is an apply that fails roughly one
+  # run in ten with most of the stack already created.
+  #
+  # Enforced by `make eip-order-check`, because a plan cannot see a race and the tests cannot
+  # see the graph.
+  depends_on = [
+    aws_instance.us_east_1,
+    aws_instance.us_east_1_refresh,
+  ]
+
 }
 
 #endregion --- [ aws_eip_association - us-east-1 ] --------------------------------------------- #
