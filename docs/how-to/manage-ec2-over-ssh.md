@@ -172,8 +172,22 @@ A selector naming a family or version that was never published fails the plan
 rather than falling back to anything approximate.
 
 A direct `ami-...` ID remains an exact pin and bypasses the catalog, but is still
-verified. Every image the framework launches - addressed or pinned - must be
-owned by the deploying account.
+verified.
+
+Ownership is checked either way, with a deliberate asymmetry. A catalog selector
+must resolve to an image the deploying account published - nothing else can
+satisfy a named address. A literal ID may additionally name one of two vendor
+accounts, because those base images are pinned directly rather than republished:
+
+| Account | Images |
+| --- | --- |
+| the deploying account | everything this org builds |
+| `679593333241` | CIS hardened images from the AWS Marketplace |
+| `801119661308` | Amazon-published Windows Server images |
+
+That list is temporary. Once those images are mirrored into the catalog they
+become ordinary selectors and the exception goes away. An image owned by any
+other account fails the plan whichever form you use.
 
 The image is expected to arrive complete: OpenSSH, cloud-init and the SSM agent
 installed. Bake that into the AMI - `user_data` installs nothing.

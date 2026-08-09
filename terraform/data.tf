@@ -43,10 +43,13 @@ data "aws_ami" "us_east_1_verified" {
     if replace(system.region, "-", "_") == "us_east_1"
   ])
 
-  # Module-owned (ADR repo/0001): every image this framework launches is one the deploying
-  # account built and owns. An id says nothing about who produced it, so pinning the owner is
-  # what stops a look-alike in an unrelated account from being launched on a matching id alone.
-  owners = ["self"]
+  # Module-owned (ADR repo/0001). An id says nothing about who produced it, so pinning the owner
+  # is what stops a look-alike in an unrelated account being launched on a matching id alone.
+  #
+  # A catalog selector only ever resolves to an image the deploying account published, so it is
+  # held to "self". A literal id is the escape hatch for images this framework did not build, so
+  # it additionally accepts the vendor accounts in local.direct_ami_owners.
+  owners = startswith(each.value, "ami-") ? local.direct_ami_owners : ["self"]
 
   filter {
     name = "image-id"
