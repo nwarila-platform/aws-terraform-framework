@@ -83,10 +83,17 @@ locals {
 
   #region ------ [ SSH Bootstrap User Data ] --------------------------------------------------- #
 
-  # user_data covers two things only: making sure sshd is actually running, and installing the
-  # launch key. Installing OpenSSH, the SSM agent and cloud-init is the AMI's job and is assumed
-  # done - in-house images ship them by default. Both steps below are idempotent, so an image
-  # that already has sshd enabled pays nothing for them.
+  # user_data covers three things: making sure sshd is actually running, installing the launch
+  # key, and making sure the SSM agent is running on Linux. Installing OpenSSH and cloud-init is
+  # still the AMI's job. Every step below is idempotent, so an image that already has them
+  # enabled pays nothing.
+  #
+  # The SSM step is here because "in-house images ship the agent" is not yet true of anything
+  # this framework launches: the catalog is unpopulated, so every image in play is a vendor one
+  # reached through the literal ami- escape hatch. Amazon's Windows images register on their own;
+  # CIS RHEL ships the agent without enabling it, so an instance launches healthy and never
+  # becomes manageable. TEMPORARY on the same terms as that escape hatch - it goes when images
+  # are mirrored into the catalog and the in-house assumption starts holding.
   #
   # The enable-and-start guard stays because "installed but not enabled" is the plausible failure
   # mode on a hardened or third-party image, and it strands the box with no way in. On Windows,
@@ -146,10 +153,20 @@ locals {
   WINDOWS_WINRM_USER_DATA
 
   # sshd.service on RHEL-family images, ssh.service on Debian-family ones.
+  # __AWS_REGION__ is substituted with the hyphenated region where user_data is rendered, so the
+  # agent is fetched from the S3 bucket in the region it is booting into rather than across one.
+  #
+  # Enable first, download second: the common case on a hardened image is an agent that is
+  # installed but not enabled, and that path needs no network at all. The install only runs when
+  # enabling failed, and it needs egress at boot - on an image with no route to S3 it fails, and
+  # the failure lands in the console log and in cloud-init's status rather than leaving a host
+  # that looks healthy and is unreachable.
   linux_ssh_user_data = <<-LINUX_USER_DATA
     #cloud-config
     runcmd:
       - systemctl enable --now sshd || systemctl enable --now ssh
+      - systemctl enable --now amazon-ssm-agent 2>/dev/null || curl -sSL -o /root/amazon-ssm-agent.rpm https://s3.__AWS_REGION__.amazonaws.com/amazon-ssm-__AWS_REGION__/latest/linux_amd64/amazon-ssm-agent.rpm
+      - test -f /root/amazon-ssm-agent.rpm && rpm -Uvh --replacepkgs /root/amazon-ssm-agent.rpm && systemctl enable --now amazon-ssm-agent
   LINUX_USER_DATA
 
   #endregion --- [ SSH Bootstrap User Data ] --------------------------------------------------- #
@@ -488,6 +505,10 @@ locals {
           coalesce(system.connection_type, "ssh") == "winrm"
         )
 
+        # The SSM step is deliberately not gated on connection_type. That field says how the
+        # framework's own readiness gate connects, not whether the consumer will administer the
+        # host over SSM afterwards - an "ssh" system reached through SSM by its configuration
+        # management is the normal case, so every Linux image gets the agent.
         user_data = trimspace(
           local.amazon_machine_images[system.ami][region].platform == "windows"
           ? (
@@ -495,7 +516,7 @@ locals {
             ? local.windows_winrm_user_data
             : local.windows_ssh_user_data
           )
-          : local.linux_ssh_user_data
+          : replace(local.linux_ssh_user_data, "__AWS_REGION__", replace(region, "_", "-"))
         )
 
         root_block_device = {

@@ -189,8 +189,17 @@ That list is temporary. Once those images are mirrored into the catalog they
 become ordinary selectors and the exception goes away. An image owned by any
 other account fails the plan whichever form you use.
 
-The image is expected to arrive complete: OpenSSH, cloud-init and the SSM agent
-installed. Bake that into the AMI - `user_data` installs nothing.
+The image is expected to arrive with OpenSSH and cloud-init installed. Bake those into the AMI.
+
+The SSM agent is the exception, on Linux only. `user_data` enables it if the image ships it
+disabled, and installs it from the region's S3 bucket if the image lacks it entirely. That is
+temporary: it exists because the image catalog is unpopulated, so every image in play today is a
+vendor one reached through the literal `ami-` escape hatch, and CIS RHEL ships the agent without
+enabling it. Amazon's Windows images register on their own and get no such step.
+
+The install path needs egress at boot. On an image with no route to S3 it fails, and the failure
+appears in the console log and in `cloud-init status` rather than leaving a host that looks
+healthy and never becomes manageable.
 
 What it does cover is the two things an image cannot carry. First, it enables and
 starts `sshd`, because "installed but not enabled" is a plausible state on a
