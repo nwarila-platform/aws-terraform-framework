@@ -122,6 +122,12 @@ locals {
   # connections it cannot yet authenticate. Set-Service is only registry config, so it stays up
   # top with the rest of the configuration.
   #
+  # Windows also opens the port, mirroring what the WinRM path does for 5986. A hardened image
+  # may ship OpenSSH with its inbound rule absent or disabled, and the host firewall then refuses
+  # the connection whether or not sshd is listening - the readiness gate times out against a
+  # machine that is running perfectly. The rule sits with the other configuration, before
+  # Start-Service: opening a port nothing is listening on yet is inert.
+  #
   # Windows additionally needs the key install: EC2Launch populates the Administrator password
   # path, not administrators_authorized_keys. The OpenSSH default shell is deliberately left as
   # cmd; setting it to PowerShell breaks the remote-exec SCP upload the readiness gate uses.
@@ -132,6 +138,7 @@ locals {
     $ErrorActionPreference = "Stop"
 
     Set-Service -Name sshd -StartupType Automatic
+    New-NetFirewallRule -DisplayName "OpenSSH SSH Server" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
 
     $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
     $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }

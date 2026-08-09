@@ -201,16 +201,26 @@ The install path needs egress at boot. On an image with no route to S3 it fails,
 appears in the console log and in `cloud-init status` rather than leaving a host that looks
 healthy and never becomes manageable.
 
-What it does cover is the two things an image cannot carry. First, it enables and
+What it does cover is what an image cannot carry. First, it enables and
 starts `sshd`, because "installed but not enabled" is a plausible state on a
 hardened or third-party image and it strands the box with no way in; both forms
-are idempotent, so an image that already has it running pays nothing. Second, on
-Windows only, it reads the launch key pair's public key from IMDSv2 into
+are idempotent, so an image that already has it running pays nothing.
+
+Second, on Windows only, it reads the launch key pair's public key from IMDSv2 into
 `administrators_authorized_keys` with the ACLs OpenSSH requires, because
 EC2Launch populates the Administrator password path rather than that file.
 `Start-Service` runs after that write, so the listener never accepts a connection
 it cannot yet authenticate. Linux needs no key step: cloud-init installs the
 launch key into the login user's `authorized_keys` by itself.
+
+Third, again on Windows only, it opens inbound TCP 22 in the host firewall,
+mirroring what the WinRM path does for 5986. A hardened image may ship OpenSSH
+with its inbound rule absent or disabled, and the firewall then refuses the
+connection whether or not `sshd` is listening — the readiness gate times out
+against a machine that is running perfectly. The rule is created with the rest of
+the configuration, before `Start-Service`, because opening a port nothing is
+listening on yet is inert. Linux needs no equivalent: security groups are the
+only filter in front of it.
 
 If OpenSSH is genuinely absent, `Set-Service` fails and `user_data` aborts, so an
 unreachable image fails loudly rather than silently.

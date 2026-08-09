@@ -105,9 +105,13 @@ run "windows_defaults_to_ssh_and_fetches_no_password" {
   assert {
     condition = (
       strcontains(local.elastic_compute_cloud.us_east_1["win-transport"].user_data, "administrators_authorized_keys") &&
-      !strcontains(local.elastic_compute_cloud.us_east_1["win-transport"].user_data, "WSMan")
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-transport"].user_data, "WSMan") &&
+      # The port has to be opened too. A hardened image may ship OpenSSH with its inbound rule
+      # absent or disabled, and the host firewall then refuses the connection whether or not
+      # sshd is listening - the readiness gate times out against a machine that is running fine.
+      strcontains(local.elastic_compute_cloud.us_east_1["win-transport"].user_data, "New-NetFirewallRule -DisplayName \"OpenSSH SSH Server\" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow")
     )
-    error_message = "The SSH transport must render the key-install bootstrap, not the WinRM one."
+    error_message = "The SSH transport must render the key-install bootstrap and open TCP 22, not the WinRM one."
   }
 
   assert {
