@@ -105,6 +105,32 @@ variables {
   ]
 }
 
+# What provider default_tags carries, pinned as an exact key set. These six are the only keys
+# whose value is identical on every resource; a seventh added here would be silently wrong
+# somewhere, and one removed would drop out of the create request.
+#
+# Nothing in this suite can prove those tags reach the RunInstances request. plan, validate and
+# terraform test all stop at Terraform's own graph and never inspect an API call, which is
+# exactly why removing default_tags once passed every gate and still broke every launch under a
+# policy conditioning on aws:RequestTag. The only end-to-end proof is an apply against such a
+# policy.
+run "identity_tags_carry_exactly_the_six_uniform_keys" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      sort(keys(local.identity_tags)) == sort(["CommitSha", "Environment", "ManagedBy", "Repository", "RepositoryId", "RunId"]),
+      local.identity_tags["CommitSha"] == "0123456789abcdef0123456789abcdef01234567",
+      local.identity_tags["Environment"] == "test",
+      local.identity_tags["ManagedBy"] == "Terraform",
+      local.identity_tags["Repository"] == "nwarila-platform/aws-terraform-framework",
+      local.identity_tags["RepositoryId"] == "123456789",
+      local.identity_tags["RunId"] == "42",
+    ])
+    error_message = "default_tags must carry exactly the six identity keys whose value is uniform across every resource."
+  }
+}
+
 run "rejects_environment_outside_lowercase_set" {
   command = plan
 

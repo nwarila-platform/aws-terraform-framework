@@ -109,9 +109,20 @@ matching Packer variable declarations for every top-level variable it assigns.
   wiring); `locals.tf` is the only place shaping logic lives.
 - Every taggable resource merges consumer tags under a non-overwritable PascalCase
   framework set (`Name`, `Environment`, `ManagedBy`, `Repository`, `RepositoryId`,
-  `CommitSha`, `RunId`), composed in `locals.tf`. There is no provider `default_tags`:
-  every tag map is built explicitly, which is also the only way to reach EC2 root
-  volumes.
+  `CommitSha`, `RunId`), composed in `locals.tf`.
+- The six keys whose value never varies are *additionally* set as provider
+  `default_tags`, and that is not redundant. `default_tags` is the only mechanism that
+  puts tags inside the create API call: `RunInstances` carries them in its
+  `TagSpecifications`, so the volumes it creates are tagged as they are born. A tag
+  written in a resource's own `tags` block is applied afterwards by a separate
+  `CreateTags` call, so the create request carries no `aws:RequestTag` key and a launch
+  policy conditioning on one cannot match. Removing `default_tags` therefore breaks any
+  consumer whose `ec2:RunInstances` grant is scoped that way — with no signal from
+  `plan`, `validate`, or `terraform test`, none of which inspects an API request.
+- Explicit per-resource maps stay for the keys whose value varies (`Name`, `Index`,
+  `DeviceName`, `OS`, `Backup`, `Function`). `RunInstances` applies one tag set to every
+  volume in the request, so per-device values could not live in `default_tags` even in
+  principle. The two mechanisms are complementary, never alternatives.
 - PascalCase holds without exception because AWS recognises `Name` only in that exact
   casing — it is what the console shows as a resource's display name — so PascalCase is
   the one convention needing no carve-out. AWS tag keys are case-sensitive, so

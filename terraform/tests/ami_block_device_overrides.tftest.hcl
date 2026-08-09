@@ -249,6 +249,26 @@ run "single_override_renders_encrypted_ebs_block_device" {
     ])
     error_message = "A single AMI override must normalize to one encrypted block carrying every authored property and the system's KMS alias."
   }
+
+  # These volumes carried no tags at all until the identity map was added, so every
+  # ec2:ResourceTag-scoped grant for DeleteVolume, DetachVolume and ModifyVolume missed them and
+  # an identity-based reaper could not find them after a failed run.
+  assert {
+    condition = alltrue([
+      for key, expected in {
+        CommitSha    = "0123456789abcdef0123456789abcdef01234567"
+        DeviceName   = "/dev/sdf"
+        Environment  = "test"
+        ManagedBy    = "Terraform"
+        Name         = "ami-override"
+        Repository   = "nwarila-platform/aws-terraform-framework"
+        RepositoryId = "123456789"
+        RunId        = "42"
+      } :
+      one(aws_instance.us_east_1["ami-override"].ebs_block_device).tags[key] == expected
+    ])
+    error_message = "A volume created from an AMI override must carry the deployment identity plus its own device name."
+  }
 }
 
 run "refresh_override_matches_normal_override" {
