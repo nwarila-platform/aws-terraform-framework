@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.0.0...v3.1.0) (2026-08-09)
+
+
+### Features
+
+* **ec2:** accept two vendor accounts for directly pinned images ([#111](https://github.com/nwarila-platform/aws-terraform-framework/issues/111)) ([027faa4](https://github.com/nwarila-platform/aws-terraform-framework/commit/027faa4cb67ce389c7059fe5266020e53570c8d4))
+* **ec2:** name the transport channel, and skip runner ingress for tunnelled systems ([#113](https://github.com/nwarila-platform/aws-terraform-framework/issues/113)) ([1f280fa](https://github.com/nwarila-platform/aws-terraform-framework/commit/1f280fabdf0f52e0c85502b531079181f2d7b7ce))
+
+
+### Bug Fixes
+
+* **ec2:** bootstrap the SSM agent on Linux again, for vendor images ([#116](https://github.com/nwarila-platform/aws-terraform-framework/issues/116)) ([7643272](https://github.com/nwarila-platform/aws-terraform-framework/commit/764327228ae382a23e495ff0ce1f498e3c5a21fe))
+* **ec2:** put identity tags in the launch request, not only on the resource ([#114](https://github.com/nwarila-platform/aws-terraform-framework/issues/114)) ([2e00722](https://github.com/nwarila-platform/aws-terraform-framework/commit/2e0072224606b8c93909a022ed7b22ae99d1bdbb))
+
 ## [3.0.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.2.0...v3.0.0) (2026-08-09)
 
 
