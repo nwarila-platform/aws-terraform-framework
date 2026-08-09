@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.1](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.0...v3.1.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ec2:** open inbound TCP 22 in the Windows SSH bootstrap ([#119](https://github.com/nwarila-platform/aws-terraform-framework/issues/119)) ([9bc479c](https://github.com/nwarila-platform/aws-terraform-framework/commit/9bc479c8f8ad779f4b8fa8f5d238208216921b09))
+* stop silently discarding consumer tags on systems and databases ([#117](https://github.com/nwarila-platform/aws-terraform-framework/issues/117)) ([52ea43e](https://github.com/nwarila-platform/aws-terraform-framework/commit/52ea43edd91b8fb16704d4e0a255b9f8d49b445f))
+
 ## [3.1.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.0.0...v3.1.0) (2026-08-09)
 
 
