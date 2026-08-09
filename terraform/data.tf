@@ -1,138 +1,108 @@
 # Pre-existing infrastructure lookups. Managed-capability names are excluded from these
 # lookups so a managed reference is never resolved as pre-existing.
 
-#region ------ [ aws_ami (self-built) ] -------------------------------------------------------- #
+#region ------ [ aws_ssm_parameter (image catalog) ] ------------------------------------------- #
 
-#region ------ [ aws_ami.us_east_1_selfbuilt - us-east-1 ] ------------------------------------- #
+#region ------ [ aws_ssm_parameter.us_east_1_ami - us-east-1 ] --------------------------------- #
 
-data "aws_ami" "us_east_1_selfbuilt" {
+data "aws_ssm_parameter" "us_east_1_ami" {
 
-  # Iterate through all Self-Built Amazon Machine Images in the US-East-1 region.
+  # Resolve every distinct catalog selector used by a US-East-1 system. Keyed by selector rather
+  # than by system, so systems sharing an image share one read.
   provider = aws.us_east_1
   for_each = toset([
     for system in var.all_systems : system.ami
-    if !local.ami_specs[system.ami].is_direct_id &&
-    !local.ami_specs[system.ami].is_public_alias &&
+    if !startswith(system.ami, "ami-") &&
     replace(system.region, "-", "_") == "us_east_1"
   ])
 
-  # Define the Self-Built Amazon Machine Image Properties
-  most_recent = true
-  name_regex  = local.ami_specs[each.value].name_regex
+  # The key is computed from the selector, never searched for. A misspelled family or a version
+  # that was never published fails the plan here with ParameterNotFound - which is the point:
+  # there is no fallback that could quietly substitute a different image.
+  name = local.ami_parameter_name[each.value]
 
-  # Self-owned AMIs in the deploying account.
+}
+
+#endregion --- [ aws_ssm_parameter.us_east_1_ami - us-east-1 ] --------------------------------- #
+
+#endregion --- [ aws_ssm_parameter (image catalog) ] ------------------------------------------- #
+
+
+#region ------ [ aws_ami (verification) ] ------------------------------------------------------ #
+
+#region ------ [ aws_ami.us_east_1_verified - us-east-1 ] -------------------------------------- #
+
+data "aws_ami" "us_east_1_verified" {
+
+  # Every image the framework launches is fetched by exact id and checked before use, whether the
+  # id was pinned in tfvars or resolved from the catalog above. This is also the lookup the rest
+  # of the plan reads image attributes from, so verification cannot be bypassed by accident.
+  provider = aws.us_east_1
+  for_each = toset([
+    for system in var.all_systems : system.ami
+    if replace(system.region, "-", "_") == "us_east_1"
+  ])
+
+  # Module-owned (ADR repo/0001): every image this framework launches is one the deploying
+  # account built and owns. An id says nothing about who produced it, so pinning the owner is
+  # what stops a look-alike in an unrelated account from being launched on a matching id alone.
   owners = ["self"]
 
   filter {
-    name   = "architecture"
-    values = ["x86_64"]
+    name = "image-id"
+    values = [
+      startswith(each.value, "ami-")
+      ? each.value
+      : data.aws_ssm_parameter.us_east_1_ami[each.value].insecure_value
+    ]
   }
 
-  filter {
-    name   = "image-type"
-    values = ["machine"]
-  }
+  lifecycle {
 
-  # The glob template is assembled in local.ami_specs, so a future naming-delimiter change
-  # stays localized there.
-  filter {
-    name   = "name"
-    values = [local.ami_specs[each.value].glob]
-  }
+    # A pointer aimed at a deregistered or still-pending image resolves fine and then fails at
+    # apply; catching it here keeps the failure in the plan.
+    postcondition {
+      condition     = self.state == "available"
+      error_message = "AMI selector '${each.value}' resolved to image ${self.id}, which is in state '${self.state}' rather than 'available'."
+    }
 
-  filter {
-    name   = "root-device-type"
-    values = ["ebs"]
-  }
+    # The publisher stamps what it built; the selector says what was asked for. Comparing them
+    # catches a mis-wired catalog pointer - the one failure an id alone cannot reveal. Literal
+    # ids are exempt: they address an image directly and make no claim about a family.
+    #
+    # An image carrying no family stamp at all is not treated as a mismatch. Every image the
+    # publisher produces is stamped (its own monotonicity guard reads the tag back), so an
+    # unstamped image is a hand-built one in this account rather than a bad publish - and
+    # owners = ["self"] above is what bounds that case.
+    postcondition {
+      condition = (
+        startswith(each.value, "ami-") ||
+        try(self.tags["ImageFamily"], null) == null ||
+        self.tags["ImageFamily"] == split("@", each.value)[0]
+      )
+      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped family '${try(self.tags["ImageFamily"], "<untagged>")}'."
+    }
 
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
+    # A truncated selector accepts drift below the level it pins, so the stamped version must
+    # either equal the requested one or extend it by a further segment. "8.10" accepts
+    # "8.10.20260808"; it does not accept "8.11".
+    postcondition {
+      condition = (
+        !strcontains(each.value, "@") ||
+        try(self.tags["ImageVersion"], null) == null ||
+        self.tags["ImageVersion"] == split("@", each.value)[1] ||
+        startswith(self.tags["ImageVersion"], "${split("@", each.value)[1]}.")
+      )
+      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped version '${try(self.tags["ImageVersion"], "<untagged>")}'."
+    }
 
-}
-
-#endregion --- [ aws_ami.us_east_1_selfbuilt - us-east-1 ] ------------------------------------- #
-
-#endregion --- [ aws_ami (self-built) ] -------------------------------------------------------- #
-
-
-#region ------ [ aws_ami (public base) ] ------------------------------------------------------- #
-
-#region ------ [ aws_ami.us_east_1_public - us-east-1 ] ---------------------------------------- #
-
-data "aws_ami" "us_east_1_public" {
-
-  # Iterate through all Public Base Amazon Machine Images in the US-East-1 region.
-  provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.ami
-    if local.ami_specs[system.ami].is_public_alias &&
-    replace(system.region, "-", "_") == "us_east_1"
-  ])
-
-  # Define the Public Base Amazon Machine Image Properties
-  most_recent = true
-  name_regex  = local.public_ami_name_regex[each.value]
-
-  # Module-owned: this framework consumes Amazon's public images only, so there is nothing
-  # here for a consumer to vary.
-  owners = ["amazon"]
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "image-type"
-    values = ["machine"]
-  }
-
-  filter {
-    name   = "root-device-type"
-    values = ["ebs"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
   }
 
 }
 
-#endregion --- [ aws_ami.us_east_1_public - us-east-1 ] ---------------------------------------- #
+#endregion --- [ aws_ami.us_east_1_verified - us-east-1 ] -------------------------------------- #
 
-#endregion --- [ aws_ami (public base) ] ------------------------------------------------------- #
-
-
-#region ------ [ aws_ami (direct id) ] --------------------------------------------------------- #
-
-#region ------ [ aws_ami.us_east_1_direct - us-east-1 ] ---------------------------------------- #
-
-data "aws_ami" "us_east_1_direct" {
-
-  # Iterate through all Direct Amazon Machine Image IDs in the US-East-1 region.
-  provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.ami
-    if local.ami_specs[system.ami].is_direct_id &&
-    replace(system.region, "-", "_") == "us_east_1"
-  ])
-
-  # Define the Direct Amazon Machine Image Properties. A pinned id identifies exactly one image,
-  # so the architecture, image-type, root-device-type and state filters the other two AMI blocks
-  # need to narrow a name match have nothing left to narrow here.
-  filter {
-    name   = "image-id"
-    values = [each.value]
-  }
-
-}
-
-#endregion --- [ aws_ami.us_east_1_direct - us-east-1 ] ---------------------------------------- #
-
-#endregion --- [ aws_ami (direct id) ] --------------------------------------------------------- #
+#endregion --- [ aws_ami (verification) ] ------------------------------------------------------ #
 
 
 #region ------ [ aws_kms_alias ] --------------------------------------------------------------- #

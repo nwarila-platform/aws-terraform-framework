@@ -1,6 +1,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   # The runner group derives its VPC from the systems' subnets, so the mock has to answer with a
   # coherent VPC. Runs that need a SECOND VPC override this per-subnet.
   mock_data "aws_subnet" {

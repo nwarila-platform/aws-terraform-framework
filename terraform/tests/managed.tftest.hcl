@@ -1,6 +1,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   mock_data "aws_subnet" {
     defaults = {
       vpc_id            = "vpc-preexisting"
@@ -96,11 +104,11 @@ run "wazuh_preexisting_shape_is_zero_diff" {
     error_message = "With no interface-owned group, the framework must create zero security groups and zero rules."
   }
 
-  # Lookups are scoped to what this region actually deploys: a self-built AMI must not
-  # trigger a DescribeImages call for either public Windows base image.
+  # Lookups are scoped to what this region actually deploys, and deduplicated by selector: one
+  # system on one image is one catalog read and one image verification, never more.
   assert {
-    condition     = length(data.aws_ami.us_east_1_public) == 0
-    error_message = "A config referencing no public AMI alias must create zero public-image lookups."
+    condition     = length(data.aws_ssm_parameter.us_east_1_ami) == 1 && length(data.aws_ami.us_east_1_verified) == 1
+    error_message = "A single-system config on one catalog selector must produce exactly one parameter read and one verified-image lookup."
   }
 
   assert {

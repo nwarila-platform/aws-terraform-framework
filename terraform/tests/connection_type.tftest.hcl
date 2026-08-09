@@ -1,6 +1,14 @@
 mock_provider "aws" {
   alias = "us_east_1"
 
+  # The verified-image lookup asserts state; unmocked attributes come back as random
+  # strings, so the default has to say what a healthy image looks like.
+  mock_data "aws_ami" {
+    defaults = {
+      state = "available"
+    }
+  }
+
   mock_data "aws_subnet" {
     defaults = {
       cidr_block        = "10.0.0.0/8"
@@ -26,7 +34,7 @@ variables {
       key_name             = "preexisting-key"
       iam_instance_profile = "preexisting-profile"
       aws_kms_alias        = "preexisting"
-      ami                  = "windows_server_2022_base"
+      ami                  = "windows@2022"
 
       refresh                    = false
       instance_type              = "m6i.large"
@@ -78,8 +86,9 @@ run "windows_defaults_to_ssh_and_fetches_no_password" {
   command = plan
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       id       = "ami-00000000000000021"
       platform = "windows"
     }
@@ -120,8 +129,9 @@ run "windows_winrm_renders_wsman_bootstrap_and_fetches_password" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       id       = "ami-00000000000000021"
       platform = "windows"
     }
@@ -194,8 +204,9 @@ run "linux_winrm_is_rejected_by_the_instance_precondition" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_selfbuilt["test-linux"]
+    target = data.aws_ami.us_east_1_verified["test-linux"]
     values = {
+      state            = "available"
       id               = "ami-00000000000000022"
       platform         = ""
       platform_details = "Red Hat Enterprise Linux"
@@ -219,8 +230,9 @@ run "readiness_gate_carries_the_winrm_transport" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       id       = "ami-00000000000000021"
       platform = "windows"
     }
@@ -253,8 +265,9 @@ run "readiness_gate_keeps_ssh_for_the_default_transport" {
   }
 
   override_data {
-    target = data.aws_ami.us_east_1_public["windows_server_2022_base"]
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
     values = {
+      state    = "available"
       id       = "ami-00000000000000021"
       platform = "windows"
     }
