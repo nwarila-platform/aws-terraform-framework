@@ -45,6 +45,20 @@ readiness-order-check:
 	  { echo 'aws_ec2_instance_state.us_east_1 must depend on terraform_data.readiness_gate'; \
 	    exit 1; }
 
+# The association targets the interface, not the instance, so its only derived dependencies are
+# the address and the interface - both of which exist before the instance does. Without a stated
+# edge, AssociateAddress can land while the instance is still pending-instance-creation, which
+# AWS rejects and the provider does not retry. A plan cannot see a race and terraform test
+# cannot see the graph, so the edge is asserted here.
+eip-order-check:
+	@block=$$(sed -n '/^resource "aws_eip_association" "us_east_1" {$$/,/^}$$/p' \
+	  terraform/resources.tf | tr -d ' \t' | tr '\n' ' '); \
+	for instance in aws_instance.us_east_1 aws_instance.us_east_1_refresh; do \
+	  printf '%s' "$$block" | grep -Eq "depends_on=\[[^]]*$$instance[,]" || \
+	    { echo "aws_eip_association.us_east_1 must depend on $$instance"; exit 1; }; \
+	done; \
+	printf 'eip-order-check: OK — the association waits for both instance resources\n'
+
 # Mutating: regenerates the injected block in docs/reference/terraform.md.
 docs:
 	terraform-docs --config .terraform-docs.yml terraform
@@ -96,6 +110,7 @@ ci:
 	$(MAKE) validate
 	$(MAKE) test
 	$(MAKE) readiness-order-check
+	$(MAKE) eip-order-check
 	$(MAKE) tflint
 	$(MAKE) docs-diff
 	$(MAKE) docs-check
