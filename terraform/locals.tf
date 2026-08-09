@@ -52,6 +52,35 @@ locals {
   #endregion --- [ Amazon Machine Image Resolution ] ------------------------------------------- #
 
 
+  #region ------ [ Deployment Identity Tags ] -------------------------------------------------- #
+
+  # The identity keys whose value is identical on every resource, applied as provider
+  # default_tags in providers.tf.
+  #
+  # That placement is load-bearing, not stylistic. default_tags is the only mechanism that puts
+  # tags inside the create API call itself: RunInstances carries them in its TagSpecifications,
+  # so the volumes it creates are tagged as they are born and a launch policy conditioning on
+  # aws:RequestTag matches. Tags written in a resource's own tags block are applied by a separate
+  # CreateTags call after the resource exists - too late for that condition, which sees a request
+  # carrying no aws:RequestTag key at all and cannot match.
+  #
+  # This does not replace the per-resource tag maps. Those carry the keys whose value varies by
+  # resource - Name, Index, DeviceName, OS, Backup, Function - which one static provider map
+  # cannot express. RunInstances applies a single tag set to every volume in the request, so
+  # per-device values could not live there even in principle. The two are complementary: this
+  # covers the request, the explicit maps cover per-device values and state visibility.
+  identity_tags = {
+    CommitSha    = var.commit_sha
+    Environment  = var.environment
+    ManagedBy    = "Terraform"
+    Repository   = var.repository
+    RepositoryId = var.repository_id
+    RunId        = var.run_id
+  }
+
+  #endregion --- [ Deployment Identity Tags ] -------------------------------------------------- #
+
+
   #region ------ [ SSH Bootstrap User Data ] --------------------------------------------------- #
 
   # user_data covers two things only: making sure sshd is actually running, and installing the
@@ -529,9 +558,17 @@ locals {
             device_name           = override.device_name
             iops                  = override.iops
             kms_key_id            = system.aws_kms_alias
-            throughput            = override.throughput
-            volume_size           = override.volume_size
-            volume_type           = override.volume_type
+            # Identity on the volume itself. default_tags puts it in the launch request, but only
+            # a tag on the resource survives into state where an ec2:ResourceTag-scoped grant for
+            # DeleteVolume, DetachVolume or ModifyVolume can be written against it - and where a
+            # reaper can still find the volume after a failed run.
+            tags = merge(local.identity_tags, {
+              DeviceName = override.device_name
+              Name       = system.hostname
+            })
+            throughput  = override.throughput
+            volume_size = override.volume_size
+            volume_type = override.volume_type
           }
         ]
 

@@ -714,6 +714,7 @@ resource "aws_instance" "us_east_1" {
       encrypted             = true
       iops                  = ebs_block_device.value.iops
       kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      tags                  = ebs_block_device.value.tags
       throughput            = ebs_block_device.value.throughput
       volume_size           = ebs_block_device.value.volume_size
       volume_type           = ebs_block_device.value.volume_type
@@ -813,6 +814,7 @@ resource "aws_instance" "us_east_1_refresh" {
       encrypted             = true
       iops                  = ebs_block_device.value.iops
       kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      tags                  = ebs_block_device.value.tags
       throughput            = ebs_block_device.value.throughput
       volume_size           = ebs_block_device.value.volume_size
       volume_type           = ebs_block_device.value.volume_type
