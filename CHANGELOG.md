@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.2.0...v3.0.0) (2026-08-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ec2:** address images through a version catalog instead of discovering them ([#110](https://github.com/nwarila-platform/aws-terraform-framework/issues/110))
+* **variables:** flatten resource_metadata into individual deployment-identity variables ([#105](https://github.com/nwarila-platform/aws-terraform-framework/issues/105))
+
+### Features
+
+* **ec2:** address images through a version catalog instead of discovering them ([#110](https://github.com/nwarila-platform/aws-terraform-framework/issues/110)) ([c4a5316](https://github.com/nwarila-platform/aws-terraform-framework/commit/c4a5316752bca8a6701b21c01e510174bded4d2d))
+* run-scoped runner ingress, WinRM transport selection, and audit remediation ([#107](https://github.com/nwarila-platform/aws-terraform-framework/issues/107)) ([34aa20a](https://github.com/nwarila-platform/aws-terraform-framework/commit/34aa20a2511675c996e78c7a1d5618d8234b8c84))
+* **variables:** flatten resource_metadata into individual deployment-identity variables ([#105](https://github.com/nwarila-platform/aws-terraform-framework/issues/105)) ([15fe4a0](https://github.com/nwarila-platform/aws-terraform-framework/commit/15fe4a01065b00aca1a34de6b4827c235bd816c2))
+
 ## [2.2.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v2.1.0...v2.2.0) (2026-08-06)
 
 
