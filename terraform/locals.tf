@@ -18,6 +18,19 @@ locals {
   # A literal id bypasses the catalog; every other selector resolves through it.
   catalog_selectors = toset([for ami in local.ami_selectors : ami if !startswith(ami, "ami-")])
 
+  # Accounts a literal ami- id may belong to. "self" is the deploying account (793496711039),
+  # which publishes the catalog; the other two are vendor accounts whose base images are pinned
+  # directly because the catalog does not republish them:
+  #
+  #   679593333241  CIS hardened images from the AWS Marketplace
+  #   801119661308  Amazon-published Windows Server images
+  #
+  # TEMPORARY: hardcoded until those images are mirrored into the catalog, at which point they
+  # become ordinary selectors and this list collapses back to ["self"]. It applies ONLY to
+  # literal ids - a catalog selector is always held to the deploying account, so widening this
+  # cannot loosen what a named selector resolves to.
+  direct_ami_owners = ["self", "679593333241", "801119661308"]
+
   # Selector to exact SSM key: "@" becomes a path separator, and a bare family addresses the
   # floating "latest" pointer. This is a pure string transformation - no name filter, no
   # most_recent, no discovery of any kind. An address that was never published fails the plan

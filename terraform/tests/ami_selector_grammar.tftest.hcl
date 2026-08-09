@@ -204,4 +204,26 @@ run "accepts_a_literal_image_id_and_keeps_it_out_of_the_catalog" {
     ])
     error_message = "A literal id must be verified like any other image but must not produce a catalog parameter read."
   }
+
+  # A literal id is the escape hatch for images this org did not build, so it accepts the two
+  # pinned vendor accounts alongside the deploying one.
+  assert {
+    condition = alltrue([
+      contains(data.aws_ami.us_east_1_verified["ami-0123456789abcdef0"].owners, "self"),
+      contains(data.aws_ami.us_east_1_verified["ami-0123456789abcdef0"].owners, "679593333241"),
+      contains(data.aws_ami.us_east_1_verified["ami-0123456789abcdef0"].owners, "801119661308"),
+    ])
+    error_message = "A pinned id must accept the deploying account plus the CIS and Amazon Windows vendor accounts."
+  }
+}
+
+# The other half of that asymmetry, and the reason widening the direct-id list is safe: a named
+# selector is still held to the deploying account, so no vendor account can satisfy one.
+run "a_catalog_selector_is_restricted_to_the_deploying_account" {
+  command = plan
+
+  assert {
+    condition     = data.aws_ami.us_east_1_verified["rhel@8.10.20260808"].owners == tolist(["self"])
+    error_message = "A catalog selector must resolve only against the deploying account, never a vendor account."
+  }
 }
