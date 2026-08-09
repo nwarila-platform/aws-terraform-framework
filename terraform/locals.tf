@@ -3,6 +3,7 @@
 
 # Statically Configured LOCALS
 locals {
+
   #region ------ [ Amazon Machine Image Resolution ] ------------------------------------------- #
 
   # Images are addressed, never discovered. A selector is either the literal-id escape hatch
