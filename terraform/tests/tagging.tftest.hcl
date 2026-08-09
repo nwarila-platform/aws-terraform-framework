@@ -131,6 +131,87 @@ run "identity_tags_carry_exactly_the_six_uniform_keys" {
   }
 }
 
+# The point of the open map. A closed object type accepted a key it did not declare and then
+# discarded it during conversion - no error, no warning, and a consumer believing the tag was
+# applied. Backup still normalizes, so opening the map cost nothing that the type was giving.
+run "consumer_tags_beyond_backup_and_function_reach_the_instance" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        tags = {
+          Backup     = true
+          Function   = "tagging test host"
+          Team       = "platform-engineering"
+          CostCenter = "cc-1234"
+        }
+      }),
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      aws_instance.us_east_1["tag-host"].tags["Team"] == "platform-engineering",
+      aws_instance.us_east_1["tag-host"].tags["CostCenter"] == "cc-1234",
+      aws_instance.us_east_1["tag-host"].tags["Function"] == "tagging test host",
+      aws_instance.us_east_1["tag-host"].tags["Backup"] == "True",
+    ])
+    error_message = "A consumer tag map must carry its own keys through to the instance, and Backup must still normalize."
+  }
+}
+
+# Opening the map means a consumer can now name a framework key, which the merge would silently
+# overwrite. Rejected instead.
+run "a_consumer_tag_may_not_shadow_a_framework_key" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        tags = {
+          Backup      = true
+          Function    = "tagging test host"
+          Environment = "prod"
+        }
+      }),
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+# The object type used to guarantee both keys were present; validation has to now.
+run "tags_must_still_set_backup_and_function" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], { tags = { Function = "tagging test host" } }),
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+# And that Backup is a boolean, which a map of strings cannot express in the type.
+run "backup_must_still_read_as_a_boolean" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        tags = {
+          Backup   = "yes"
+          Function = "tagging test host"
+        }
+      }),
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
 run "rejects_environment_outside_lowercase_set" {
   command = plan
 

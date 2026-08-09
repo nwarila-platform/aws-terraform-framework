@@ -61,18 +61,24 @@ variable "all_systems" {
     region               = string
     subnet_id            = string
 
-    tags = object({
-      #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
-      #Name                 = string
-      Backup   = bool
-      Function = string
-      #ManagedBy            = <Statically Set To 'Terraform'>
-      #Repository           = <Set Automatically From 'var.repository'>
-      #RepositoryId         = <Set Automatically From 'var.repository_id'>
-      #CommitSha            = <Set Automatically From 'var.commit_sha'>
-      #RunId                = <Set Automatically From 'var.run_id'>
-      #Environment          = <Set Automatically From 'var.environment'>
-    })
+    # Consumer tags, open so a consumer can set their own keys alongside the two this framework
+    # reads. A map rather than a typed object because Terraform silently discards attributes an
+    # object type does not declare: a closed object accepted `Team = "platform"` and then dropped
+    # it with no error and no warning. Backup and Function are still required and Backup must
+    # still read as a boolean - the validations below restate what the object type guaranteed.
+    #
+    # The framework writes the rest of the tag set (Name, ManagedBy, Repository, RepositoryId,
+    # CommitSha, RunId, Environment, OS) and merges it last, so a colliding consumer key is
+    # rejected rather than silently overwritten.
+    #   #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
+    #   #Name                 = <Set Automatically From 'hostname'>
+    #   #ManagedBy            = <Statically Set To 'Terraform'>
+    #   #Repository           = <Set Automatically From 'var.repository'>
+    #   #RepositoryId         = <Set Automatically From 'var.repository_id'>
+    #   #CommitSha            = <Set Automatically From 'var.commit_sha'>
+    #   #RunId                = <Set Automatically From 'var.run_id'>
+    #   #Environment          = <Set Automatically From 'var.environment'>
+    tags = map(string)
 
     # Opt-out: still mandatory in the object type, because optional() is banned
     # (ADR repo/0002). Set null, [] or {} to decline one.
@@ -775,6 +781,52 @@ variable "all_systems" {
   }
 
 
+  # The object type used to guarantee these two were present. A map does not, so say it here
+  # rather than discover it when a tag map renders without them.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      contains(keys(system.tags), "Backup") && contains(keys(system.tags), "Function")
+    ])
+    error_message = join(" ", [
+      "Each all_systems tags map must set Backup and Function. Every other key in the map is the",
+      "consumer's own and is passed through to the instance untouched.",
+    ])
+  }
+
+  # Backup selects a normalized True/False tag, so it has to read as a boolean rather than as
+  # whatever string happens to be written. The object type enforced this by being typed bool;
+  # a map of strings cannot, so the check moves here.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      contains(["true", "false"], lower(try(system.tags["Backup"], "")))
+    ])
+    error_message = "Each all_systems tags Backup must be true or false, in any letter case."
+  }
+
+  # The framework writes the rest of the instance tag set and merges it last, so a colliding
+  # consumer key would be silently overwritten. Backup and Function are absent from this list on
+  # purpose: on this map they are the consumer's to set.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems : alltrue([
+        for key in keys(system.tags) : !contains(
+          [
+            "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
+            "runid", "os", "index", "devicename",
+          ],
+          lower(key)
+        )
+      ])
+    ])
+    error_message = join(" ", [
+      "Name, Environment, ManagedBy, Repository, RepositoryId, CommitSha, RunId, OS, Index and",
+      "DeviceName are written by this framework onto the instance and would be silently",
+      "overwritten; an all_systems tags map must not set them, in any letter case.",
+    ])
+  }
+
   # These keys are written by this framework in each tag map's non-overwritable section.
   # A consumer map that reuses one would be silently overwritten, so reject it up front.
   # Matched case-insensitively: AWS tag keys are case-sensitive, so allowing `environment`
@@ -855,17 +907,16 @@ variable "all_databases" {
     region                              = string
     username                            = string
 
-    tags = object({
-      #Name        = <Set Automatically From 'db_name'>
-      Backup   = bool
-      Function = string
-      #ManagedBy   = <Statically Set To 'Terraform'>
-      #Repository   = <Set Automatically From 'var.repository'>
-      #RepositoryId = <Set Automatically From 'var.repository_id'>
-      #CommitSha    = <Set Automatically From 'var.commit_sha'>
-      #RunId        = <Set Automatically From 'var.run_id'>
-      #Environment = <Set Automatically From 'var.environment'>
-    })
+    # Consumer tags, open for the same reason as all_systems: a closed object type silently
+    # discards keys it does not declare. Backup and Function stay required by validation.
+    #   #Name        = <Set Automatically From 'db_name'>
+    #   #ManagedBy   = <Statically Set To 'Terraform'>
+    #   #Repository   = <Set Automatically From 'var.repository'>
+    #   #RepositoryId = <Set Automatically From 'var.repository_id'>
+    #   #CommitSha    = <Set Automatically From 'var.commit_sha'>
+    #   #RunId        = <Set Automatically From 'var.run_id'>
+    #   #Environment = <Set Automatically From 'var.environment'>
+    tags = map(string)
 
     # Opt-out: still mandatory in the object type, because optional() is banned
     # (ADR repo/0002). Set null, [] or {} to decline one.
@@ -891,12 +942,50 @@ variable "all_databases" {
   validation {
     condition = alltrue([
       for database in var.all_databases :
-      try(database.tags.Backup != null, false) &&
       database.blue_green_update != null
     ])
+    error_message = "blue_green_update carries no default and must not be null. Give it a real boolean."
+  }
+
+  # The object type used to guarantee these two were present, and that Backup was a boolean.
+  # A map of strings cannot, so both checks move here.
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      contains(keys(database.tags), "Backup") && contains(keys(database.tags), "Function")
+    ])
     error_message = join(" ", [
-      "tags.Backup and blue_green_update carry no defaults and must not be null. Give each a",
-      "real boolean.",
+      "Each all_databases tags map must set Backup and Function. Every other key in the map is",
+      "the consumer's own and is passed through to the database untouched.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      contains(["true", "false"], lower(try(database.tags["Backup"], "")))
+    ])
+    error_message = "Each all_databases tags Backup must be true or false, in any letter case."
+  }
+
+  # Framework-written keys, merged last onto the database. Backup and Function are the
+  # consumer's on this map and so are absent from the list.
+  validation {
+    condition = alltrue([
+      for database in var.all_databases : alltrue([
+        for key in keys(database.tags) : !contains(
+          [
+            "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
+            "runid",
+          ],
+          lower(key)
+        )
+      ])
+    ])
+    error_message = join(" ", [
+      "Name, Environment, ManagedBy, Repository, RepositoryId, CommitSha and RunId are written",
+      "by this framework onto the database and would be silently overwritten; an all_databases",
+      "tags map must not set them, in any letter case.",
     ])
   }
 
