@@ -213,7 +213,80 @@ run "linux_winrm_is_rejected_by_the_instance_precondition" {
     }
   }
 
-  expect_failures = [terraform_data.readiness_gate]
+  expect_failures = [aws_instance.us_east_1]
+}
+
+# The tunnelled form has to be rejected on the same terms. This system has no readiness gate at
+# all, so while the rule lived on the gate nothing rejected it: the transport was accepted and
+# then silently ignored, because user_data keys off the resolved platform.
+run "linux_winrm_over_ssm_is_rejected_on_the_same_terms" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        hostname        = "linux-winrm-ssm"
+        ami             = "test-linux"
+        connection_type = "winrm-ssm"
+        readiness_gate  = false
+      }),
+    ]
+  }
+
+  expect_failures = [aws_instance.us_east_1]
+}
+
+# An SSM transport cannot be gated: Terraform's connection block dials SSH and WinRM directly and
+# cannot traverse a Session Manager tunnel, so an enabled gate would only fail on timeout.
+run "an_ssm_transport_rejects_an_enabled_readiness_gate" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        hostname        = "gated-ssm"
+        connection_type = "ssh-ssm"
+        readiness_gate  = true
+      }),
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+# The protocol half still selects the bootstrap: something has to be listening for the tunnel to
+# carry, so an SSM-reached Windows system renders the same WinRM listener as a direct one.
+run "an_ssm_transport_still_renders_its_protocol_bootstrap" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        hostname        = "win-ssm"
+        ami             = "windows@2022"
+        connection_type = "winrm-ssm"
+        readiness_gate  = false
+      }),
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
+    values = {
+      state    = "available"
+      platform = "windows"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      local.connection_protocol["win-ssm"] == "winrm",
+      local.connection_over_ssm["win-ssm"],
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssm"].user_data, "WSMan"),
+      local.elastic_compute_cloud.us_east_1["win-ssm"].get_password_data,
+    ])
+    error_message = "A tunnelled WinRM system must still render the WinRM listener and fetch the launch password."
+  }
 }
 
 # The gate has to actually switch transport, not merely record the choice.

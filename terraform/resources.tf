@@ -767,6 +767,23 @@ resource "aws_instance" "us_east_1" {
       ])
     }
 
+    # WinRM is Windows-only, and the operating system is data-resolved, so a variable validation
+    # cannot see it. Checked on the instance rather than on the readiness gate because a system
+    # reached over SSM has no gate - the rule has to cover "winrm-ssm" too.
+    precondition {
+      condition = each.value.connection_protocol != "winrm" || each.value.is_windows
+      error_message = format(
+        join(" ", [
+          "System %s selects the WinRM protocol via connection_type = \"%s\", but its AMI",
+          "resolves to a non-Windows platform. WinRM is Windows-only; use \"ssh\", \"ssh-ssm\",",
+          "or null on Linux systems.",
+        ]),
+        each.key,
+        each.value.connection_type,
+      )
+    }
+
+
     precondition {
       condition = length(each.value.uncovered_ami_block_devices) == 0
       error_message = format(
@@ -871,6 +888,23 @@ resource "aws_instance" "us_east_1_refresh" {
       ])
     }
 
+    # WinRM is Windows-only, and the operating system is data-resolved, so a variable validation
+    # cannot see it. Checked on the instance rather than on the readiness gate because a system
+    # reached over SSM has no gate - the rule has to cover "winrm-ssm" too.
+    precondition {
+      condition = each.value.connection_protocol != "winrm" || each.value.is_windows
+      error_message = format(
+        join(" ", [
+          "System %s selects the WinRM protocol via connection_type = \"%s\", but its AMI",
+          "resolves to a non-Windows platform. WinRM is Windows-only; use \"ssh\", \"ssh-ssm\",",
+          "or null on Linux systems.",
+        ]),
+        each.key,
+        each.value.connection_type,
+      )
+    }
+
+
     precondition {
       condition = length(each.value.uncovered_ami_block_devices) == 0
       error_message = format(
@@ -959,17 +993,8 @@ resource "terraform_data" "readiness_gate" {
   }
 
   lifecycle {
-    precondition {
-      condition = each.value.connection_type != "winrm" || each.value.target_platform == "windows"
-      error_message = format(
-        join(" ", [
-          "System %s sets connection_type = \"winrm\", but its AMI resolves to a non-Windows",
-          "platform. WinRM is Windows-only; use \"ssh\" or null on Linux systems.",
-        ]),
-        each.key,
-      )
-    }
-
+    # The WinRM/Windows rule lives on the instance, not here: a system reached over SSM has no
+    # readiness gate, so a copy of it on this resource would not cover "winrm-ssm".
     precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."

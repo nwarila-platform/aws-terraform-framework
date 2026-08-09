@@ -241,6 +241,98 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
   }
 }
 
+# CASE 6: a system reached over SSM accepts nothing inbound, so the group the runner uses to
+# open SSH, WinRM and ICMP is not attached to it. Its interfaces keep exactly what the consumer
+# listed.
+run "an_ssm_reached_system_is_not_given_the_runner_group" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+
+    all_systems = [
+      merge(var.all_systems[0], {
+        connection_type = "ssh-ssm"
+        readiness_gate  = false
+      }),
+    ]
+  }
+
+  # Nothing is left to attach to, so the group is never built rather than created as an orphan.
+  assert {
+    condition = (
+      length(aws_security_group.runner_ingress_us_east_1) == 0 &&
+      length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
+    )
+    error_message = "A region whose systems are all reached over SSM must build no runner group at all."
+  }
+
+  assert {
+    condition = (
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 2 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 1
+    )
+    error_message = "An SSM-reached system's interfaces must keep exactly the groups the consumer gave them."
+  }
+}
+
+# CASE 7: the selective half. One group is still built for the directly-reached system, and only
+# its interfaces receive it - the tunnelled system alongside it is left alone.
+run "a_mixed_fleet_attaches_the_group_only_to_directly_reached_systems" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+
+    all_systems = [
+      var.all_systems[0],
+      merge(var.all_systems[0], {
+        hostname        = "runner-host-b"
+        connection_type = "ssh-ssm"
+        readiness_gate  = false
+        # Same subnet as host A, so the addresses are left for AWS to pick rather than pinned.
+        network_interfaces = [
+          for nic in var.all_systems[0].network_interfaces : merge(nic, { private_ip = null })
+        ]
+      }),
+    ]
+  }
+
+  override_resource {
+    target          = aws_security_group.runner_ingress_us_east_1
+    override_during = plan
+    values = {
+      id = "sg-runneringress0"
+    }
+  }
+
+  assert {
+    condition     = length(aws_security_group.runner_ingress_us_east_1) == 1
+    error_message = "One directly-reached system is enough to require the runner group."
+  }
+
+  assert {
+    condition = alltrue([
+      for key in ["runner-host-a-eni-0", "runner-host-a-eni-1"] :
+      contains(local.elastic_network_interfaces.us_east_1[key].security_groups, "sg-runneringress0")
+    ])
+    error_message = "A directly-reached system must still receive the runner group on every interface."
+  }
+
+  # Counted rather than searched: host B's own inline group id is provider-computed, so a
+  # negative contains() over that list is unknown at plan. The counts are known, and they say
+  # the same thing - B's interfaces carry exactly what the consumer gave them, A's carry one more.
+  assert {
+    condition = (
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-b-eni-0"].security_groups) == 2 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-b-eni-1"].security_groups) == 1
+    )
+    error_message = "A tunnelled system must not receive the runner group, even when a neighbour does."
+  }
+}
+
 # CASE 3: a prefix is rejected by the input type, which is what makes a range structurally
 # impossible rather than merely discouraged.
 run "cidr_runner_ip_is_rejected" {

@@ -81,6 +81,27 @@ locals {
   #endregion --- [ Deployment Identity Tags ] -------------------------------------------------- #
 
 
+  #region ------ [ Connection Transport ] ------------------------------------------------------ #
+
+  # connection_type carries two facts in one field: the protocol on the wire, and whether the
+  # system is reached directly or through an SSM tunnel. SSM is a channel, not a protocol - a
+  # tunnelled system still runs sshd or a WinRM listener - so the protocol half keeps driving
+  # user_data, get_password_data and the Windows-only check. Null means "ssh".
+  connection_protocol = {
+    for system in var.all_systems : system.hostname =>
+    contains(["winrm", "winrm-ssm"], coalesce(system.connection_type, "ssh")) ? "winrm" : "ssh"
+  }
+
+  # Nothing reaches a tunnelled system inbound, so it is given no runner ingress group and cannot
+  # run the readiness gate (var.all_systems requires readiness_gate = false for these).
+  connection_over_ssm = {
+    for system in var.all_systems : system.hostname =>
+    contains(["ssh-ssm", "winrm-ssm"], coalesce(system.connection_type, "ssh"))
+  }
+
+  #endregion --- [ Connection Transport ] ------------------------------------------------------ #
+
+
   #region ------ [ SSH Bootstrap User Data ] --------------------------------------------------- #
 
   # user_data covers three things: making sure sshd is actually running, installing the launch
@@ -388,11 +409,15 @@ locals {
 
   # Every distinct VPC the fleet resolves to. One security group cannot span VPCs, so a length
   # other than 1 is a hard error, raised by a precondition on the group itself.
+  #
+  # Counts only systems that will actually receive the group, so a region reached entirely over
+  # SSM contributes no VPC and builds no group rather than an orphan attached to nothing.
   runner_ingress_vpc_ids = {
     for region in var.aws_config.regions : region => distinct([
       for system in var.all_systems :
       data.aws_subnet.us_east_1[system.subnet_id].vpc_id
-      if replace(system.region, "-", "_") == region
+      if replace(system.region, "-", "_") == region &&
+      !local.connection_over_ssm[system.hostname]
     ])
   }
 
@@ -495,24 +520,31 @@ locals {
         # Null selects SSH, the default transport. WinRM is only meaningful on Windows; a Linux
         # system asking for it is rejected by a precondition on the instance, because the OS is
         # data-resolved and a variable validation cannot see it.
-        connection_type = coalesce(system.connection_type, "ssh")
+        connection_type     = coalesce(system.connection_type, "ssh")
+        connection_protocol = local.connection_protocol[system.hostname]
+        connection_over_ssm = local.connection_over_ssm[system.hostname]
 
         # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
         # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
-        # password to become available, and the SSH path has no use for it.
+        # password to become available, and the SSH path has no use for it. Tunnelling over SSM
+        # does not change how the far end authenticates, so this keys off the protocol.
         get_password_data = (
           local.amazon_machine_images[system.ami][region].platform == "windows" &&
-          coalesce(system.connection_type, "ssh") == "winrm"
+          local.connection_protocol[system.hostname] == "winrm"
         )
 
-        # The SSM step is deliberately not gated on connection_type. That field says how the
-        # framework's own readiness gate connects, not whether the consumer will administer the
-        # host over SSM afterwards - an "ssh" system reached through SSM by its configuration
-        # management is the normal case, so every Linux image gets the agent.
+        # The protocol half selects the bootstrap: an SSM-reached system still needs something
+        # listening for the tunnel to carry, so it renders the same user_data as a direct one.
+        #
+        # The SSM agent step inside that user_data is deliberately not gated on connection_type
+        # at all. That field says how the framework's own readiness gate connects, not whether
+        # the consumer will administer the host over SSM afterwards - an "ssh" system reached
+        # through SSM by its configuration management is the normal case, so every Linux image
+        # gets the agent.
         user_data = trimspace(
           local.amazon_machine_images[system.ami][region].platform == "windows"
           ? (
-            coalesce(system.connection_type, "ssh") == "winrm"
+            local.connection_protocol[system.hostname] == "winrm"
             ? local.windows_winrm_user_data
             : local.windows_ssh_user_data
           )
@@ -642,14 +674,15 @@ locals {
 
         # WinRM reaches 5986 over TLS with a certificate the instance generated for itself, so the
         # client cannot verify it and insecure has to be true. NTLM carries the authentication.
-        connection_type = local.systems_by_hostname[hostname].connection_type
-        use_winrm       = local.systems_by_hostname[hostname].connection_type == "winrm"
-        winrm_port      = 5986
+        connection_type     = local.systems_by_hostname[hostname].connection_type
+        connection_protocol = local.systems_by_hostname[hostname].connection_protocol
+        use_winrm           = local.systems_by_hostname[hostname].connection_protocol == "winrm"
+        winrm_port          = 5986
 
         # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
         # gate already requires. Only the ciphertext ever reaches state.
         password = (
-          local.systems_by_hostname[hostname].connection_type == "winrm" &&
+          local.systems_by_hostname[hostname].connection_protocol == "winrm" &&
           local.systems_by_hostname[hostname].readiness_private_key_path != null
           ? rsadecrypt(instance.password_data, file(local.systems_by_hostname[hostname].readiness_private_key_path))
           : null
@@ -744,7 +777,11 @@ locals {
             # Attached here, at ENI creation, rather than modified onto the interface afterwards:
             # creation-time attachment stays inside a consumer's existing IAM grants, where
             # ec2:ModifyNetworkInterfaceAttribute would force every consumer to widen its policy.
-            var.runner_ip == null ? [] : [local.runner_ingress_security_group_ids[region][local.runner_ingress_name]],
+            # Skipped for tunnelled systems, which accept no inbound connection at all.
+            (
+              var.runner_ip == null ||
+              local.connection_over_ssm[system.hostname]
+            ) ? [] : [local.runner_ingress_security_group_ids[region][local.runner_ingress_name]],
           )
           subnet_id = system.subnet_id
 
