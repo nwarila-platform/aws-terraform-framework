@@ -253,12 +253,34 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems :
-      system.connection_type == null || contains(["ssh", "winrm"], system.connection_type)
+      system.connection_type == null ||
+      contains(["ssh", "winrm", "ssh-ssm", "winrm-ssm"], system.connection_type)
     ])
     error_message = join(" ", [
-      "Each all_systems connection_type must be \"ssh\", \"winrm\", or null to take the SSH",
-      "default. WinRM is Windows-only; a Linux system asking for it is rejected at plan time,",
-      "because the operating system is data-resolved and not visible to this validation.",
+      "Each all_systems connection_type must be \"ssh\", \"winrm\", \"ssh-ssm\", \"winrm-ssm\",",
+      "or null to take the SSH default. The first half names the protocol on the wire; the",
+      "\"-ssm\" suffix means the system is reached through an SSM tunnel rather than directly, so",
+      "no inbound path is opened to it. WinRM is Windows-only; a Linux system asking for it is",
+      "rejected at plan time, because the operating system is data-resolved and not visible to",
+      "this validation.",
+    ])
+  }
+
+  # An SSM-reached system has no inbound path, and Terraform's connection block speaks only
+  # direct SSH and WinRM - it has no ProxyCommand and does not read ssh_config, so it cannot
+  # dial through a Session Manager tunnel on its own. Reaching one would need the runner to
+  # port-forward first and the gate to target localhost, which is not built. Rejected here
+  # rather than silently ignored, so the config states what actually happens.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      !contains(["ssh-ssm", "winrm-ssm"], coalesce(system.connection_type, "ssh")) ||
+      system.readiness_gate == false
+    ])
+    error_message = join(" ", [
+      "An all_systems entry using connection_type \"ssh-ssm\" or \"winrm-ssm\" must set",
+      "readiness_gate = false. The gate connects directly over SSH or WinRM and cannot traverse",
+      "an SSM tunnel, so leaving it enabled would only fail after its ten-minute timeout.",
     ])
   }
 

@@ -227,8 +227,31 @@ selectable.
 
 ## Choosing a transport
 
-`connection_type` selects how the readiness gate reaches a system, and which bootstrap
-`user_data` renders to match. Null takes `ssh`, which is the default for every platform.
+`connection_type` selects how a system is reached, and which bootstrap `user_data` renders to
+match. Null takes `ssh`, which is the default for every platform.
+
+It names two things at once: the protocol on the wire, and whether the system is reached
+directly or only through an SSM tunnel.
+
+| Value | Protocol | Reached | Readiness gate |
+| --- | --- | --- | --- |
+| `ssh` (or null) | SSH | directly | supported |
+| `winrm` | WinRM | directly | supported |
+| `ssh-ssm` | SSH | SSM tunnel only | must be `false` |
+| `winrm-ssm` | WinRM | SSM tunnel only | must be `false` |
+
+SSM is a channel rather than a protocol, so the `-ssm` forms still render the same bootstrap as
+their direct counterparts - something has to be listening for the tunnel to carry.
+
+What the `-ssm` forms change is inbound exposure: nothing connects to those systems from outside,
+so they are not given the run-scoped runner ingress group. If every system in a region is
+reached that way, no such group is created at all.
+
+They also cannot use the readiness gate, and setting `readiness_gate = true` alongside one is
+rejected at plan time rather than ignored. Terraform's `connection` block speaks direct SSH and
+WinRM only - it has no `ProxyCommand` and does not read `ssh_config` - so it cannot dial through
+Session Manager. Reaching one would need the runner to establish a port-forward first and the
+gate to target `localhost`, which this framework does not do.
 
 `winrm` is Windows-only and exists for images that cannot install the OpenSSH
 Feature-on-Demand. Every stock Windows AMI needs Windows Update egress to install it, so in an
@@ -247,8 +270,10 @@ Choosing `winrm` changes three things:
 - The gate connects with `https`, `insecure` and `use_ntlm` set. `insecure` is required because
   the certificate is self-signed and no client can verify it.
 
-Setting `winrm` on a Linux system fails at plan time. The operating system comes from the AMI
-lookup, so the guard is a precondition on the instance rather than a variable validation.
+Setting `winrm` or `winrm-ssm` on a Linux system fails at plan time. The operating system comes
+from the AMI lookup, so the guard is a precondition on the instance rather than a variable
+validation - on the instance specifically, because a tunnelled system has no readiness gate for
+the check to live on.
 
 This module validates Windows hostnames for NetBIOS compatibility, including
 the 15-character limit, but it does not set OS hostnames. Hostname setting
