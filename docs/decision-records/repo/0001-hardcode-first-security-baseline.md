@@ -109,7 +109,7 @@ The repository MUST:
   checks, including every normal and refresh resource collection.
 - Use variable validation only for valid-typeable settings that objectively
   violate the established baseline and cannot be hard-coded.
-- Reject world-open IPv4 and IPv6 managed security-group ingress while allowing
+- Reject world-open IPv4 managed security-group ingress while allowing
   unrestricted egress.
 - Require every RDS database to receive at least one explicit VPC security-group
   ID.
@@ -169,9 +169,13 @@ The repository MUST:
    normal and refresh collections, RDS storage encryption, EC2 root encryption,
    and IMDSv2 (token enforcement, disabled IMDS IPv6, disabled metadata tags,
    hop-limit pass-through, and rejection of out-of-bounds hop limits).
-3. `managed_security_groups` validation MUST reject ingress sources
-   `0.0.0.0/0` and `::/0`, with isolated negative tests for each address family
-   and a passing unrestricted-egress control.
+3. `all_systems[*].network_interfaces[*].ingress` validation MUST reject any
+   `cidr_ipv4` with a `/0` prefix. `terraform/tests/inline_security_groups.tftest.hcl`
+   MUST cover this with `inline_group_rejects_world_open_ipv4_ingress`,
+   `inline_group_rejects_zero_padded_world_open_ipv4_ingress`, and
+   `inline_group_rejects_noncanonical_world_open_ipv4_ingress`, with
+   `inline_group_allows_world_open_egress` as the passing unrestricted-egress
+   control.
 4. `all_databases` validation MUST reject both null and empty
    `vpc_security_group_ids`, with isolated negative tests for each case.
 5. `make ci`, the CI tool installer, Renovate annotations, and current reference
@@ -232,6 +236,10 @@ network-interface rule attributes supersedes that declaration path again. The
 ban remains current and is now enforced on
 `all_systems[*].network_interfaces[*].ingress`.
 
+The 2026-08-07 removal of IPv6 from network-interface rule inputs supersedes the
+IPv6 half of the original ingress baseline and Confirmation item 3. The framework
+is IPv4-only, so IPv6 ingress validation and negative tests are no longer required.
+
 ## Implementing PRs
 
 None yet. T19 introduces this ADR and its implementation together; the merged PR
@@ -254,6 +262,7 @@ encryption, and metadata-service baselines are enforced in module code.
 
 | Date       | Change                                             | Reason                                        | Author/Role          | Body-diff? |
 | ---------- | -------------------------------------------------- | --------------------------------------------- | -------------------- | ---------- |
+| 2026-08-07 | Removed IPv6 ingress checks. | Inputs are IPv4-only. | Portfolio maintainer | Yes |
 | 2026-07-27 | Removed the top-level managed security-group path. | Keep security-group creation system-specific while retaining the ingress baseline on inline groups. | Portfolio maintainer | Yes        |
 | 2026-07-22 | Accepted the hardcode-first security baseline ADR. | Record the maintainer's enforcement ruling.   | Portfolio maintainer | Yes        |
 | 2026-07-22 | Sanctioned `imds_hop_limit` as a validated input.  | Container hosts need hop limit 2; bounded 1-2 with explicit-null rejection per the exposure rule this ADR defines. | Portfolio maintainer | Yes        |

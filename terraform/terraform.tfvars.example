@@ -4,30 +4,26 @@
 # Exactly one of dev, test, or prod (lowercase).
 environment = "dev"
 
-# Required for a real apply. The readiness gate uses SSH for both Linux and
-# Windows, and the map keys must match all_systems[*].key_name. Windows logs in
-# as Administrator; WinRM is decommissioned.
-readiness_private_key_paths = {
-  "app-linux-key" = "/secure/path/REPLACE_ME-app-linux-key.pem"
-  "win-admin-key" = "/secure/path/REPLACE_ME-win-admin-key.pem"
-}
-
 all_systems = [
   {
-    region               = "us_east_1"
-    hostname             = "app01"
-    availability_zone    = "us-east-1a"
-    subnet_id            = "subnet-replace-me"
-    key_name             = "app-linux-key"
-    iam_instance_profile = "ec2-REPLACE_ME-profile"
-    aws_kms_alias        = "ebs-REPLACE_ME"
-    ami                  = "app-linux"
-    refresh              = false
-    instance_type        = "m6i.large"
-    readiness_user       = null
-    readiness_gate       = true
-    imds_hop_limit       = 1
-    set_state            = null
+    region                     = "us_east_1"
+    hostname                   = "app01"
+    availability_zone          = "us-east-1a"
+    subnet_id                  = "subnet-replace-me"
+    key_name                   = "app-linux-key"
+    iam_instance_profile       = "ec2-REPLACE_ME-profile"
+    aws_kms_alias              = "ebs-REPLACE_ME"
+    ami                        = "app-linux"
+    refresh                    = false
+    instance_type              = "m6i.large"
+    connection_type            = null
+    readiness_user             = null
+    readiness_command          = null
+    readiness_script_dir       = null
+    readiness_private_key_path = "/secure/path/REPLACE_ME-app-linux-key.pem"
+    readiness_gate             = true
+    imds_hop_limit             = 1
+    set_state                  = null
 
     tags = {
       Function = "app"
@@ -44,6 +40,8 @@ all_systems = [
     }
 
     ebs_block_devices = []
+
+    ami_block_device_overrides = []
 
     network_interfaces = [
       {
@@ -64,7 +62,6 @@ all_systems = [
             from_port                    = 443
             to_port                      = 443
             cidr_ipv4                    = "10.0.0.0/16"
-            cidr_ipv6                    = null
             prefix_list_id               = null
             referenced_security_group_id = null
           }
@@ -76,7 +73,6 @@ all_systems = [
             from_port                    = null
             to_port                      = null
             cidr_ipv4                    = "0.0.0.0/0"
-            cidr_ipv6                    = null
             prefix_list_id               = null
             referenced_security_group_id = null
           }
@@ -88,20 +84,24 @@ all_systems = [
     associate_public_ip = false
   },
   {
-    region               = "us_east_1"
-    hostname             = "win01"
-    availability_zone    = "us-east-1a"
-    subnet_id            = "subnet-replace-me"
-    key_name             = "win-admin-key"
-    iam_instance_profile = "ec2-REPLACE_ME-profile"
-    aws_kms_alias        = "ebs-REPLACE_ME"
-    ami                  = "windows_server_2025_base"
-    refresh              = false
-    instance_type        = "m6i.large"
-    readiness_user       = null
-    readiness_gate       = true
-    imds_hop_limit       = 1
-    set_state            = null
+    region                     = "us_east_1"
+    hostname                   = "win01"
+    availability_zone          = "us-east-1a"
+    subnet_id                  = "subnet-replace-me"
+    key_name                   = "win-admin-key"
+    iam_instance_profile       = "ec2-REPLACE_ME-profile"
+    aws_kms_alias              = "ebs-REPLACE_ME"
+    ami                        = "windows_server_2025_base"
+    refresh                    = false
+    instance_type              = "m6i.large"
+    connection_type            = null
+    readiness_user             = null
+    readiness_command          = null
+    readiness_script_dir       = null
+    readiness_private_key_path = "/secure/path/REPLACE_ME-win-admin-key.pem"
+    readiness_gate             = true
+    imds_hop_limit             = 1
+    set_state                  = null
 
     tags = {
       Function = "app"
@@ -119,12 +119,14 @@ all_systems = [
 
     ebs_block_devices = []
 
+    ami_block_device_overrides = []
+
     network_interfaces = [
       {
         # The deliberate-pin form, for an interface something outside this framework addresses by
-        # IP. A pinned address must be a bare IPv4 address, unique within its subnet, and - when
-        # the system sits in a managed_networks subnet - inside that subnet_cidr and clear of the
-        # five addresses AWS reserves in every subnet (the first four and the last).
+        # IP. A pinned address must be a bare IPv4 address, unique within its subnet, inside the
+        # subnet's real CIDR, and clear of the five addresses AWS reserves in every subnet (the
+        # first four and the last). All of that is checked at plan time against the subnet itself.
         private_ip      = "10.0.2.10"
         security_groups = ["sg-REPLACE_ME"]
         description     = null
@@ -145,14 +147,7 @@ all_systems = [
 all_databases      = []
 all_load_balancers = []
 
-# Deployment identity (optional). The deploy workflow injects this automatically as
-# TF_VAR_resource_metadata (see docs/reference/runner-protocol.md); set it manually only to
-# exercise the tagging path. Unset (the default) emits zero tags.
-# resource_metadata = {
-#   repository    = "nwarila-platform/aws-terraform-framework"
-#   repository_id = "123456789"
-#   stack         = "wsus-poc-us-east-1"
-#   owner         = "platform-engineering"
-#   commit_sha    = "0123456789abcdef0123456789abcdef01234567"
-#   run_id        = "1234567890"
-# }
+# Deployment identity is NOT set here. The deploy workflow passes repository, repository_id,
+# commit_sha, and run_id as command-line -var arguments (see docs/reference/runner-protocol.md),
+# which outrank every tfvars source - so a value file cannot restate them. All four are required:
+# a plan without them fails rather than emitting untagged resources.

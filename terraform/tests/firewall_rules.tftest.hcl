@@ -3,13 +3,19 @@ mock_provider "aws" {
 
   mock_data "aws_subnet" {
     defaults = {
-      vpc_id = "vpc-fromsubnetlookup"
+      vpc_id            = "vpc-fromsubnetlookup"
+      cidr_block        = "10.0.0.0/8"
+      availability_zone = "us-east-1a"
     }
   }
 }
 
 variables {
-  environment = "test"
+  repository    = "nwarila-platform/aws-terraform-framework"
+  repository_id = "123456789"
+  commit_sha    = "0123456789abcdef0123456789abcdef01234567"
+  run_id        = "42"
+  environment   = "test"
 
   all_systems = [
     {
@@ -22,12 +28,16 @@ variables {
       aws_kms_alias        = "preexisting"
       ami                  = "test-linux"
 
-      refresh        = false
-      instance_type  = "m6i.large"
-      readiness_user = null
-      readiness_gate = false
-      imds_hop_limit = 1
-      set_state      = null
+      refresh                    = false
+      instance_type              = "m6i.large"
+      connection_type            = null
+      readiness_user             = null
+      readiness_command          = null
+      readiness_script_dir       = null
+      readiness_private_key_path = null
+      readiness_gate             = false
+      imds_hop_limit             = 1
+      set_state                  = null
 
       tags = {
         Function = "Rule-key stability"
@@ -45,6 +55,8 @@ variables {
 
       ebs_block_devices = []
 
+      ami_block_device_overrides = []
+
       network_interfaces = [
         {
           private_ip      = "10.0.0.80"
@@ -58,17 +70,15 @@ variables {
               from_port                    = 22
               to_port                      = 22
               cidr_ipv4                    = "10.1.0.0/16"
-              cidr_ipv6                    = null
               prefix_list_id               = null
               referenced_security_group_id = null
             },
             {
-              description                  = "HTTPS from IPv6 services"
+              description                  = "HTTPS from IPv4 services"
               ip_protocol                  = "tcp"
               from_port                    = 443
               to_port                      = 443
-              cidr_ipv4                    = null
-              cidr_ipv6                    = "2001:db8:1::/64"
+              cidr_ipv4                    = "10.2.0.0/16"
               prefix_list_id               = null
               referenced_security_group_id = null
             }
@@ -90,7 +100,7 @@ run "rule_keys_before_front_insert" {
   assert {
     condition = toset(keys(aws_vpc_security_group_ingress_rule.us_east_1)) == toset([
       "stability-host-eni-0-sg/ingress-protocol-tcp-ports-22-22-cidr-ipv4-10-1-0-0-16-${substr(sha256(jsonencode(["ingress", "tcp", 22, 22, "cidr_ipv4", "10.1.0.0/16"])), 0, 12)}",
-      "stability-host-eni-0-sg/ingress-protocol-tcp-ports-443-443-cidr-ipv6-2001-db8-1-64-${substr(sha256(jsonencode(["ingress", "tcp", 443, 443, "cidr_ipv6", "2001:db8:1::/64"])), 0, 12)}",
+      "stability-host-eni-0-sg/ingress-protocol-tcp-ports-443-443-cidr-ipv4-10-2-0-0-16-${substr(sha256(jsonencode(["ingress", "tcp", 443, 443, "cidr_ipv4", "10.2.0.0/16"])), 0, 12)}",
     ])
     error_message = "Rule keys must be derived from the rule identity rather than its list position."
   }
@@ -113,12 +123,16 @@ run "front_insert_preserves_existing_rule_keys" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
 
         tags = {
           Function = "Rule-key stability after a front insert"
@@ -136,6 +150,8 @@ run "front_insert_preserves_existing_rule_keys" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.80"
@@ -149,7 +165,6 @@ run "front_insert_preserves_existing_rule_keys" {
                 from_port                    = 8443
                 to_port                      = 8443
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = "pl-0123456789abcdef0"
                 referenced_security_group_id = null
               },
@@ -159,17 +174,15 @@ run "front_insert_preserves_existing_rule_keys" {
                 from_port                    = 22
                 to_port                      = 22
                 cidr_ipv4                    = "10.1.0.0/16"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
               {
-                description                  = "HTTPS from IPv6 services"
+                description                  = "HTTPS from IPv4 services"
                 ip_protocol                  = "tcp"
                 from_port                    = 443
                 to_port                      = 443
-                cidr_ipv4                    = null
-                cidr_ipv6                    = "2001:db8:1::/64"
+                cidr_ipv4                    = "10.2.0.0/16"
                 prefix_list_id               = null
                 referenced_security_group_id = null
               }
@@ -190,7 +203,7 @@ run "front_insert_preserves_existing_rule_keys" {
       contains(keys(aws_security_group.us_east_1), "stability-host-eni-0-sg"),
       length(aws_vpc_security_group_ingress_rule.us_east_1) == 3,
       contains(keys(aws_vpc_security_group_ingress_rule.us_east_1), "stability-host-eni-0-sg/ingress-protocol-tcp-ports-22-22-cidr-ipv4-10-1-0-0-16-${substr(sha256(jsonencode(["ingress", "tcp", 22, 22, "cidr_ipv4", "10.1.0.0/16"])), 0, 12)}"),
-      contains(keys(aws_vpc_security_group_ingress_rule.us_east_1), "stability-host-eni-0-sg/ingress-protocol-tcp-ports-443-443-cidr-ipv6-2001-db8-1-64-${substr(sha256(jsonencode(["ingress", "tcp", 443, 443, "cidr_ipv6", "2001:db8:1::/64"])), 0, 12)}"),
+      contains(keys(aws_vpc_security_group_ingress_rule.us_east_1), "stability-host-eni-0-sg/ingress-protocol-tcp-ports-443-443-cidr-ipv4-10-2-0-0-16-${substr(sha256(jsonencode(["ingress", "tcp", 443, 443, "cidr_ipv4", "10.2.0.0/16"])), 0, 12)}"),
     ])
     error_message = "A front insertion must add one rule key while retaining the security-group key and both pre-existing rule keys."
   }
@@ -212,12 +225,16 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
 
         tags = {
           Function = "Many rules on multiple interfaces"
@@ -235,6 +252,8 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.81"
@@ -248,7 +267,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 443
                 to_port                      = 443
                 cidr_ipv4                    = "10.10.0.0/16"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               }
@@ -268,17 +286,15 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 22
                 to_port                      = 22
                 cidr_ipv4                    = "10.20.0.0/16"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
               {
-                description                  = "HTTPS from IPv6 clients"
+                description                  = "HTTPS from IPv4 clients"
                 ip_protocol                  = "tcp"
                 from_port                    = 443
                 to_port                      = 443
-                cidr_ipv4                    = null
-                cidr_ipv6                    = "2001:db8:20::/64"
+                cidr_ipv4                    = "10.20.0.0/16"
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -288,7 +304,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 9090
                 to_port                      = 9090
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = "sg-0123456789abcdef0"
               }
@@ -300,7 +315,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 443
                 to_port                      = 443
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = "pl-0123456789abcdef0"
                 referenced_security_group_id = null
               },
@@ -310,7 +324,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 53
                 to_port                      = 53
                 cidr_ipv4                    = "10.20.0.2/32"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               }
@@ -329,7 +342,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 8001
                 to_port                      = 8001
                 cidr_ipv4                    = "10.30.1.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -339,17 +351,15 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 8002
                 to_port                      = 8002
                 cidr_ipv4                    = "10.30.2.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
               {
-                description                  = "IPv6 application clients"
+                description                  = "IPv4 application clients"
                 ip_protocol                  = "tcp"
                 from_port                    = 8003
                 to_port                      = 8003
-                cidr_ipv4                    = null
-                cidr_ipv6                    = "2001:db8:30::/64"
+                cidr_ipv4                    = "10.30.0.0/16"
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -359,7 +369,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 8004
                 to_port                      = 8004
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = "pl-11111111111111111"
                 referenced_security_group_id = null
               },
@@ -369,7 +378,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 8005
                 to_port                      = 8005
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = "sg-11111111111111111"
               }
@@ -381,7 +389,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 9001
                 to_port                      = 9001
                 cidr_ipv4                    = "10.40.1.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -391,17 +398,15 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 9002
                 to_port                      = 9002
                 cidr_ipv4                    = "10.40.2.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
               {
-                description                  = "Outbound IPv6 service"
+                description                  = "Outbound IPv4 service"
                 ip_protocol                  = "tcp"
                 from_port                    = 9003
                 to_port                      = 9003
-                cidr_ipv4                    = null
-                cidr_ipv6                    = "2001:db8:40::/64"
+                cidr_ipv4                    = "10.40.0.0/16"
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -411,7 +416,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 9004
                 to_port                      = 9004
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = "pl-22222222222222222"
                 referenced_security_group_id = null
               },
@@ -421,7 +425,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 9005
                 to_port                      = 9005
                 cidr_ipv4                    = null
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = "sg-22222222222222222"
               },
@@ -431,7 +434,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 443
                 to_port                      = 443
                 cidr_ipv4                    = "10.40.6.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               },
@@ -441,7 +443,6 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
                 from_port                    = 123
                 to_port                      = 123
                 cidr_ipv4                    = "10.40.7.0/24"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               }
@@ -478,11 +479,10 @@ run "three_interfaces_scale_without_rule_or_attachment_collisions" {
   assert {
     condition = alltrue([
       anytrue([for rule in values(local.network_interface_security_group_rules.us_east_1) : rule.cidr_ipv4 != null]),
-      anytrue([for rule in values(local.network_interface_security_group_rules.us_east_1) : rule.cidr_ipv6 != null]),
       anytrue([for rule in values(local.network_interface_security_group_rules.us_east_1) : rule.prefix_list_id != null]),
       anytrue([for rule in values(local.network_interface_security_group_rules.us_east_1) : rule.referenced_security_group_id != null]),
     ])
-    error_message = "The scale case must exercise every supported rule destination kind."
+    error_message = "The scale case must exercise every supported rule destination kind (cidr_ipv4, prefix_list_id, referenced_security_group_id - this framework is IPv4-only)."
   }
 
   assert {
@@ -524,12 +524,16 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
         aws_kms_alias        = "preexisting"
         ami                  = "test-linux"
 
-        refresh        = false
-        instance_type  = "m6i.large"
-        readiness_user = null
-        readiness_gate = false
-        imds_hop_limit = 1
-        set_state      = null
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
 
         tags = {
           Function = "Composed security groups"
@@ -547,6 +551,8 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
 
         ebs_block_devices = []
 
+        ami_block_device_overrides = []
+
         network_interfaces = [
           {
             private_ip      = "10.0.0.85"
@@ -560,7 +566,6 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
                 from_port                    = 22
                 to_port                      = 22
                 cidr_ipv4                    = "10.60.0.0/16"
-                cidr_ipv6                    = null
                 prefix_list_id               = null
                 referenced_security_group_id = null
               }
@@ -589,4 +594,3 @@ run "derived_and_precreated_groups_compose_in_authored_order" {
     error_message = "The authored group must remain first, the derived group must append once, and neither group may be dropped."
   }
 }
-

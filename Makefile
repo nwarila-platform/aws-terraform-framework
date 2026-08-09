@@ -2,18 +2,28 @@ PYTHON ?= python3
 TFLINT ?= tflint
 
 # The deny-all guard scans the whole repository. Only rooted, known runtime/scratch artifacts are
-# excluded: Terraform's local cache/state, Python bytecode caches, and the handoff workspace.
-GUARD_EXCLUDE := ^(_handoff/|terraform/\.terraform/|terraform/terraform\.tfstate(\.backup)?$$|terraform/\.terraform\.tfstate\.lock\.info$$|([^/]+/)*__pycache__/|([^/]+/)*[^/]+\.py[co]$$)
+# excluded: Terraform's local cache/state, Python bytecode caches, the handoff workspace, the
+# `.tmp/` scratch directory this org's repositories share, and `.themis/` tool state. These are
+# working-tree-only by construction, so excluding them cannot hide a deliverable.
+GUARD_EXCLUDE := ^(_handoff/|\.tmp/|\.themis/|terraform/\.terraform/|terraform/terraform\.tfstate(\.backup)?$$|terraform/\.terraform\.tfstate\.lock\.info$$|([^/]+/)*__pycache__/|([^/]+/)*[^/]+\.py[co]$$)
 
-.PHONY: fmt fmt-check init validate test docs docs-diff docs-check allowlist-check tflint ci
+.PHONY: fmt fmt-check init validate test readiness-order-check docs docs-diff docs-check \
+	allowlist-check tflint ci
 
 # Mutating: rewrites HCL in place. Use locally before committing.
+# -recursive skips terraform.tfvars.example because fmt only walks .tf and .tfvars extensions,
+# so the example is piped through stdin mode separately. Both targets must cover it or a
+# contributor could run fmt and still fail fmt-check.
 fmt:
 	terraform -chdir=terraform fmt -recursive
+	@formatted=$$(terraform fmt - < terraform/terraform.tfvars.example) && \
+	printf '%s\n' "$$formatted" > terraform/terraform.tfvars.example
 
 # Non-mutating: fails if any file would change. Use in CI.
 fmt-check:
 	terraform -chdir=terraform fmt -check -recursive
+	@terraform fmt -check - < terraform/terraform.tfvars.example > /dev/null || \
+	{ echo "terraform/terraform.tfvars.example is not fmt-clean; run 'make fmt'"; exit 1; }
 
 init:
 	terraform -chdir=terraform init -backend=false -input=false
@@ -23,6 +33,17 @@ validate:
 
 test:
 	terraform -chdir=terraform test
+
+# Starting or stopping an instance before the readiness gate returns races the launch agent.
+# That ordering is a depends_on edge, and a plan assertion cannot inspect one, so it is checked
+# here instead. Whitespace is stripped and newlines folded first, so reformatting or a second
+# entry in the list cannot fail this - only the edge actually going missing.
+readiness-order-check:
+	@sed -n '/^resource "aws_ec2_instance_state" "us_east_1" {$$/,/^}$$/p' \
+	  terraform/resources.tf | tr -d ' \t' | tr '\n' ' ' \
+	  | grep -Eq 'depends_on=\[[^]]*terraform_data\.readiness_gate' || \
+	  { echo 'aws_ec2_instance_state.us_east_1 must depend on terraform_data.readiness_gate'; \
+	    exit 1; }
 
 # Mutating: regenerates the injected block in docs/reference/terraform.md.
 docs:
@@ -36,8 +57,8 @@ docs-check:
 	$(PYTHON) tools/check_docs_layout.py
 
 # Bidirectional deny-all allowlist guard. The forward half catches deliverable files that exist on
-# disk but git would silently omit; the reverse half catches stale unignore entries after a path is
-# renamed or deleted.
+# disk but git would silently omit; the reverse half catches stale unignore entries after a
+# path is renamed or deleted.
 allowlist-check:
 	@ignored=$$(git ls-files --others --ignored --exclude-standard -- . 2>/dev/null \
 	  | grep -vE '$(GUARD_EXCLUDE)' || true); \
@@ -74,6 +95,7 @@ ci:
 	$(MAKE) init
 	$(MAKE) validate
 	$(MAKE) test
+	$(MAKE) readiness-order-check
 	$(MAKE) tflint
 	$(MAKE) docs-diff
 	$(MAKE) docs-check

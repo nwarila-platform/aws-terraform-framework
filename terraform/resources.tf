@@ -1,342 +1,295 @@
 # Managed resources. Consumes the shaped maps from locals.tf; the refresh trigger
 # fleet-replaces refresh=true instances when var.refresh_serial increments.
 
+
+#region ------ [ terraform_data.refresh ] ------------------------------------------------------ #
+
 resource "terraform_data" "refresh" {
+
+  # Define the Fleet Refresh Trigger Properties
   input = var.refresh_serial
-}
-
-#region ------ [ Create Managed EC2 Key Pairs ] ----------------------------------------------- #
-
-# Optional framework-managed key pairs (public half supplied via var.managed_keypairs). Created in
-# us-east-1, the supported region. Empty default map
-# creates nothing.
-
-
-resource "aws_key_pair" "us_east_1" {
-
-  # Set the provider in which to deploy the key pair.
-  provider = aws.us_east_1
-
-  for_each = var.managed_keypairs
-
-  key_name   = each.key
-  public_key = each.value.public_key
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
 
 }
 
-#endregion --- [ Create Managed EC2 Key Pairs ] ------------------------------------------------ #
+#endregion --- [ terraform_data.refresh ] ------------------------------------------------------ #
 
 
-#region ------ [ Create Managed Security Groups ] ---------------------------------------------- #
+#region ------ [ aws_security_group ] ---------------------------------------------------------- #
 
-# Optional interface-owned security groups. An interface with no ingress entries is zero-inbound
-# (the SSM posture). Rules are granular aws_vpc_security_group_*_rule resources with stable
-# content-derived addresses under their "<sg>/" prefix.
-# Interfaces with null ingress and egress create nothing.
-
+#region ------ [ aws_security_group - us-east-1 ] ---------------------------------------------- #
 
 resource "aws_security_group" "us_east_1" {
 
-  # Set the provider in which to deploy the security group.
+  # Iterate through all Security Groups in the US-East-1 region.
   provider = aws.us_east_1
-
   for_each = local.network_interface_security_groups_by_region.us_east_1
 
-  name        = each.key
+  # Define the Security Group Properties
   description = each.value.description
-  vpc_id      = lookup(local.managed_vpc_ids.us_east_1, each.value.vpc_id, each.value.vpc_id)
+  name        = each.key
+  tags        = each.value.tags
+  vpc_id      = each.value.vpc_id
 
-  lifecycle { ignore_changes = [description] }
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
+  lifecycle {
+    # Changing a security group's description forces replacement, which AWS refuses while the
+    # group is attached to a live ENI, so the authored description is fixed at creation.
+    ignore_changes = [description]
+  }
 
 }
 
+#endregion --- [ aws_security_group - us-east-1 ] ---------------------------------------------- #
+
+#endregion --- [ aws_security_group ] ---------------------------------------------------------- #
+
+
+#region ------ [ aws_security_group.runner_ingress ] ------------------------------------------- #
+
+#region ------ [ aws_security_group.runner_ingress - us-east-1 ] ------------------------------- #
+
+resource "aws_security_group" "runner_ingress_us_east_1" {
+
+  # Iterate through the Run-Scoped Runner Ingress Security Group in the US-East-1 region.
+  provider = aws.us_east_1
+  for_each = local.runner_ingress_security_groups.us_east_1
+
+  # Define the Security Group Properties
+  description = each.value.description
+  name        = each.value.name
+  tags        = each.value.tags
+  vpc_id      = each.value.vpc_id
+
+  lifecycle {
+    # A security group lives in exactly one VPC, so one shared group cannot cover a fleet spread
+    # across several. Fail here rather than attach to whichever VPC sorted first and leave the
+    # rest silently unreachable.
+    precondition {
+      condition = length(local.runner_ingress_vpc_ids.us_east_1) == 1
+      error_message = format(
+        join(" ", [
+          "runner_ip is set, but all_systems resolves to %d VPCs (%s). One security group cannot",
+          "span VPCs. Deploy the systems sharing a VPC separately, or clear runner_ip.",
+        ]),
+        length(local.runner_ingress_vpc_ids.us_east_1),
+        join(", ", local.runner_ingress_vpc_ids.us_east_1),
+      )
+    }
+
+    # Changing a security group's description forces replacement, which AWS refuses while the
+    # group is attached to a live ENI, so the authored description is fixed at creation.
+    ignore_changes = [description]
+  }
+
+}
+
+#endregion --- [ aws_security_group.runner_ingress - us-east-1 ] ------------------------------- #
+
+#endregion --- [ aws_security_group.runner_ingress ] ------------------------------------------- #
+
+
+#region ------ [ aws_vpc_security_group_ingress_rule ] ----------------------------------------- #
+
+#region ------ [ aws_vpc_security_group_ingress_rule - us-east-1 ] ----------------------------- #
 
 resource "aws_vpc_security_group_ingress_rule" "us_east_1" {
 
-  # Set the provider in which to deploy the rule.
+  # Iterate through all Security Group Ingress Rules in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.network_interface_security_group_ingress_rules.us_east_1
 
-  for_each = {
-    for key, rule in local.network_interface_security_group_rules.us_east_1 : key => rule
-    if rule.direction == "ingress"
-  }
-
-  security_group_id = aws_security_group.us_east_1[each.value.sg_key].id
-
-  description                  = each.value.description
-  ip_protocol                  = each.value.ip_protocol
-  from_port                    = each.value.from_port
-  to_port                      = each.value.to_port
+  # Define the Security Group Ingress Rule Properties
   cidr_ipv4                    = each.value.cidr_ipv4
-  cidr_ipv6                    = each.value.cidr_ipv6
+  description                  = each.value.description
+  from_port                    = each.value.from_port
+  ip_protocol                  = each.value.ip_protocol
   prefix_list_id               = each.value.prefix_list_id
   referenced_security_group_id = each.value.referenced_security_group_id
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "True"
-  }
+  security_group_id            = aws_security_group.us_east_1[each.value.sg_key].id
+  tags                         = each.value.tags
+  to_port                      = each.value.to_port
 
 }
 
+#endregion --- [ aws_vpc_security_group_ingress_rule - us-east-1 ] ----------------------------- #
+
+#endregion --- [ aws_vpc_security_group_ingress_rule ] ----------------------------------------- #
+
+
+#region ------ [ aws_vpc_security_group_ingress_rule.runner_ingress ] -------------------------- #
+
+#region ------ [ aws_vpc_security_group_ingress_rule.runner_ingress - us-east-1 ] -------------- #
+
+resource "aws_vpc_security_group_ingress_rule" "runner_ingress_us_east_1" {
+
+  # Iterate through all Run-Scoped Runner Ingress Rules in the US-East-1 region.
+  provider = aws.us_east_1
+  for_each = local.runner_ingress_security_group_rules.us_east_1
+
+  # Define the Security Group Ingress Rule Properties
+  cidr_ipv4                    = each.value.cidr_ipv4
+  description                  = each.value.description
+  from_port                    = each.value.from_port
+  ip_protocol                  = each.value.ip_protocol
+  prefix_list_id               = each.value.prefix_list_id
+  referenced_security_group_id = each.value.referenced_security_group_id
+  security_group_id            = aws_security_group.runner_ingress_us_east_1[each.value.sg_key].id
+  tags                         = each.value.tags
+  to_port                      = each.value.to_port
+
+}
+
+#endregion --- [ aws_vpc_security_group_ingress_rule.runner_ingress - us-east-1 ] -------------- #
+
+#endregion --- [ aws_vpc_security_group_ingress_rule.runner_ingress ] -------------------------- #
+
+
+#region ------ [ aws_vpc_security_group_egress_rule ] ------------------------------------------ #
+
+#region ------ [ aws_vpc_security_group_egress_rule - us-east-1 ] ------------------------------ #
 
 resource "aws_vpc_security_group_egress_rule" "us_east_1" {
 
-  # Set the provider in which to deploy the rule.
+  # Iterate through all Security Group Egress Rules in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.network_interface_security_group_egress_rules.us_east_1
 
-  for_each = {
-    for key, rule in local.network_interface_security_group_rules.us_east_1 : key => rule
-    if rule.direction == "egress"
-  }
-
-  security_group_id = aws_security_group.us_east_1[each.value.sg_key].id
-
-  description                  = each.value.description
-  ip_protocol                  = each.value.ip_protocol
-  from_port                    = each.value.from_port
-  to_port                      = each.value.to_port
+  # Define the Security Group Egress Rule Properties
   cidr_ipv4                    = each.value.cidr_ipv4
-  cidr_ipv6                    = each.value.cidr_ipv6
+  description                  = each.value.description
+  from_port                    = each.value.from_port
+  ip_protocol                  = each.value.ip_protocol
   prefix_list_id               = each.value.prefix_list_id
   referenced_security_group_id = each.value.referenced_security_group_id
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "True"
-  }
+  security_group_id            = aws_security_group.us_east_1[each.value.sg_key].id
+  tags                         = each.value.tags
+  to_port                      = each.value.to_port
 
 }
 
-#endregion --- [ Create Managed Security Groups ] ---------------------------------------------- #
+#endregion --- [ aws_vpc_security_group_egress_rule - us-east-1 ] ------------------------------ #
+
+#endregion --- [ aws_vpc_security_group_egress_rule ] ------------------------------------------ #
 
 
-#region ------ [ Create Managed Networking ] --------------------------------------------------- #
+#region ------ [ aws_eip ] --------------------------------------------------------------------- #
 
-# Optional framework-managed throwaway networking (var.managed_networks): VPC (or BYO vpc_id),
-# one subnet, and for public networks an internet gateway + default route. Setting
-# associate_public_ip = true allocates an EIP and binds it to the primary ENI for a stable public
-# IPv4 address. Independently, AWS assigns a public IPv4 address at launch to an instance with a
-# pre-created primary ENI when subnet public-IP auto-assignment is enabled; that address is not
-# managed by this framework. Empty default map creates nothing.
-
-
-resource "aws_vpc" "us_east_1" {
-
-  # Set the provider in which to deploy the VPC.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.vpc_cidr != null
-  }
-
-  cidr_block           = each.value.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_internet_gateway" "us_east_1" {
-
-  # Set the provider in which to deploy the internet gateway.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.public && network.vpc_cidr != null
-  }
-
-  vpc_id = aws_vpc.us_east_1[each.key].id
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_subnet" "us_east_1" {
-
-  # Set the provider in which to deploy the subnet.
-  provider = aws.us_east_1
-
-  for_each = local.managed_networks_by_region.us_east_1
-
-  vpc_id            = local.managed_vpc_ids.us_east_1[each.key]
-  cidr_block        = each.value.subnet_cidr
-  availability_zone = each.value.availability_zone
-
-  # Kept false so AWS does not automatically assign a public IPv4 address to instances launched in
-  # this managed subnet. If enabled, subnet auto-assignment also applies when an instance launches
-  # with this framework's pre-created primary ENI.
-  map_public_ip_on_launch = false
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_route_table" "us_east_1" {
-
-  # Set the provider in which to deploy the route table.
-  provider = aws.us_east_1
-
-  for_each = {
-    for name, network in local.managed_networks_by_region.us_east_1 : name => network
-    if network.public && network.vpc_cidr != null
-  }
-
-  vpc_id = aws_vpc.us_east_1[each.key].id
-
-  tags = merge(
-    each.value.tags,
-    {
-      Name        = each.key
-      Environment = var.environment
-      Terraform   = "True"
-    }
-  )
-
-}
-
-resource "aws_route" "us_east_1_default" {
-
-  # Set the provider in which to deploy the route.
-  provider = aws.us_east_1
-
-  for_each = aws_route_table.us_east_1
-
-  route_table_id         = each.value.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.us_east_1[each.key].id
-
-}
-
-resource "aws_route_table_association" "us_east_1" {
-
-  # Set the provider in which to deploy the route table association.
-  provider = aws.us_east_1
-
-  for_each = aws_route_table.us_east_1
-
-  subnet_id      = aws_subnet.us_east_1[each.key].id
-  route_table_id = each.value.id
-
-}
+#region ------ [ aws_eip - us-east-1 ] --------------------------------------------------------- #
 
 resource "aws_eip" "us_east_1" {
 
-  # Set the provider in which to allocate the Elastic IP.
+  # Iterate through all Elastic IPs in the US-East-1 region.
   provider = aws.us_east_1
-
   for_each = local.eip_systems.us_east_1
 
+  # Define the Elastic IP Properties
   domain = "vpc"
-
-  tags = {
-    Name        = each.key
-    Environment = var.environment
-    Terraform   = "True"
-  }
+  tags   = each.value.tags
 
 }
+
+#endregion --- [ aws_eip - us-east-1 ] --------------------------------------------------------- #
+
+#endregion --- [ aws_eip ] --------------------------------------------------------------------- #
+
+
+#region ------ [ aws_eip_association ] --------------------------------------------------------- #
+
+#region ------ [ aws_eip_association - us-east-1 ] --------------------------------------------- #
 
 resource "aws_eip_association" "us_east_1" {
 
-  # Set the provider in which to associate the Elastic IP.
+  # Iterate through all EIP Associations in the US-East-1 region.
   provider = aws.us_east_1
-
   for_each = local.eip_systems.us_east_1
 
+  # Define the EIP Association Properties
   allocation_id        = aws_eip.us_east_1[each.key].id
   network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
 
-  # EC2 requires the VPC internet gateway to exist before an EIP can be associated.
-  depends_on = [aws_internet_gateway.us_east_1]
-
 }
 
-#endregion --- [ Create Managed Networking ] --------------------------------------------------- #
+#endregion --- [ aws_eip_association - us-east-1 ] --------------------------------------------- #
+
+#endregion --- [ aws_eip_association ] --------------------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #
+#region ------ [ aws_network_interface ] ------------------------------------------------------- #
 
-
-#region ------ [ Create All Elastic Network Interfaces (ENIs) - us-east-1 ] ------------- #
+#region ------ [ aws_network_interface - us-east-1 ] ------------------------------------------- #
 
 resource "aws_network_interface" "us_east_1" {
 
-  # Iterate through all network interfaces in the target region.
+  # Iterate through all Elastic Network Interfaces in the US-East-1 region.
+  provider = aws.us_east_1
   for_each = local.elastic_network_interfaces.us_east_1
 
-  # Set the provider in which to deploy the network interface.
-  provider = aws.us_east_1
-
-  # Define the Network Interface Properties
-  subnet_id       = each.value.subnet_id
+  # Define the Elastic Network Interface Properties
   description     = each.value.description
   interface_type  = each.value.interface_type
   private_ips     = each.value.private_ips
   security_groups = each.value.security_groups
+  subnet_id       = each.value.subnet_id
   tags            = each.value.tags
+
+  # These two checks used to be variable validations fed by caller-declared subnet metadata. The
+  # subnet is now read directly, so they compare against the real thing instead - which means they
+  # must be preconditions: a variable validation runs before any data source is read.
+  lifecycle {
+    precondition {
+      condition = (
+        each.value.availability_zone ==
+        data.aws_subnet.us_east_1[each.value.subnet_id].availability_zone
+      )
+      error_message = format(
+        "System %s declares availability_zone %s, but subnet %s is in %s. An interface is created in its subnet's zone, so the instance and its volumes must name that same zone.",
+        each.value.hostname,
+        each.value.availability_zone,
+        each.value.subnet_id,
+        data.aws_subnet.us_east_1[each.value.subnet_id].availability_zone,
+      )
+    }
+
+    # AWS reserves five addresses in every subnet: the first four and the last.
+    precondition {
+      condition = each.value.private_ip == null || (
+        cidrhost(
+          "${each.value.private_ip}/${split("/", data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block)[1]}",
+          0
+        ) == cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, 0) &&
+        !contains(
+          [
+            for reserved in [0, 1, 2, 3, -1] :
+            cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, reserved)
+          ],
+          each.value.private_ip,
+        )
+      )
+      error_message = format(
+        "Pinned private_ip %s on %s falls outside subnet %s (%s) or lands on one of the five addresses AWS reserves in it. Leave private_ip null to let AWS pick.",
+        coalesce(each.value.private_ip, "null"),
+        each.value.hostname,
+        each.value.subnet_id,
+        data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block,
+      )
+    }
+  }
 
 }
 
-#endregion --- [ Create All Elastic Network Interfaces (ENIs) - us-east-1 ] ------------- #
+#endregion --- [ aws_network_interface - us-east-1 ] ------------------------------------------- #
 
-#endregion --- [ Create All Elastic Network Interfaces (ENIs) ] ------------------------------- #
-
-
-#region ------ [ Create All Elastic Load Balancers (ELBs) ] ---------------------------------- #
+#endregion --- [ aws_network_interface ] ------------------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Load Balancers (ELBs) - us-east-1 ] ---------------- #
+#region ------ [ aws_lb ] ---------------------------------------------------------------------- #
+
+#region ------ [ aws_lb - us-east-1 ] ---------------------------------------------------------- #
 
 resource "aws_lb" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancers in the target region.
-  for_each = local.elastic_load_balancers.us_east_1
-
-  # Set the provider in which to deploy the load balancer.
+  # Iterate through all Elastic Load Balancers in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.elastic_load_balancers.us_east_1
 
   # Define the Elastic Load Balancer Properties
   client_keep_alive                                            = each.value.client_keep_alive
@@ -351,7 +304,7 @@ resource "aws_lb" "us_east_1" {
   enable_waf_fail_open                                         = each.value.enable_waf_fail_open
   enable_xff_client_port                                       = each.value.enable_xff_client_port
   enable_zonal_shift                                           = each.value.enable_zonal_shift
-  enforce_security_group_inbound_rules_on_private_link_traffic = each.value.enforce_security_group_inbound_rules_on_private_link_traffic
+  enforce_security_group_inbound_rules_on_private_link_traffic = each.value.load_balancer_type == "network" ? "on" : null
   idle_timeout                                                 = each.value.idle_timeout
   internal                                                     = each.value.internal
   ip_address_type                                              = each.value.ip_address_type
@@ -434,23 +387,20 @@ resource "aws_lb" "us_east_1" {
 
 }
 
-#endregion --- [ Create All Elastic Load Balancers (ELBs) - us-east-1 ] ---------------- #
+#endregion --- [ aws_lb - us-east-1 ] ---------------------------------------------------------- #
 
-#endregion --- [ Create All Elastic Load Balancers (ELBs) ] ---------------------------------- #
-
-
-#region ------ [ Create All Elastic Load Balancer Target Groups ] ----------------------------- #
+#endregion --- [ aws_lb ] ---------------------------------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Load Balancer Target Groups - us-east-1 ] ---------- #
+#region ------ [ aws_lb_target_group ] --------------------------------------------------------- #
+
+#region ------ [ aws_lb_target_group - us-east-1 ] --------------------------------------------- #
 
 resource "aws_lb_target_group" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancer target groups in the target region.
-  for_each = local.lb_target_groups.us_east_1
-
-  # Set the provider in which to deploy the target group.
+  # Iterate through all Elastic Load Balancer Target Groups in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.lb_target_groups.us_east_1
 
   # Define the Elastic Load Balancer Target Group Properties
   connection_termination            = each.value.connection_termination
@@ -498,38 +448,42 @@ resource "aws_lb_target_group" "us_east_1" {
 
 }
 
+#endregion --- [ aws_lb_target_group - us-east-1 ] --------------------------------------------- #
+
+#endregion --- [ aws_lb_target_group ] --------------------------------------------------------- #
+
+
+#region ------ [ aws_lb_target_group_attachment ] ---------------------------------------------- #
+
+#region ------ [ aws_lb_target_group_attachment - us-east-1 ] ---------------------------------- #
+
 resource "aws_lb_target_group_attachment" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancer target group attachments in the target region.
+  # Iterate through all Elastic Load Balancer Target Group Attachments in the US-East-1 region.
+  provider = aws.us_east_1
   for_each = local.lb_target_group_attachments.us_east_1
 
-  # Set the provider in which to deploy the target group attachment.
-  provider = aws.us_east_1
-
   # Define the Elastic Load Balancer Target Group Attachment Properties
-  target_group_arn = aws_lb_target_group.us_east_1[each.value.tg_key].arn
-  target_id        = merge(aws_instance.us_east_1, aws_instance.us_east_1_refresh)[each.value.hostname].id
   port             = each.value.port
+  target_group_arn = aws_lb_target_group.us_east_1[each.value.tg_key].arn
+  target_id        = local.all_ec2_instances[each.value.hostname].id
 
 }
 
-#endregion --- [ Create All Elastic Load Balancer Target Groups - us-east-1 ] ---------- #
+#endregion --- [ aws_lb_target_group_attachment - us-east-1 ] ---------------------------------- #
 
-#endregion --- [ Create All Elastic Load Balancer Target Groups ] ----------------------------- #
-
-
-#region ------ [ Create All Elastic Load Balancer Listeners ] --------------------------------- #
+#endregion --- [ aws_lb_target_group_attachment ] ---------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Load Balancer Listeners - us-east-1 ] -------------- #
+#region ------ [ aws_lb_listener ] ------------------------------------------------------------- #
+
+#region ------ [ aws_lb_listener - us-east-1 ] ------------------------------------------------- #
 
 resource "aws_lb_listener" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancer listeners in the target region.
-  for_each = local.lb_listeners.us_east_1
-
-  # Set the provider in which to deploy the listener.
+  # Iterate through all Elastic Load Balancer Listeners in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.lb_listeners.us_east_1
 
   # Define the Elastic Load Balancer Listener Properties
   alpn_policy       = each.value.alpn_policy
@@ -543,6 +497,16 @@ resource "aws_lb_listener" "us_east_1" {
     target_group_arn = each.value.default_action.type == "forward" ? aws_lb_target_group.us_east_1[each.value.default_action.target_group_key].arn : null
     type             = each.value.default_action.type
 
+    dynamic "fixed_response" {
+      for_each = each.value.default_action.fixed_response == null ? [] : [each.value.default_action.fixed_response]
+
+      content {
+        content_type = fixed_response.value.content_type
+        message_body = fixed_response.value.message_body
+        status_code  = fixed_response.value.status_code
+      }
+    }
+
     dynamic "redirect" {
       for_each = each.value.default_action.redirect == null ? [] : [each.value.default_action.redirect]
 
@@ -555,27 +519,24 @@ resource "aws_lb_listener" "us_east_1" {
         status_code = redirect.value.status_code
       }
     }
-
-    dynamic "fixed_response" {
-      for_each = each.value.default_action.fixed_response == null ? [] : [each.value.default_action.fixed_response]
-
-      content {
-        content_type = fixed_response.value.content_type
-        message_body = fixed_response.value.message_body
-        status_code  = fixed_response.value.status_code
-      }
-    }
   }
 
 }
 
+#endregion --- [ aws_lb_listener - us-east-1 ] ------------------------------------------------- #
+
+#endregion --- [ aws_lb_listener ] ------------------------------------------------------------- #
+
+
+#region ------ [ aws_lb_listener_rule ] -------------------------------------------------------- #
+
+#region ------ [ aws_lb_listener_rule - us-east-1 ] -------------------------------------------- #
+
 resource "aws_lb_listener_rule" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancer listener rules in the target region.
-  for_each = local.lb_listener_rules.us_east_1
-
-  # Set the provider in which to deploy the listener rule.
+  # Iterate through all Elastic Load Balancer Listener Rules in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.lb_listener_rules.us_east_1
 
   # Define the Elastic Load Balancer Listener Rule Properties
   listener_arn = aws_lb_listener.us_east_1[each.value.listener_key].arn
@@ -667,13 +628,20 @@ resource "aws_lb_listener_rule" "us_east_1" {
 
 }
 
+#endregion --- [ aws_lb_listener_rule - us-east-1 ] -------------------------------------------- #
+
+#endregion --- [ aws_lb_listener_rule ] -------------------------------------------------------- #
+
+
+#region ------ [ aws_lb_listener_certificate ] ------------------------------------------------- #
+
+#region ------ [ aws_lb_listener_certificate - us-east-1 ] ------------------------------------- #
+
 resource "aws_lb_listener_certificate" "us_east_1" {
 
-  # Iterate through all Elastic Load Balancer listener certificates in the target region.
-  for_each = local.lb_listener_certificates.us_east_1
-
-  # Set the provider in which to deploy the listener certificate.
+  # Iterate through all Elastic Load Balancer Listener Certificates in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.lb_listener_certificates.us_east_1
 
   # Define the Elastic Load Balancer Listener Certificate Properties
   certificate_arn = each.value.certificate_arn
@@ -681,100 +649,76 @@ resource "aws_lb_listener_certificate" "us_east_1" {
 
 }
 
-#endregion --- [ Create All Elastic Load Balancer Listeners - us-east-1 ] -------------- #
+#endregion --- [ aws_lb_listener_certificate - us-east-1 ] ------------------------------------- #
 
-#endregion --- [ Create All Elastic Load Balancer Listeners ] --------------------------------- #
-
-
-#region ------ [ Create All Elastic Block Store (EBS) Objects ] ------------------------------- #
+#endregion --- [ aws_lb_listener_certificate ] ------------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Block Store (EBS) Objects - us-east-1 ] ------------- #
+#region ------ [ aws_ebs_volume ] -------------------------------------------------------------- #
+
+#region ------ [ aws_ebs_volume - us-east-1 ] -------------------------------------------------- #
 
 resource "aws_ebs_volume" "us_east_1" {
 
-  # Iterate through all Elastic Block Store volumes in the target region.
-  for_each = {
-    for k, v in local.ebs_block_devices.us_east_1 : k => v
-    if v.refresh == false
-  }
-
-  # Set the provider in which to deploy the Elastic Block Store volume.
+  # Iterate through all Elastic Block Store Volumes in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.ebs_block_devices.us_east_1
 
-  # Define the Elastic Block Store Properties
+  # Define the Elastic Block Store Volume Properties
   availability_zone = each.value.availability_zone
   encrypted         = true
   iops              = each.value.iops
-
-  snapshot_id = each.value.snapshot_id
-  tags        = each.value.tags
-  throughput  = each.value.throughput
-  size        = each.value.volume_size
-  type        = each.value.volume_type
-
-  # ?Note: Using the lookup function, search inside the 'local.all_kms_keys' object map for a
-  # ?  object with the key matching the value of 'system.aws_kms_alias'.
-  kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  kms_key_id        = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  size              = each.value.volume_size
+  snapshot_id       = each.value.snapshot_id
+  tags              = each.value.tags
+  throughput        = each.value.throughput
+  type              = each.value.volume_type
 
 }
 
-resource "aws_ebs_volume" "us_east_1_refresh" {
+#endregion --- [ aws_ebs_volume - us-east-1 ] -------------------------------------------------- #
 
-  # Iterate through all Elastic Block Store volumes in the target region.
-  for_each = {
-    for k, v in local.ebs_block_devices.us_east_1 : k => v
-    if v.refresh == true
-  }
-
-  # Set the provider in which to deploy the Elastic Block Store volume.
-  provider = aws.us_east_1
-
-  # Define the Elastic Block Store Properties
-  availability_zone = each.value.availability_zone
-  encrypted         = true
-  iops              = each.value.iops
-
-  snapshot_id = each.value.snapshot_id
-  tags        = each.value.tags
-  throughput  = each.value.throughput
-  size        = each.value.volume_size
-  type        = each.value.volume_type
-
-  # ?Note: Using the lookup function, search inside the 'local.all_kms_keys' object map for a
-  # ?  object with the key matching the value of 'system.aws_kms_alias'.
-  kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
-
-}
-
-#endregion --- [ Create All Elastic Block Store (EBS) Objects - us-east-1 ] ------------- #
-
-#endregion --- [ Create All Elastic Block Store (EBS) Objects ] ------------------------------- #
+#endregion --- [ aws_ebs_volume ] -------------------------------------------------------------- #
 
 
-#region ------ [ Create All Elastic Compute Cloud (EC2s) ] ------------------------------------ #
+#region ------ [ aws_instance ] ---------------------------------------------------------------- #
 
+#region ------ [ aws_instance - us-east-1 ] ---------------------------------------------------- #
 
 resource "aws_instance" "us_east_1" {
 
-  # Set the provider in which to deploy the instance.
+  # Iterate through all Elastic Compute Cloud Instances in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.elastic_compute_cloud_stable.us_east_1
 
-  # Iterate through all EC2 instances in the target region.
-  for_each = {
-    for k, v in local.elastic_compute_cloud.us_east_1 : k => v
-    if v.refresh == false
-  }
-
+  # Define the Elastic Compute Cloud Instance Properties
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
-  instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = false
-  tags                        = each.value.tags
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  instance_type               = each.value.instance_type
+  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
+
+  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
+  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  dynamic "ebs_block_device" {
+    for_each = each.value.ami_block_device_overrides
+
+    content {
+      delete_on_termination = ebs_block_device.value.delete_on_termination
+      device_name           = ebs_block_device.value.device_name
+      encrypted             = true
+      iops                  = ebs_block_device.value.iops
+      kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      throughput            = ebs_block_device.value.throughput
+      volume_size           = ebs_block_device.value.volume_size
+      volume_type           = ebs_block_device.value.volume_type
+    }
+  }
 
   # http_tokens, http_protocol_ipv6, and instance_metadata_tags are module-owned
   # (ADR repo/0001): IMDSv2 is always enforced, the IMDS IPv6 endpoint stays off in this
@@ -782,72 +726,98 @@ resource "aws_instance" "us_east_1" {
   # Only the hop limit is consumer-set (validated 1-2 in variables.tf).
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = each.value.imds_hop_limit
     http_protocol_ipv6          = "disabled"
+    http_put_response_hop_limit = each.value.imds_hop_limit
+    http_tokens                 = "required"
     instance_metadata_tags      = "disabled"
   }
 
+  # Attach the existing index-zero ENI during launch so EC2 does not create a default interface.
+  # Secondary ENIs are managed by aws_network_interface_attachment resources below.
+  #
+  # delete_on_termination is not set: the provider computes it, because AWS decides it. Attaching
+  # an ENI that already exists by id defaults it to false, unlike an interface AWS creates at
+  # launch, so the ENI outlives the instance and its pinned private address survives a refresh.
+  primary_network_interface {
+    network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
+  }
+
   root_block_device {
-    volume_type           = each.value.root_block_device.volume_type
-    volume_size           = each.value.root_block_device.volume_size
-    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    encrypted             = true
     iops                  = each.value.root_block_device.iops
+    kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
     tags                  = each.value.root_block_device.tags
     throughput            = each.value.root_block_device.throughput
-    kms_key_id = (
-      data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
-    )
+    volume_size           = each.value.root_block_device.volume_size
+    volume_type           = each.value.root_block_device.volume_type
   }
 
-  # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created regardless of what else has been configured, and network interfaces
-  # ?  can only be attached while the system is powered off causing serious workflow issues.
-  dynamic "network_interface" {
-    for_each = {
-      for eni_key, network_interface in aws_network_interface.us_east_1 :
-      eni_key => {
-        id    = network_interface.id
-        index = local.elastic_network_interfaces.us_east_1[eni_key].index
-      }
-      if local.elastic_network_interfaces.us_east_1[eni_key].hostname == each.value.hostname
+  lifecycle {
+    precondition {
+      condition = !each.value.is_windows || (
+        length(each.value.hostname) <= 15 &&
+        can(regex("^[0-9A-Za-z][0-9A-Za-z-]*$", each.value.hostname)) &&
+        !can(regex("^[0-9]+$", each.value.hostname))
+      )
+      error_message = join(" ", [
+        "Windows system hostnames must be 15 characters or less, contain only letters, numbers,",
+        "and hyphens, and not be all numeric.",
+      ])
     }
-    content {
-      delete_on_termination = false
-      device_index          = network_interface.value.index
-      network_card_index    = 0
-      network_interface_id  = network_interface.value.id
+
+    precondition {
+      condition = length(each.value.uncovered_ami_block_devices) == 0
+      error_message = format(
+        join(" ", [
+          "System %s launches AMI %s, which declares non-root block-device mapping(s) %s that",
+          "ami_block_device_overrides does not cover. RunInstances would create them from the AMI",
+          "snapshots with those snapshots' own encryption state, outside this module's",
+          "all-volumes-encrypted invariant. Add an ami_block_device_overrides entry whose",
+          "device_name matches each listed name exactly.",
+        ]),
+        each.value.hostname,
+        each.value.ami,
+        join(", ", each.value.uncovered_ami_block_devices),
+      )
     }
   }
-
-  # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
-  # ?  configured will not automatically reattach the volume when the EC2 instance is
-  # ?  recreated, it will just abandon the volume and create/attach a new volume.
-  # dynamic "ebs_block_device" {}
 
 }
 
 resource "aws_instance" "us_east_1_refresh" {
 
-  # Set the provider in which to deploy the instance.
+  # Iterate through all Elastic Compute Cloud Instances in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.elastic_compute_cloud_refresh.us_east_1
 
-  # Iterate through all EC2 instances in the target region.
-  for_each = {
-    for k, v in local.elastic_compute_cloud.us_east_1 : k => v
-    if v.refresh == true
-  }
-
+  # Define the Elastic Compute Cloud Instance Properties
   ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
-  instance_type               = each.value.instance_type
   availability_zone           = each.value.availability_zone
-  get_password_data           = false
-  tags                        = each.value.tags
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
+  instance_type               = each.value.instance_type
+  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
+
+  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
+  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  dynamic "ebs_block_device" {
+    for_each = each.value.ami_block_device_overrides
+
+    content {
+      delete_on_termination = ebs_block_device.value.delete_on_termination
+      device_name           = ebs_block_device.value.device_name
+      encrypted             = true
+      iops                  = ebs_block_device.value.iops
+      kms_key_id            = data.aws_kms_alias.us_east_1[ebs_block_device.value.kms_key_id].target_key_arn
+      throughput            = ebs_block_device.value.throughput
+      volume_size           = ebs_block_device.value.volume_size
+      volume_type           = ebs_block_device.value.volume_type
+    }
+  }
 
   # http_tokens, http_protocol_ipv6, and instance_metadata_tags are module-owned
   # (ADR repo/0001): IMDSv2 is always enforced, the IMDS IPv6 endpoint stays off in this
@@ -855,193 +825,264 @@ resource "aws_instance" "us_east_1_refresh" {
   # Only the hop limit is consumer-set (validated 1-2 in variables.tf).
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = each.value.imds_hop_limit
     http_protocol_ipv6          = "disabled"
+    http_put_response_hop_limit = each.value.imds_hop_limit
+    http_tokens                 = "required"
     instance_metadata_tags      = "disabled"
   }
 
+  # Attach the existing index-zero ENI during launch so EC2 does not create a default interface.
+  # Secondary ENIs are managed by aws_network_interface_attachment resources below.
+  #
+  # delete_on_termination is not set: the provider computes it, because AWS decides it. Attaching
+  # an ENI that already exists by id defaults it to false, unlike an interface AWS creates at
+  # launch, so the ENI outlives the instance and its pinned private address survives a refresh.
+  primary_network_interface {
+    network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
+  }
+
   root_block_device {
-    volume_type           = each.value.root_block_device.volume_type
-    volume_size           = each.value.root_block_device.volume_size
-    encrypted             = true
     delete_on_termination = each.value.root_block_device.delete_on_termination
+    encrypted             = true
     iops                  = each.value.root_block_device.iops
+    kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
     tags                  = each.value.root_block_device.tags
     throughput            = each.value.root_block_device.throughput
-    kms_key_id = (
-      data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
-    )
+    volume_size           = each.value.root_block_device.volume_size
+    volume_type           = each.value.root_block_device.volume_type
   }
-
-  # ?Note: Network interface(s) need to be attached on creation otherwise a default interface
-  # ?  will be created regardless of what else has been configured, and network interfaces
-  # ?  can only be attached while the system is powered off causing serious workflow issues.
-  dynamic "network_interface" {
-    for_each = {
-      for eni_key, network_interface in aws_network_interface.us_east_1 :
-      eni_key => {
-        id    = network_interface.id
-        index = local.elastic_network_interfaces.us_east_1[eni_key].index
-      }
-      if local.elastic_network_interfaces.us_east_1[eni_key].hostname == each.value.hostname
-    }
-    content {
-      delete_on_termination = false
-      device_index          = network_interface.value.index
-      network_card_index    = 0
-      network_interface_id  = network_interface.value.id
-    }
-  }
-
-  # ?Note: Volumes created with ebs_block_device and have 'delete_on_termination = false'
-  # ?  configured will not automatically reattach the volume when the EC2 instance is
-  # ?  recreated, it will just abandon the volume and create/attach a new volume.
-  # dynamic "ebs_block_device" {}
 
   lifecycle {
     replace_triggered_by = [
       terraform_data.refresh
     ]
+
+    precondition {
+      condition = !each.value.is_windows || (
+        length(each.value.hostname) <= 15 &&
+        can(regex("^[0-9A-Za-z][0-9A-Za-z-]*$", each.value.hostname)) &&
+        !can(regex("^[0-9]+$", each.value.hostname))
+      )
+      error_message = join(" ", [
+        "Windows system hostnames must be 15 characters or less, contain only letters, numbers,",
+        "and hyphens, and not be all numeric.",
+      ])
+    }
+
+    precondition {
+      condition = length(each.value.uncovered_ami_block_devices) == 0
+      error_message = format(
+        join(" ", [
+          "System %s launches AMI %s, which declares non-root block-device mapping(s) %s that",
+          "ami_block_device_overrides does not cover. RunInstances would create them from the AMI",
+          "snapshots with those snapshots' own encryption state, outside this module's",
+          "all-volumes-encrypted invariant. Add an ami_block_device_overrides entry whose",
+          "device_name matches each listed name exactly.",
+        ]),
+        each.value.hostname,
+        each.value.ami,
+        join(", ", each.value.uncovered_ami_block_devices),
+      )
+    }
   }
 
 }
 
-#region ------ [ Readiness Gate ] ------------------------------------------------------------- #
+#endregion --- [ aws_instance - us-east-1 ] ---------------------------------------------------- #
+
+#endregion --- [ aws_instance ] ---------------------------------------------------------------- #
+
+
+#region ------ [ aws_network_interface_attachment ] -------------------------------------------- #
+
+#region ------ [ aws_network_interface_attachment - us-east-1 ] -------------------------------- #
+
+resource "aws_network_interface_attachment" "us_east_1" {
+
+  # Iterate through stable EC2 instances' secondary network interfaces in the US-East-1 region.
+  provider = aws.us_east_1
+  for_each = local.network_interface_attachments_stable.us_east_1
+
+  # Define the Elastic Network Interface Attachment Properties
+  device_index         = each.value.index
+  instance_id          = aws_instance.us_east_1[each.value.hostname].id
+  network_card_index   = 0
+  network_interface_id = aws_network_interface.us_east_1[each.key].id
+
+}
+
+resource "aws_network_interface_attachment" "us_east_1_refresh" {
+
+  # Iterate through refresh EC2 instances' secondary network interfaces in the US-East-1 region.
+  provider = aws.us_east_1
+  for_each = local.network_interface_attachments_refresh.us_east_1
+
+  # Define the Elastic Network Interface Attachment Properties
+  device_index         = each.value.index
+  instance_id          = aws_instance.us_east_1_refresh[each.value.hostname].id
+  network_card_index   = 0
+  network_interface_id = aws_network_interface.us_east_1[each.key].id
+
+}
+
+#endregion --- [ aws_network_interface_attachment - us-east-1 ] -------------------------------- #
+
+#endregion --- [ aws_network_interface_attachment ] -------------------------------------------- #
+
+
+#region ------ [ terraform_data.readiness_gate ] ----------------------------------------------- #
+
+#region ------ [ terraform_data.readiness_gate - us-east-1 ] ----------------------------------- #
 
 # Block `apply` until each instance finishes provisioning and is reachable over SSH — the single
 # readiness transport for every platform (WinRM is decommissioned). The connection retry
 # (10-minute timeout) waits for sshd; the OS-native inline command then waits for the launch agent
 # to finish (cloud-init on Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit.
 # Both platforms authenticate with the launch key pair (path supplied by
-# var.readiness_private_key_paths; the Windows bootstrap installs the launch public key for
-# Administrator). Systems with readiness_gate = false are absent from readiness_targets and create
-# no gate at all. On a SEPARATE terraform_data so a gate failure taints only this resource, never
-# the EC2 instance.
+# each system's readiness_private_key_path; the Windows bootstrap installs the launch public key
+# for Administrator). No `host_key` is pinned: the instance host key is generated at first boot
+# and is not retrievable through the provider, so the gate trusts the first host answering at the
+# private IP. Public-key auth means the launch key cannot be captured, and the channel carries
+# only the launch-agent wait command. Systems with readiness_gate = false are absent from
+# readiness_targets and create no gate at all. On a SEPARATE terraform_data so a gate failure
+# taints only this resource, never the EC2 instance.
 resource "terraform_data" "readiness_gate" {
 
-  for_each = local.readiness_targets
+  # Iterate through all Readiness Gates in the US-East-1 region.
+  for_each = local.readiness_targets.us_east_1
 
+  # Define the Readiness Gate Properties
   triggers_replace = {
     instance_id = each.value.id
   }
 
   lifecycle {
     precondition {
-      condition     = length(var.readiness_private_key_paths) == 0 || contains(keys(var.readiness_private_key_paths), each.value.key_name)
-      error_message = "readiness_private_key_paths is set but has no entry for key_name '${each.value.key_name}' (host ${each.key}); add its private-key path or the readiness gate will time out."
+      condition = each.value.connection_type != "winrm" || each.value.target_platform == "windows"
+      error_message = format(
+        join(" ", [
+          "System %s sets connection_type = \"winrm\", but its AMI resolves to a non-Windows",
+          "platform. WinRM is Windows-only; use \"ssh\" or null on Linux systems.",
+        ]),
+        each.key,
+      )
+    }
+
+    precondition {
+      condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
+      error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."
     }
   }
 
   provisioner "remote-exec" {
-    connection {
-      type            = "ssh"
-      host            = each.value.private_ip
-      user            = coalesce(each.value.readiness_user, each.value.is_windows ? "Administrator" : "ec2-user")
-      private_key     = try(file(var.readiness_private_key_paths[each.value.key_name]), null)
-      target_platform = each.value.is_windows ? "windows" : "unix"
-      script_path     = each.value.is_windows ? null : "${var.readiness_linux_script_dir}/terraform_%RAND%.sh"
-      timeout         = "10m"
-    }
-
     inline = [
-      each.value.is_windows ? local.windows_readiness_command : local.linux_readiness_command,
+      each.value.readiness_command,
     ]
+
+    connection {
+      host            = each.value.private_ip
+      https           = each.value.use_winrm
+      insecure        = each.value.use_winrm
+      password        = each.value.password
+      port            = each.value.use_winrm ? each.value.winrm_port : null
+      private_key     = each.value.use_winrm || each.value.private_key_path == null ? null : file(each.value.private_key_path)
+      script_path     = each.value.script_path
+      target_platform = each.value.target_platform
+      timeout         = "10m"
+      type            = each.value.use_winrm ? "winrm" : "ssh"
+      use_ntlm        = each.value.use_winrm
+      user            = each.value.readiness_user
+    }
   }
+
 }
 
-#endregion --- [ Readiness Gate ] ------------------------------------------------------------- #
+#endregion --- [ terraform_data.readiness_gate - us-east-1 ] ----------------------------------- #
 
-#endregion --- [ Create All Elastic Compute Cloud (EC2s) ] ------------------------------------ #
-
-
-#region ------ [ Attach All Elastic Block Store (EBS) Volumes ] ------------------------------- #
+#endregion --- [ terraform_data.readiness_gate ] ----------------------------------------------- #
 
 
-#region ------ [ Attach All Elastic Block Store (EBS) Volumes - us-east-1 ] ------------- #
+#region ------ [ aws_volume_attachment ] ------------------------------------------------------- #
+
+#region ------ [ aws_volume_attachment - us-east-1 ] ------------------------------------------- #
 
 resource "aws_volume_attachment" "us_east_1" {
 
-  # Set the provider in which to deploy the volume attachment.
+  # Iterate through all Elastic Block Store Volume Attachments in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.ebs_block_devices_stable.us_east_1
 
-  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
-  for_each = {
-    for k, v in local.ebs_block_devices.us_east_1 : k => v
-    if v.refresh == false
-  }
-
-  skip_destroy = each.value.skip_destroy
-  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
-  stop_instance_before_detaching = true
-  instance_id                    = aws_instance.us_east_1[each.value.hostname].id
-  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
+  # Define the Elastic Block Store Volume Attachment Properties
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
+  # filesystem corruption on a mounted volume.
   device_name                    = each.value.device_name
+  instance_id                    = aws_instance.us_east_1[each.value.hostname].id
+  skip_destroy                   = each.value.skip_destroy
+  stop_instance_before_detaching = true
+  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
 
 }
 
 resource "aws_volume_attachment" "us_east_1_refresh" {
 
-  # Set the provider in which to deploy the volume attachment.
+  # Iterate through all Elastic Block Store Volume Attachments in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.ebs_block_devices_refresh.us_east_1
 
-  # Iterate through all Elastic Block Storage (EBS) volumes in the target region.
-  for_each = {
-    for k, v in local.ebs_block_devices.us_east_1 : k => v
-    if v.refresh == true
-  }
-
-  skip_destroy = each.value.skip_destroy
-  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach filesystem corruption on a mounted volume.
-  stop_instance_before_detaching = true
-  instance_id                    = aws_instance.us_east_1_refresh[each.value.hostname].id
-  volume_id                      = aws_ebs_volume.us_east_1_refresh[each.key].id
+  # Define the Elastic Block Store Volume Attachment Properties
+  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
+  # filesystem corruption on a mounted volume.
   device_name                    = each.value.device_name
+  instance_id                    = aws_instance.us_east_1_refresh[each.value.hostname].id
+  skip_destroy                   = each.value.skip_destroy
+  stop_instance_before_detaching = true
+  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
 
 }
 
-#endregion --- [ Attach All Elastic Block Store (EBS) Volumes - us-east-1 ] ------------- #
+#endregion --- [ aws_volume_attachment - us-east-1 ] ------------------------------------------- #
 
-#endregion --- [ Attach All Elastic Block Store (EBS) Volumes ] ------------------------------- #
+#endregion --- [ aws_volume_attachment ] ------------------------------------------------------- #
 
 
-#region ------ [ Create Relational Database Service (RDS) ] ----------------------------------- #
+#region ------ [ aws_db_instance ] ------------------------------------------------------------- #
 
+#region ------ [ aws_db_instance - us-east-1 ] ------------------------------------------------- #
 
 resource "aws_db_instance" "us_east_1" {
 
-  # Set the provider in which to deploy the RDS database instance.
+  # Iterate through all Relational Database Service Instances in the US-East-1 region.
   provider = aws.us_east_1
-
-  # Iterate through all RDS database instances in the target region.
   for_each = local.relational_database_service.us_east_1
 
-  allocated_storage           = each.value.allocated_storage
-  availability_zone           = each.value.availability_zone
-  backup_retention_period     = each.value.backup_retention_period
-  backup_window               = each.value.backup_window
-  ca_cert_identifier          = each.value.ca_cert_identifier
-  db_name                     = each.value.db_name
-  db_subnet_group_name        = each.value.db_subnet_group_name
-  dedicated_log_volume        = each.value.dedicated_log_volume
-  delete_automated_backups    = each.value.delete_automated_backups
-  deletion_protection         = each.value.deletion_protection
-  engine                      = each.value.engine
-  engine_version              = each.value.engine_version
-  final_snapshot_identifier   = each.value.final_snapshot_identifier
-  identifier                  = each.value.identifier
-  instance_class              = each.value.instance_class
-  manage_master_user_password = each.value.manage_master_user_password ? true : null
-  max_allocated_storage       = each.value.max_allocated_storage
-  password                    = each.value.manage_master_user_password ? null : local.relational_database_service_credentials.us_east_1[each.key].password
-  skip_final_snapshot         = each.value.skip_final_snapshot
-  storage_encrypted           = true
-  storage_type                = each.value.storage_type
-  tags                        = each.value.tags
-  username                    = local.relational_database_service_credentials.us_east_1[each.key].username
-  vpc_security_group_ids      = each.value.vpc_security_group_ids
-
-  kms_key_id = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  # Define the Relational Database Service Instance Properties
+  allocated_storage                   = each.value.allocated_storage
+  availability_zone                   = each.value.availability_zone
+  backup_retention_period             = each.value.backup_retention_period
+  backup_window                       = each.value.backup_window
+  ca_cert_identifier                  = each.value.ca_cert_identifier
+  db_name                             = each.value.db_name
+  db_subnet_group_name                = each.value.db_subnet_group_name
+  dedicated_log_volume                = each.value.dedicated_log_volume
+  delete_automated_backups            = each.value.delete_automated_backups
+  deletion_protection                 = each.value.deletion_protection
+  engine                              = each.value.engine
+  engine_version                      = each.value.engine_version
+  final_snapshot_identifier           = each.value.final_snapshot_identifier
+  iam_database_authentication_enabled = each.value.iam_database_authentication_enabled
+  identifier                          = each.value.identifier
+  instance_class                      = each.value.instance_class
+  kms_key_id                          = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  manage_master_user_password         = true
+  master_user_secret_kms_key_id       = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  max_allocated_storage               = each.value.max_allocated_storage
+  publicly_accessible                 = false
+  skip_final_snapshot                 = each.value.skip_final_snapshot
+  storage_encrypted                   = true
+  storage_type                        = each.value.storage_type
+  tags                                = each.value.tags
+  username                            = local.relational_database_service_credentials.us_east_1[each.key].username
+  vpc_security_group_ids              = each.value.vpc_security_group_ids
 
   dynamic "blue_green_update" {
     for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
@@ -1053,28 +1094,31 @@ resource "aws_db_instance" "us_east_1" {
 
 }
 
-#endregion --- [ Create Relational Database Service (RDS) ] ----------------------------------- #
+#endregion --- [ aws_db_instance - us-east-1 ] ------------------------------------------------- #
+
+#endregion --- [ aws_db_instance ] ------------------------------------------------------------- #
 
 
-#region ------ [ Configure EC2 Instance State ] ----------------------------------------------- #
+#region ------ [ aws_ec2_instance_state ] ------------------------------------------------------ #
 
+#region ------ [ aws_ec2_instance_state - us-east-1 ] ------------------------------------------ #
 
 resource "aws_ec2_instance_state" "us_east_1" {
 
-  # Set the provider in which to deploy the instance.
+  # Iterate through all EC2 Instance States in the US-East-1 region.
   provider = aws.us_east_1
+  for_each = local.ec2_instance_states.us_east_1
 
-  # Iterate through all EC2 instances in 'us-east-1' where 'set_state' is defined.
-  for_each = {
-    for hostname, system in merge(aws_instance.us_east_1, aws_instance.us_east_1_refresh) : hostname => system
-    if local.elastic_compute_cloud["us_east_1"][hostname].set_state != null
-  }
+  # Define the EC2 Instance State Properties
+  instance_id = each.value.instance_id
+  state       = each.value.state
 
-  instance_id = each.value.id
-  state       = local.elastic_compute_cloud["us_east_1"][each.key].set_state
-
+  # The gate, not the instance, marks the machine ready; starting or stopping it before the gate
+  # returns races the launch agent.
   depends_on = [terraform_data.readiness_gate]
 
 }
 
-#endregion --- [ Configure EC2 Instance State ] ----------------------------------------------- #
+#endregion --- [ aws_ec2_instance_state - us-east-1 ] ------------------------------------------ #
+
+#endregion --- [ aws_ec2_instance_state ] ------------------------------------------------------ #
