@@ -77,10 +77,10 @@ data "aws_ami" "us_east_1_verified" {
     postcondition {
       condition = (
         startswith(each.value, "ami-") ||
-        try(self.tags["nwarila:image:family"], null) == null ||
-        self.tags["nwarila:image:family"] == split("@", each.value)[0]
+        try(self.tags["ImageFamily"], null) == null ||
+        self.tags["ImageFamily"] == split("@", each.value)[0]
       )
-      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped family '${try(self.tags["nwarila:image:family"], "<untagged>")}'."
+      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped family '${try(self.tags["ImageFamily"], "<untagged>")}'."
     }
 
     # A truncated selector accepts drift below the level it pins, so the stamped version must
@@ -89,11 +89,11 @@ data "aws_ami" "us_east_1_verified" {
     postcondition {
       condition = (
         !strcontains(each.value, "@") ||
-        try(self.tags["nwarila:image:version"], null) == null ||
-        self.tags["nwarila:image:version"] == split("@", each.value)[1] ||
-        startswith(self.tags["nwarila:image:version"], "${split("@", each.value)[1]}.")
+        try(self.tags["ImageVersion"], null) == null ||
+        self.tags["ImageVersion"] == split("@", each.value)[1] ||
+        startswith(self.tags["ImageVersion"], "${split("@", each.value)[1]}.")
       )
-      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped version '${try(self.tags["nwarila:image:version"], "<untagged>")}'."
+      error_message = "Catalog mismatch: selector '${each.value}' resolved to image ${self.id}, stamped version '${try(self.tags["ImageVersion"], "<untagged>")}'."
     }
 
   }
