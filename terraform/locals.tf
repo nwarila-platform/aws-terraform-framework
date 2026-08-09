@@ -205,14 +205,9 @@ locals {
         tags = merge(
           network_interface.tags,
           # Non-Overwritable Default Tags
+          local.identity_tags,
           {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = "${system.hostname}-eni-${interface_index}-sg"
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
+            Name = "${system.hostname}-eni-${interface_index}-sg"
           }
         )
       }
@@ -303,15 +298,9 @@ locals {
           sg_key    = entry.sg_key
 
           # A rule declares no consumer tags, so this map is wholly framework-owned.
-          tags = {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = "${substr("${entry.sg_key}/${entry.readable_identity}", 0, 243)}-${substr(sha256(entry.identity), 0, 12)}"
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
-          }
+          tags = merge(local.identity_tags, {
+            Name = "${substr("${entry.sg_key}/${entry.readable_identity}", 0, 243)}-${substr(sha256(entry.identity), 0, 12)}"
+          })
         },
       )
     }
@@ -405,15 +394,9 @@ locals {
           vpc_id = local.runner_ingress_vpc_ids[region][0]
 
           # The group declares no consumer tags, so this map is wholly framework-owned.
-          tags = {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = local.runner_ingress_name
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
-          }
+          tags = merge(local.identity_tags, {
+            Name = local.runner_ingress_name
+          })
         }
       }
     )
@@ -436,14 +419,7 @@ locals {
           to_port                      = rule.to_port
 
           # A rule declares no consumer tags, so this map is wholly framework-owned.
-          tags = {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
-          }
+          tags = local.identity_tags
         }
       }
     )
@@ -466,15 +442,9 @@ locals {
       for system in var.all_systems : system.hostname => {
 
         # An Elastic IP declares no consumer tags, so this map is wholly framework-owned.
-        tags = {
-          CommitSha    = var.commit_sha
-          Environment  = var.environment
-          ManagedBy    = "Terraform"
-          Name         = system.hostname
-          Repository   = var.repository
-          RepositoryId = var.repository_id
-          RunId        = var.run_id
-        }
+        tags = merge(local.identity_tags, {
+          Name = system.hostname
+        })
       }
       if replace(system.region, "-", "_") == region && system.associate_public_ip
     }
@@ -539,15 +509,10 @@ locals {
           tags = merge(
             system.root_block_device.tags,
             # Non-Overwritable Default Tags
+            local.identity_tags,
             {
-              CommitSha    = var.commit_sha
-              Environment  = var.environment
-              Index        = 0
-              ManagedBy    = "Terraform"
-              Name         = system.hostname
-              Repository   = var.repository
-              RepositoryId = var.repository_id
-              RunId        = var.run_id
+              Index = 0
+              Name  = system.hostname
             }
           )
         }
@@ -597,15 +562,10 @@ locals {
             Backup = system.tags["Backup"] ? "True" : "False"
           },
           # Non-Overwritable Default Tags
+          local.identity_tags,
           {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = system.hostname
-            OS           = local.amazon_machine_images[system.ami][region].platform_details
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
+            Name = system.hostname
+            OS   = local.amazon_machine_images[system.ami][region].platform_details
           }
         )
       }
@@ -770,15 +730,10 @@ locals {
           tags = merge(
             system.network_interfaces[index].tags,
             # Non-Overwritable Default Tags
+            local.identity_tags,
             {
-              CommitSha    = var.commit_sha
-              Environment  = var.environment
-              Index        = index
-              ManagedBy    = "Terraform"
-              Name         = system.hostname
-              Repository   = var.repository
-              RepositoryId = var.repository_id
-              RunId        = var.run_id
+              Index = index
+              Name  = system.hostname
             }
           )
         }
@@ -822,15 +777,10 @@ locals {
           tags = merge(
             try(volume.tags, {}),
             # Non-Overwritable Default Tags
+            local.identity_tags,
             {
-              CommitSha    = var.commit_sha
-              Environment  = var.environment
-              Index        = volume.device_index
-              ManagedBy    = "Terraform"
-              Name         = system.hostname
-              Repository   = var.repository
-              RepositoryId = var.repository_id
-              RunId        = var.run_id
+              Index = volume.device_index
+              Name  = system.hostname
 
               # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
               DeviceName = (
@@ -908,14 +858,9 @@ locals {
         tags = merge(
           load_balancer.tags,
           # Non-Overwritable Default Tags
+          local.identity_tags,
           {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = coalesce(load_balancer.name, load_balancer.name_prefix, load_balancer.resource_key)
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
+            Name = coalesce(load_balancer.name, load_balancer.name_prefix, load_balancer.resource_key)
           }
         )
       }
@@ -950,14 +895,9 @@ locals {
           tags = merge(
             target_group.tags,
             # Non-Overwritable Default Tags
+            local.identity_tags,
             {
-              CommitSha    = var.commit_sha
-              Environment  = var.environment
-              ManagedBy    = "Terraform"
-              Name         = "${load_balancer.resource_key}/${target_group.resource_key}"
-              Repository   = var.repository
-              RepositoryId = var.repository_id
-              RunId        = var.run_id
+              Name = "${load_balancer.resource_key}/${target_group.resource_key}"
             }
           )
         }
@@ -1106,14 +1046,9 @@ locals {
             Backup = database.tags["Backup"] ? "True" : "False"
           },
           # Non-Overwritable Default Tags
+          local.identity_tags,
           {
-            CommitSha    = var.commit_sha
-            Environment  = var.environment
-            ManagedBy    = "Terraform"
-            Name         = database.db_name
-            Repository   = var.repository
-            RepositoryId = var.repository_id
-            RunId        = var.run_id
+            Name = database.db_name
           }
         )
       }
