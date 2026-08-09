@@ -612,7 +612,7 @@ locals {
           system.tags,
           # Normalized Overwritable Tags
           {
-            Backup = system.tags["Backup"] ? "True" : "False"
+            Backup = lower(system.tags["Backup"]) == "true" ? "True" : "False"
           },
           # Non-Overwritable Default Tags
           local.identity_tags,
@@ -1101,7 +1101,7 @@ locals {
           database.tags,
           # Normalized Overwritable Tags
           {
-            Backup = database.tags["Backup"] ? "True" : "False"
+            Backup = lower(database.tags["Backup"]) == "true" ? "True" : "False"
           },
           # Non-Overwritable Default Tags
           local.identity_tags,
