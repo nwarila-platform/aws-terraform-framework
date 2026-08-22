@@ -7,7 +7,8 @@ is the single readiness transport for every platform; WinRM is decommissioned.
 ## Operating model
 
 Readiness and management use SSH on TCP 22 on both Linux and Windows. The
-Windows `user_data` bootstraps the in-box OpenSSH server at first boot and
+Windows `user_data` bootstraps the OpenSSH server at first boot, installing it
+first from a staged Feature-on-Demand cab when the image ships without it, and
 installs the launch key pair's public key for Administrator. The repository
 does not configure a long-term Windows management transport. Ansible runs
 outside this repository, in a separate pipeline job, using its own connection
@@ -190,6 +191,9 @@ become ordinary selectors and the exception goes away. An image owned by any
 other account fails the plan whichever form you use.
 
 The image is expected to arrive with OpenSSH and cloud-init installed. Bake those into the AMI.
+Windows Server 2022 is the exception: its stock images ship without the `OpenSSH.Server`
+capability, and an isolated instance cannot pull it from Windows Update, so `user_data`
+installs it from a staged Feature-on-Demand cab when `windows_fod_source` is set (see below).
 
 The SSM agent is the exception, on Linux only. `user_data` enables it if the image ships it
 disabled, and installs it from the region's S3 bucket if the image lacks it entirely. That is
@@ -222,8 +226,18 @@ the configuration, before `Start-Service`, because opening a port nothing is
 listening on yet is inert. Linux needs no equivalent: security groups are the
 only filter in front of it.
 
-If OpenSSH is genuinely absent, `Set-Service` fails and `user_data` aborts, so an
-unreachable image fails loudly rather than silently.
+If OpenSSH is absent, `user_data` installs it before any of the above runs. Stage the
+build's cab in an S3 bucket as `<key_prefix>/<OS build>/<package>.cab` (for Server 2022,
+build 20348: `fod/20348/OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab`, copied
+unrenamed from the Windows Server Languages and Optional Features ISO) and point
+`windows_fod_source` at it: the bucket's name, the region it lives in, and the key prefix.
+All three are rendered into `user_data` at plan time; the instance looks nothing up. The
+instance profile needs `s3:GetObject` on `<key_prefix>/*` in that bucket, and the instance
+needs a route to S3 in the bucket's region — a gateway endpoint when that is its own region,
+otherwise an internet or NAT route. DISM runs with `-LimitAccess`, so Windows Update is never
+contacted. Server 2025 ships `sshd` in-box and skips the step. With `windows_fod_source`
+null, or no cab staged for the image's build, `user_data` aborts with one line in the
+EC2Launch log, so an unreachable image fails loudly rather than silently.
 
 Runtime verification beyond the Terraform readiness gate is outside this
 repository. The pipeline should check that each emitted target is reachable

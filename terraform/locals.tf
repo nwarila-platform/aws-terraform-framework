@@ -104,10 +104,34 @@ locals {
 
   #region ------ [ SSH Bootstrap User Data ] --------------------------------------------------- #
 
-  # user_data covers three things: making sure sshd is actually running, installing the launch
-  # key, and making sure the SSM agent is running on Linux. Installing OpenSSH and cloud-init is
-  # still the AMI's job. Every step below is idempotent, so an image that already has them
-  # enabled pays nothing.
+  # user_data covers four things: installing OpenSSH itself when the image ships without it,
+  # making sure sshd is actually running, installing the launch key, and making sure the SSM
+  # agent is running on Linux. cloud-init is still the AMI's job. Every step below is
+  # idempotent, so an image that already has them enabled pays nothing.
+  #
+  # The OpenSSH install exists because Server 2022 images ship without the OpenSSH.Server
+  # capability, and an isolated instance cannot pull it from Windows Update. The payload comes
+  # from the caller's bucket (var.windows_fod_source: bucket, its region, key prefix), rendered
+  # in at plan time - nothing is looked up on the instance. The switch on OS build is the
+  # per-version dispatch table: FoD cabs only apply to their own build, so each supported build
+  # names its cab and the key is <key_prefix>/<build>/<cab>; supporting a new version is one
+  # switch arm plus one staged object. -LimitAccess keeps DISM off Windows Update entirely, so
+  # the only egress is S3 in the bucket's region. Server 2025 ships sshd in-box, so the branch
+  # never runs there. The install runs first because sshd does not exist as a service until the
+  # capability lands.
+  #
+  # The launch key is the only metadata read, so the IMDSv2 token is fetched right before it,
+  # after the install, where a slow DISM run cannot outlive it.
+  #
+  # The launch key goes into administrators_authorized_keys before sshd starts, so the listener
+  # never accepts a connection it cannot authenticate. sshd only creates C:\ProgramData\ssh on
+  # its first start, so the bootstrap creates the directory itself - after a fresh capability
+  # install there is nothing there yet.
+  #
+  # The single try/catch is the whole failure path: any error - unstaged build, unset bucket,
+  # missing S3 object, DISM rejecting the cab - becomes one readable line in the EC2Launch log
+  # and a nonzero exit instead of a PowerShell error cascade. The instance still fails loudly:
+  # the readiness gate times out against a box with no sshd and surfaces the launch failure.
   #
   # The SSM step is here because "in-house images ship the agent" is not yet true of anything
   # this framework launches: the catalog is unpopulated, so every image in play is a vendor one
@@ -133,20 +157,65 @@ locals {
   # cmd; setting it to PowerShell breaks the remote-exec SCP upload the readiness gate uses.
   # Linux needs no key step at all - cloud-init installs the launch key into the login user's
   # authorized_keys by itself.
+  # Null source renders as empty strings; the script throws the moment it needs them.
+  windows_fod_bucket     = try(var.windows_fod_source.bucket, "")
+  windows_fod_region     = try(var.windows_fod_source.region, "")
+  windows_fod_key_prefix = try(var.windows_fod_source.key_prefix, "")
+
   windows_ssh_user_data = <<-WINDOWS_USER_DATA
     <powershell>
     $ErrorActionPreference = "Stop"
 
-    Set-Service -Name sshd -StartupType Automatic
-    New-NetFirewallRule -DisplayName "OpenSSH SSH Server" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
+    # Rendered by Terraform from var.windows_fod_source; all empty when the source is unset.
+    $fodBucket    = "${local.windows_fod_bucket}"
+    $fodRegion    = "${local.windows_fod_region}"
+    $fodKeyPrefix = "${local.windows_fod_key_prefix}"
 
-    $token = Invoke-RestMethod -Method PUT -Uri http://169.254.169.254/latest/api/token -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
-    $publicKey = Invoke-RestMethod -Uri http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -Headers @{ "X-aws-ec2-metadata-token" = $token }
+    $capability     = "OpenSSH.Server~~~~0.0.1.0"
     $authorizedKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
-    Set-Content -Path $authorizedKeys -Value $publicKey -Encoding ascii
-    icacls $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F"
+    $imdsBase       = "http://169.254.169.254/latest"
 
-    Start-Service -Name sshd
+    try {
+      # 1. Install OpenSSH Server when the image ships without it. Each supported OS build names
+      #    its own FoD cab; the payload comes from the staged bucket and DISM stays off Windows Update.
+      $state = (Get-WindowsCapability -Online -Name $capability).State
+      if ($state -ne "Installed") {
+        if (-not $fodBucket) { throw "OpenSSH.Server is absent and windows_fod_source is unset" }
+
+        $build = [int](Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name CurrentBuild)
+        $cab   = switch ($build) {
+          20348   { "OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab" }
+          default { throw "no OpenSSH FoD is staged for Windows build $build" }
+        }
+
+        $stagingDir = "C:\Windows\Temp\fod"
+        New-Item -Path $stagingDir -ItemType Directory -Force | Out-Null
+        Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key "$fodKeyPrefix/$build/$cab" -File "$stagingDir\$cab" | Out-Null
+        Add-WindowsCapability -Online -Name $capability -Source $stagingDir -LimitAccess | Out-Null
+        Remove-Item -Path $stagingDir -Recurse -Force
+      }
+
+      # 2. Enable the service and open the host firewall. Both are idempotent.
+      Set-Service -Name sshd -StartupType Automatic
+      New-NetFirewallRule -DisplayName "OpenSSH SSH Server" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow | Out-Null
+
+      # 3. Install the launch key pair's public key for Administrator, read from IMDSv2. sshd only
+      #    creates C:\ProgramData\ssh on its first start, so the directory is created here.
+      $token     = Invoke-RestMethod -Method Put -Uri "$imdsBase/api/token" -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "300" }
+      $publicKey = Invoke-RestMethod -Method Get -Uri "$imdsBase/meta-data/public-keys/0/openssh-key" -Headers @{ "X-aws-ec2-metadata-token" = $token }
+
+      New-Item -Path (Split-Path -Path $authorizedKeys) -ItemType Directory -Force | Out-Null
+      Set-Content -Path $authorizedKeys -Value $publicKey -Encoding Ascii
+      icacls.exe $authorizedKeys /inheritance:r /grant "Administrators:F" "SYSTEM:F" | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE" }
+
+      # 4. Start sshd only now, once it has a key it can authenticate.
+      Start-Service -Name sshd
+      Write-Output "SSH bootstrap complete"
+    } catch {
+      Write-Output "SSH bootstrap failed: $_"
+      exit 1
+    }
     </powershell>
   WINDOWS_USER_DATA
 

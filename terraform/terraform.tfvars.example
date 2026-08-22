@@ -182,6 +182,13 @@ shared_ebs_volumes = {
 all_databases      = []
 all_load_balancers = []
 
+# Where the Windows SSH bootstrap fetches Feature-on-Demand cabs to install OpenSSH.Server on
+# images that ship without it (Server 2022): one account-wide bucket, the region it lives in, and
+# the prefix under which cabs sit as <key_prefix>/<OS build>/<package>.cab. Null disables the
+# install step. Instance roles need s3:GetObject on <key_prefix>/* in the bucket.
+#   windows_fod_source = { bucket = "123456789012-apprepo", region = "us-east-1", key_prefix = "fod" }
+windows_fod_source = null
+
 # Deployment identity is NOT set here. The deploy workflow passes repository, repository_id,
 # commit_sha, and run_id as command-line -var arguments (see docs/reference/runner-protocol.md),
 # which outrank every tfvars source - so a value file cannot restate them. All four are required:

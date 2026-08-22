@@ -197,6 +197,48 @@ run "rejects_non_numeric_run_id" {
   expect_failures = [var.run_id]
 }
 
+run "windows_fod_source_rejects_invalid_bucket_name" {
+  command = plan
+
+  variables {
+    windows_fod_source = {
+      bucket     = "Not_A_Bucket"
+      region     = "us-east-1"
+      key_prefix = "fod"
+    }
+  }
+
+  expect_failures = [var.windows_fod_source]
+}
+
+run "windows_fod_source_rejects_malformed_region" {
+  command = plan
+
+  variables {
+    windows_fod_source = {
+      bucket     = "123456789012-apprepo"
+      region     = "us_east_1"
+      key_prefix = "fod"
+    }
+  }
+
+  expect_failures = [var.windows_fod_source]
+}
+
+run "windows_fod_source_rejects_slashed_or_empty_key_prefix" {
+  command = plan
+
+  variables {
+    windows_fod_source = {
+      bucket     = "123456789012-apprepo"
+      region     = "us-east-1"
+      key_prefix = "/fod/"
+    }
+  }
+
+  expect_failures = [var.windows_fod_source]
+}
+
 run "load_balancers_reject_duplicate_resource_keys" {
   command = plan
 
