@@ -414,6 +414,61 @@ locals {
     }
   }
 
+  # What a HUMAN needs to sit on the host: the three above plus tcp/3389, because a Windows
+  # desktop is the one thing CI never wants and a person debugging one cannot do without. Also
+  # module-owned literals, for the same reason -- an operator input here would be a port list,
+  # and a port list invites 0-65535.
+  debug_ingress_rules = merge(local.runner_ingress_rules, {
+    rdp = {
+      description = "Run-scoped operator RDP ingress."
+      ip_protocol = "tcp"
+      from_port   = 3389
+      to_port     = 3389
+    }
+  })
+
+  # Every address a human may work from, mapped to how it was named, so the rule that appears in
+  # the console says where it came from. A literal and a resolved address are the same thing once
+  # resolved; only the provenance differs.
+  #
+  # merge([...]...) over an empty list is merge(), which is {} -- so no names means no addresses
+  # rather than an error.
+  debug_addresses = merge(
+    { for address in var.debug_ips : address => "declared operator address" },
+    merge([
+      for name in var.debug_dns_names : {
+        for address in data.dns_a_record_set.runner_ingress[name].addrs : address => "resolved from ${name}"
+      }
+    ]...)
+  )
+
+  # One grant per transport per address, keyed so that an address appearing as BOTH the runner
+  # and an operator collapses to a single rule instead of colliding: AWS would reject the
+  # duplicate, and the two would be asking for the identical opening anyway. Debug is merged
+  # last, so a shared address keeps the wider transport set and the operator's provenance.
+  runner_ingress_grants = merge(
+    var.runner_ip == null ? {} : {
+      for transport, rule in local.runner_ingress_rules :
+      "${transport}-${var.runner_ip}" => {
+        address   = var.runner_ip
+        origin    = "CI runner"
+        rule      = rule
+        transport = transport
+      }
+    },
+    merge([
+      for address, origin in local.debug_addresses : {
+        for transport, rule in local.debug_ingress_rules :
+        "${transport}-${address}" => {
+          address   = address
+          origin    = origin
+          rule      = rule
+          transport = transport
+        }
+      }
+    ]...)
+  )
+
   # Every distinct VPC the fleet resolves to. One security group cannot span VPCs, so a length
   # other than 1 is a hard error, raised by a precondition on the group itself.
   #
@@ -428,11 +483,11 @@ locals {
     ])
   }
 
-  # Empty when runner_ip is null, and also when a region declares no systems: with nothing to
-  # attach to there is no group to build, and indexing an empty VPC list would fail.
+  # Empty when nothing grants access, and also when a region declares no systems: with nothing
+  # to attach to there is no group to build, and indexing an empty VPC list would fail.
   runner_ingress_security_groups = {
     for region in var.aws_config.regions : region => (
-      var.runner_ip == null || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
+      length(local.runner_ingress_grants) == 0 || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
         (local.runner_ingress_name) = {
 
           # AWS Security Group Properties
@@ -453,19 +508,19 @@ locals {
 
   runner_ingress_security_group_rules = {
     for region in var.aws_config.regions : region => (
-      var.runner_ip == null || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
-        for transport, rule in local.runner_ingress_rules :
-        "${local.runner_ingress_name}-${transport}" => {
+      length(local.runner_ingress_grants) == 0 || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
+        for key, grant in local.runner_ingress_grants :
+        "${local.runner_ingress_name}-${key}" => {
 
           # AWS Security Group Ingress Rule Properties
-          cidr_ipv4                    = "${var.runner_ip}/32"
-          description                  = rule.description
-          from_port                    = rule.from_port
-          ip_protocol                  = rule.ip_protocol
+          cidr_ipv4                    = "${grant.address}/32"
+          description                  = "${grant.rule.description} (${grant.origin})"
+          from_port                    = grant.rule.from_port
+          ip_protocol                  = grant.rule.ip_protocol
           prefix_list_id               = null
           referenced_security_group_id = null
           sg_key                       = local.runner_ingress_name
-          to_port                      = rule.to_port
+          to_port                      = grant.rule.to_port
 
           # A rule declares no consumer tags, so this map is wholly framework-owned.
           tags = local.identity_tags

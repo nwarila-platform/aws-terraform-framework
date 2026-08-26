@@ -1125,13 +1125,17 @@ variable "run_id" {
 variable "runner_ip" {
   description = <<-EOT
     Public IPv4 address of the CI runner that must reach every instance for the life of one run.
-    Non-null creates ONE security group carrying tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all
-    sourced from "<runner_ip>/32", and attaches it to every network interface this framework
-    creates. Null, the default, creates nothing and attaches nothing: the posture for local
-    operator runs and for on-prem targets.
+    Non-null contributes tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all sourced from
+    "<runner_ip>/32", to the one run-scoped group this framework attaches to every network
+    interface it creates. Null, the default, contributes nothing: the posture for local operator
+    runs and for on-prem targets.
+
+    These are the transports a RUN drives. A human who needs to sit on the host reaches it
+    through debug_ips or debug_dns_names instead, which carry a different set -- so widening what
+    an operator can do never widens what CI can do.
 
     The protocols are module-owned literals, not a consumer input, so no deployment can widen
-    this group beyond the transports it exists to serve.
+    this beyond the transports it exists to serve.
 
     A bare address, never a CIDR. Accepting a prefix would make a range representable at all;
     requiring a single host makes one structurally impossible, which is a stronger guarantee
@@ -1162,6 +1166,83 @@ variable "runner_ip" {
     error_message = join(" ", [
       "runner_ip must not be 0.0.0.0. It is the unspecified address, never a reachable runner,",
       "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
+    ])
+  }
+}
+
+variable "debug_ips" {
+  description = <<-EOT
+    Public IPv4 addresses a HUMAN works from while the host stands. Each contributes tcp/22
+    (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP from its own "<address>/32" to the same
+    run-scoped group runner_ip feeds. Empty, the default, contributes nothing -- the same
+    optional posture as runner_ip, so a run that needs no human grants no human anything.
+
+    A separate input from runner_ip because the two want different transports. CI drives SSH,
+    WinRM and ICMP and has no use for a desktop; a person debugging a Windows host needs RDP as
+    well, which nothing else here opens. Keeping them apart means an operator's access can be
+    granted without widening what the automation may reach, and withdrawn without touching CI.
+
+    A set, because more than one person may be looking, and because an operator reaching the
+    host from two connections should not have to choose.
+
+    Bare addresses, never CIDRs, for the same reason runner_ip is: a range must not be
+    representable. Pass them at apply time; an address committed to a value file publishes where
+    the person sits, and debug_dns_names exists precisely so it never has to be.
+  EOT
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for address in var.debug_ips : can(regex(
+        "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
+        address
+      ))
+    ])
+    error_message = join(" ", [
+      "every debug_ips entry must be a single bare IPv4 address such as 203.0.113.7, carrying no",
+      "prefix length. A CIDR is rejected so that a range cannot be expressed at all.",
+    ])
+  }
+
+  validation {
+    condition = !contains(var.debug_ips, "0.0.0.0")
+    error_message = join(" ", [
+      "debug_ips must not contain 0.0.0.0. It is the unspecified address, never a reachable",
+      "operator, and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host",
+      "route.",
+    ])
+  }
+}
+
+variable "debug_dns_names" {
+  description = <<-EOT
+    Hostnames whose A records name the addresses a human works from. Each name is resolved at
+    PLAN time and every address it returns is treated exactly as a debug_ips entry: SSH, RDP,
+    WinRM and ICMP from that one host.
+
+    This exists for the address that is not knowable when the run starts and not safe to commit.
+    An operator on a changing connection points a name at themselves and declares the NAME, so
+    the configuration records who may reach the host without recording where they are.
+
+    A name that does not resolve, or resolves to nothing, fails the plan rather than building a
+    group that reaches nobody. A name is only as fresh as the last plan: an address that moves
+    mid-run is not followed until the next apply.
+
+    Names, never addresses -- an address belongs in debug_ips, where it is validated as one.
+  EOT
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for name in var.debug_dns_names :
+      can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+[a-zA-Z]{2,63}[.]?$", name))
+    ])
+    error_message = join(" ", [
+      "every debug_dns_names entry must be a fully qualified hostname such as",
+      "operator.example.com. A bare label cannot be resolved unambiguously, and an address",
+      "belongs in debug_ips where it is validated as one.",
     ])
   }
 }

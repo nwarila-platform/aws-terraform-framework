@@ -12,3 +12,8 @@ provider "aws" {
   }
 
 }
+
+# Declared with no configuration on purpose: resolution uses the runner's own resolver, which is
+# the one that agrees with what the operator sees. Pointing it at a fixed server would resolve
+# names the runner itself cannot, and the addresses have to match the operator's reality.
+provider "dns" {}

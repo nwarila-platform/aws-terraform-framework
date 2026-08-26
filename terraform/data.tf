@@ -208,3 +208,24 @@ data "aws_iam_instance_profile" "us_east_1" {
 #endregion --- [ aws_iam_instance_profile.us_east_1 - us-east-1 ] ------------------------------ #
 
 #endregion --- [ aws_iam_instance_profile ] ---------------------------------------------------- #
+
+
+#region ------ [ dns_a_record_set (runner ingress) ] ------------------------------------------- #
+
+data "dns_a_record_set" "runner_ingress" {
+
+  # One lookup per declared name, keyed by the name so two systems naming the same host share a
+  # read. Resolution happens at PLAN time: the addresses that reach the fleet are the ones the
+  # name held when the plan was made, and a name that moves afterwards is not followed until the
+  # next apply. That is the trade a name buys -- an address that can be changed without editing
+  # a value file, in exchange for a rule that is only as fresh as the last plan.
+  #
+  # A name that does not resolve fails the plan. That is the wanted behaviour: the alternative is
+  # an apply that quietly builds a group reaching nobody.
+  for_each = var.debug_dns_names
+
+  host = each.value
+
+}
+
+#endregion --- [ dns_a_record_set (runner ingress) ] ------------------------------------------- #

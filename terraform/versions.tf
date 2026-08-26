@@ -14,6 +14,13 @@ terraform {
       version = "= 6.47.0"
     }
 
+    # Resolves debug_dns_names to the addresses that may reach the fleet. Terraform has no
+    # built-in resolver, so a name can only become a rule through a provider.
+    dns = {
+      source  = "hashicorp/dns"
+      version = "= 3.4.3"
+    }
+
   }
 
 }

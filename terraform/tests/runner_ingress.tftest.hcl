@@ -20,6 +20,16 @@ mock_provider "aws" {
   }
 }
 
+# Resolution is mocked so a test never depends on what the world's DNS happens to answer. Runs
+# that declare no names instantiate no data source, so this is inert for every other run here.
+mock_provider "dns" {
+  mock_data "dns_a_record_set" {
+    defaults = {
+      addrs = ["203.0.113.50"]
+    }
+  }
+}
+
 variables {
   repository    = "nwarila-platform/aws-terraform-framework"
   repository_id = "123456789"
@@ -161,10 +171,10 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
   assert {
     condition = (
       length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 3 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh"].from_port == 22 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh"].to_port == 22 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm"].from_port == 5986 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm"].to_port == 5986
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh-203.0.113.7"].from_port == 22 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh-203.0.113.7"].to_port == 22 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm-203.0.113.7"].from_port == 5986 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm-203.0.113.7"].to_port == 5986
     )
     error_message = "The group must carry exactly tcp/22 and tcp/5986."
   }
@@ -173,9 +183,9 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
   # runner's single address.
   assert {
     condition = (
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].ip_protocol == "icmp" &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].from_port == -1 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].to_port == -1
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].ip_protocol == "icmp" &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].from_port == -1 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].to_port == -1
     )
     error_message = "The group must carry an ICMP rule covering every type and code."
   }
@@ -188,12 +198,13 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
     error_message = "Every runner rule must be sourced from the single-host /32 built from runner_ip."
   }
 
-  # Nothing beyond the three module-owned transports may appear, whatever else changes.
+  # Nothing beyond the three module-owned runner transports may appear, whatever else changes.
+  # A key names its transport AND its source, because several sources may now grant access.
   assert {
     condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
-      "runner-ingress-123456789-test-ssh",
-      "runner-ingress-123456789-test-winrm",
-      "runner-ingress-123456789-test-icmp",
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
     ])
     error_message = "The runner group must carry exactly the ssh, winrm and icmp rules and nothing else."
   }
@@ -493,4 +504,248 @@ run "runner_ip_across_two_vpcs_fails_the_precondition" {
   }
 
   expect_failures = [aws_security_group.runner_ingress_us_east_1]
+}
+
+
+# The operator half. debug_ips carries the runner's three transports PLUS RDP, because a person
+# on a Windows host needs a desktop and CI never does -- so granting an operator access must not
+# be expressible as widening what the automation may reach.
+run "debug_ips_carry_rdp_as_well_as_the_runner_transports" {
+  command = plan
+
+  variables {
+    runner_ip = null
+    debug_ips = ["198.51.100.20"]
+  }
+
+  assert {
+    condition     = length(aws_security_group.runner_ingress_us_east_1) == 1
+    error_message = "debug_ips alone must create the run-scoped group, exactly as runner_ip does."
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-198.51.100.20",
+      "runner-ingress-123456789-test-winrm-198.51.100.20",
+      "runner-ingress-123456789-test-icmp-198.51.100.20",
+      "runner-ingress-123456789-test-rdp-198.51.100.20",
+    ])
+    error_message = "A debug address must carry ssh, winrm, icmp and rdp, and nothing else."
+  }
+
+  assert {
+    condition = (
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].from_port == 3389 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].to_port == 3389 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].ip_protocol == "tcp"
+    )
+    error_message = "The RDP rule must be tcp/3389 exactly."
+  }
+
+  assert {
+    condition = alltrue([
+      for _, rule in aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1 :
+      rule.cidr_ipv4 == "198.51.100.20/32"
+    ])
+    error_message = "Every debug rule must be sourced from the single-host /32 built from the address."
+  }
+}
+
+# The runner never gains a desktop just because an operator asked for one.
+run "runner_and_debug_addresses_keep_their_own_transports" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+    debug_ips = ["198.51.100.20"]
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
+      "runner-ingress-123456789-test-ssh-198.51.100.20",
+      "runner-ingress-123456789-test-winrm-198.51.100.20",
+      "runner-ingress-123456789-test-icmp-198.51.100.20",
+      "runner-ingress-123456789-test-rdp-198.51.100.20",
+    ])
+    error_message = "The runner address must carry no RDP rule while the debug address does."
+  }
+}
+
+# Several people may be looking at once.
+run "several_debug_addresses_each_get_their_own_rules" {
+  command = plan
+
+  variables {
+    runner_ip = null
+    debug_ips = ["198.51.100.20", "198.51.100.21"]
+  }
+
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 8
+    error_message = "Two debug addresses must produce four rules each and share one group."
+  }
+
+  assert {
+    condition     = length(aws_security_group.runner_ingress_us_east_1) == 1
+    error_message = "Several addresses must still share exactly one security group."
+  }
+}
+
+# An address that is both the runner and an operator asks for the same opening twice. AWS rejects
+# a duplicate rule, so the two must collapse rather than collide -- and the surviving set is the
+# wider one, because the person still needs their desktop.
+run "an_address_that_is_both_runner_and_operator_collapses" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+    debug_ips = ["203.0.113.7"]
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
+      "runner-ingress-123456789-test-rdp-203.0.113.7",
+    ])
+    error_message = "One address named twice must yield one rule per transport, not two."
+  }
+}
+
+# Empty is the default and grants nothing, the same posture runner_ip holds at null.
+run "empty_debug_inputs_create_nothing" {
+  command = plan
+
+  variables {
+    runner_ip       = null
+    debug_ips       = []
+    debug_dns_names = []
+  }
+
+  assert {
+    condition = (
+      length(aws_security_group.runner_ingress_us_east_1) == 0 &&
+      length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
+    )
+    error_message = "No runner and no debug source must create no group and no rule."
+  }
+}
+
+# The same structural guarantee runner_ip carries: a range must not be representable.
+run "cidr_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ips = ["198.51.100.0/24"]
+  }
+
+  expect_failures = [var.debug_ips]
+}
+
+run "unspecified_address_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ips = ["0.0.0.0"]
+  }
+
+  expect_failures = [var.debug_ips]
+}
+
+run "malformed_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ips = ["198.51.100.999"]
+  }
+
+  expect_failures = [var.debug_ips]
+}
+
+# A name is resolved; an address is not a name. Passing one where the other belongs is refused so
+# that an address always reaches the validation that proves it is a single host.
+run "an_address_in_debug_dns_names_is_rejected" {
+  command = plan
+
+  variables {
+    debug_dns_names = ["198.51.100.20"]
+  }
+
+  expect_failures = [var.debug_dns_names]
+}
+
+run "a_bare_label_in_debug_dns_names_is_rejected" {
+  command = plan
+
+  variables {
+    debug_dns_names = ["operator"]
+  }
+
+  expect_failures = [var.debug_dns_names]
+}
+
+
+# The point of a name: an address the configuration never records. A resolved address is treated
+# exactly as a declared one -- same four transports, same single-host /32.
+run "a_resolved_name_grants_the_same_access_as_a_declared_address" {
+  command = plan
+
+  variables {
+    runner_ip       = null
+    debug_ips       = []
+    debug_dns_names = ["operator.example.com"]
+  }
+
+  assert {
+    condition     = length(aws_security_group.runner_ingress_us_east_1) == 1
+    error_message = "A name alone must create the run-scoped group."
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-203.0.113.50",
+      "runner-ingress-123456789-test-winrm-203.0.113.50",
+      "runner-ingress-123456789-test-icmp-203.0.113.50",
+      "runner-ingress-123456789-test-rdp-203.0.113.50",
+    ])
+    error_message = "A resolved address must carry the same four transports a declared one does."
+  }
+
+  assert {
+    condition = alltrue([
+      for _, rule in aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1 :
+      rule.cidr_ipv4 == "203.0.113.50/32"
+    ])
+    error_message = "A resolved address must be sourced as a single host, never a range."
+  }
+
+  # The console has to say where an address came from, or an operator reading the group cannot
+  # tell a name's answer from a hardcoded address.
+  assert {
+    condition = alltrue([
+      for _, rule in aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1 :
+      endswith(rule.description, "(resolved from operator.example.com)")
+    ])
+    error_message = "A rule from a name must name the name it was resolved from."
+  }
+}
+
+# A name and an address that agree ask for the same opening; they must collapse, not collide.
+run "a_name_resolving_to_a_declared_address_collapses" {
+  command = plan
+
+  variables {
+    runner_ip       = null
+    debug_ips       = ["203.0.113.50"]
+    debug_dns_names = ["operator.example.com"]
+  }
+
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 4
+    error_message = "A name and an address naming one host must yield four rules, not eight."
+  }
 }
