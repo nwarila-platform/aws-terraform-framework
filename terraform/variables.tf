@@ -1130,12 +1130,10 @@ variable "runner_ip" {
     interface it creates. Null, the default, contributes nothing: the posture for local operator
     runs and for on-prem targets.
 
-    These are the transports a RUN drives. A human who needs to sit on the host reaches it
-    through debug_ip instead, which carries a different set -- so widening what an operator can
-    do never widens what CI can do.
-
-    The protocols are module-owned literals, not a consumer input, so no deployment can widen
-    this beyond the transports it exists to serve.
+    These are the transports a RUN drives; a human sitting on the host is debug_ip's business
+    and carries its own set, so widening one never widens the other. Both sets are module-owned
+    literals rather than consumer inputs, so no deployment can widen either beyond the
+    transports it exists to serve.
 
     A bare address, never a CIDR. Accepting a prefix would make a range representable at all;
     requiring a single host makes one structurally impossible, which is a stronger guarantee
@@ -1159,8 +1157,6 @@ variable "runner_ip" {
     ])
   }
 
-  # 0.0.0.0/32 is a host route, not /0, so the world-open ingress ban does not catch it. It is
-  # never a real runner address either way, so reject it outright rather than reason about it.
   validation {
     condition = var.runner_ip != "0.0.0.0"
     error_message = join(" ", [
@@ -1174,24 +1170,17 @@ variable "debug_ip" {
   description = <<-EOT
     Public IPv4 address a HUMAN works from while the host stands. Non-null contributes tcp/22
     (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP, all sourced from "<debug_ip>/32", to the
-    same run-scoped group runner_ip feeds. Null, the default, contributes nothing -- the same
-    optional posture as runner_ip, so a run that needs no human grants no human anything.
+    same run-scoped group runner_ip feeds, under that variable's rules and for its reasons: null
+    by default and granting nobody anything, a bare address rather than a CIDR, and passed at
+    apply time rather than committed.
 
-    A separate input from runner_ip because the two want different transports. CI drives SSH,
-    WinRM and ICMP and has no use for a desktop; a person debugging a Windows host needs RDP as
-    well, which nothing else here opens. Keeping them apart means an operator's access can be
-    granted without widening what the automation may reach, and withdrawn without touching CI.
+    RDP is why this is a second input and not a second address on the first. CI has no use for a
+    desktop; a person debugging a Windows host cannot work without one. Kept apart, an operator's
+    access is granted and withdrawn without ever touching what the automation may reach.
 
-    The protocols are module-owned literals, not a consumer input, so no deployment can widen
-    this beyond the transports it exists to serve.
-
-    A bare address, never a CIDR, for the same reason runner_ip is: a range must not be
-    representable at all.
-
-    Pass it at apply time, not from a value file. An operator's address belongs to a single run,
-    and a committed one publishes where that person sits -- which is why a caller that cannot
-    know the address up front resolves it in the pipeline and passes the result, rather than
-    naming the operator anywhere this configuration records.
+    A committed operator address would also publish where that person sits, which is why a caller
+    that cannot know the address up front resolves it in the pipeline and passes the result --
+    naming the operator nowhere this configuration records.
   EOT
   type        = string
   default     = null
@@ -1207,8 +1196,6 @@ variable "debug_ip" {
     ])
   }
 
-  # 0.0.0.0/32 is a host route, not /0, so the world-open ingress ban does not catch it. It is
-  # never a real operator address either way, so reject it outright rather than reason about it.
   validation {
     condition = var.debug_ip != "0.0.0.0"
     error_message = join(" ", [
