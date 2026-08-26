@@ -245,6 +245,34 @@ run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
 # a system reached over SSM accepts nothing inbound, so the group the runner uses to
 # open SSH, WinRM and ICMP is not attached to it. Its interfaces keep exactly what the consumer
 # listed.
+# Creation asks whether a VPC was contributed; attachment asks whether anything is granted.
+# They are different questions, so this pins the case where they could disagree: an operator
+# address makes grants non-empty while an SSM-only fleet contributes no VPC and builds no group.
+# Were attachment to look the group up anyway, this fails at plan with a key error.
+run "debug_ip_alone_on_an_ssm_only_fleet_builds_and_attaches_nothing" {
+  command = plan
+
+  variables {
+    runner_ip = null
+    debug_ip  = "198.51.100.20"
+
+    all_systems = [
+      merge(var.all_systems[0], {
+        connection_type = "ssh-ssm"
+        readiness_gate  = false
+      }),
+    ]
+  }
+
+  assert {
+    condition = (
+      length(aws_security_group.runner_ingress_us_east_1) == 0 &&
+      length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
+    )
+    error_message = "An SSM-only fleet must build no group even when an operator address is set."
+  }
+}
+
 run "an_ssm_reached_system_is_not_given_the_runner_group" {
   command = plan
 

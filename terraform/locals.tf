@@ -375,11 +375,11 @@ locals {
   #endregion --- [ Interface-Owned Security Groups ] ------------------------------------------- #
 
 
-  #region ------ [ Run-Scoped Ingress Security Group ] --------------------------------------------- #
+  #region ------ [ Run-Scoped Ingress Security Group ] ----------------------------------------- #
 
   # One group, attached to every interface the framework builds, so whoever must reach the fleet
-  # can for the life of a single run: the CI runner, an operator, or both. No address at all collapses every map below to {},
-  # so the resources plan to nothing and no ENI gains a group.
+  # can for the life of a single run: the CI runner, an operator, or both. No address at all
+  # collapses every map below to {}, so the resources plan to nothing and no ENI gains a group.
   #
   # The name has to be unique per VPC: several repositories deploy into one shared subnet and
   # all of them use environment = "dev", so environment alone would collide. repository_id is
@@ -515,7 +515,7 @@ locals {
     us_east_1 = { for name, group in aws_security_group.runner_ingress_us_east_1 : name => group.id }
   }
 
-  #endregion --- [ Run-Scoped Ingress Security Group ] --------------------------------------------- #
+  #endregion --- [ Run-Scoped Ingress Security Group ] ----------------------------------------- #
 
 
   #region ------ [ Elastic IPs ] --------------------------------------------------------------- #
