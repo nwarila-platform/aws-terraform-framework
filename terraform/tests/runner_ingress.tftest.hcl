@@ -104,8 +104,8 @@ variables {
   ]
 }
 
-# the default. Nothing is created and no ENI's security_groups changes, so a consumer
-# that never sets runner_ip sees exactly today's plan.
+# the default. Nothing is created and no ENI's security_groups changes, so a consumer that sets
+# neither address sees exactly today's plan.
 run "no_address_at_all_creates_nothing_and_attaches_nothing" {
   command = plan
 
@@ -127,8 +127,8 @@ run "no_address_at_all_creates_nothing_and_attaches_nothing" {
   }
 }
 
-# one group, exactly the three transport ports, sourced from the /32 the module
-# derives, attached to every ENI, and carrying the framework tag block.
+# one group, exactly the three transports, sourced from the /32 the module derives, attached to
+# every directly-reached ENI, and carrying the framework tag block.
 run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
   command = plan
 
@@ -201,10 +201,10 @@ run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
 
   # "attach to EVERY ENI": both interfaces gain the group on top of what they already had.
   assert {
-    condition = (
-      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
-      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2
-    )
+    condition = alltrue([
+      for key in ["runner-host-a-eni-0", "runner-host-a-eni-1"] :
+      contains(local.elastic_network_interfaces.us_east_1[key].security_groups, "sg-runneringress0")
+    ])
     error_message = "The runner group must be attached to every ENI the framework creates."
   }
 
@@ -580,10 +580,10 @@ run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
   # An operator address alone must ATTACH the group, not merely build it: a group nobody is in
   # grants nobody anything, which is the failure this input exists to prevent.
   assert {
-    condition = (
-      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
-      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2
-    )
+    condition = alltrue([
+      for key in ["runner-host-a-eni-0", "runner-host-a-eni-1"] :
+      contains(local.elastic_network_interfaces.us_east_1[key].security_groups, "sg-runneringress0")
+    ])
     error_message = "debug_ip alone must attach the run-scoped group to the interface."
   }
 }

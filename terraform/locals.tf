@@ -377,8 +377,9 @@ locals {
 
   #region ------ [ Run-Scoped Ingress Security Group ] ----------------------------------------- #
 
-  # One group, attached to every interface the framework builds, so whoever must reach the fleet
-  # can for the life of a single run: the CI runner, an operator, or both. No address at all
+  # One group, attached to every directly-reached interface the framework builds, so whoever must
+  # reach the fleet can for the life of a single run: the CI runner, an operator, or both. A
+  # system reached over SSM accepts nothing inbound and is left out. No address at all
   # collapses every map below to {}, so the resources plan to nothing and no ENI gains a group.
   #
   # The name has to be unique per VPC: several repositories deploy into one shared subnet and
@@ -472,7 +473,7 @@ locals {
         (local.runner_ingress_name) = {
 
           # AWS Security Group Properties
-          description = "Run-scoped CI runner ingress. Managed by aws-terraform-framework."
+          description = "Run-scoped ingress. Managed by aws-terraform-framework."
           name        = local.runner_ingress_name
           # [0] rather than one(): one() is absent from Packer and unused here by style. A list
           # longer than 1 is caught by the single-VPC precondition on the group resource.
