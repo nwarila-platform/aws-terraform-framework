@@ -69,23 +69,11 @@ resource "aws_security_group" "runner_ingress_us_east_1" {
         join(" ", [
           "run-scoped ingress is granted, but all_systems resolves to %d VPCs (%s). One security",
           "group cannot span VPCs. Deploy the systems sharing a VPC separately, or clear",
-          "runner_ip, debug_ips and debug_dns_names.",
+          "runner_ip and debug_ip.",
         ]),
         length(local.runner_ingress_vpc_ids.us_east_1),
         join(", ", local.runner_ingress_vpc_ids.us_east_1),
       )
-    }
-
-    # A name resolves to whatever it resolves to, so an address that no variable validation ever
-    # saw can reach here. The unspecified address is refused after resolution exactly as
-    # debug_ips refuses it before: 0.0.0.0/32 is a host route and slips past the world-open
-    # ingress ban.
-    precondition {
-      condition = !contains(keys(local.debug_addresses), "0.0.0.0")
-      error_message = join(" ", [
-        "a debug_dns_names entry resolved to 0.0.0.0, which is the unspecified address and never",
-        "a reachable operator. Point the name at a real address or remove it.",
-      ])
     }
 
     # Changing a security group's description forces replacement, which AWS refuses while the

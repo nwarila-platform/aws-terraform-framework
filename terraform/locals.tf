@@ -427,25 +427,10 @@ locals {
     }
   })
 
-  # Every address a human may work from, mapped to how it was named, so the rule that appears in
-  # the console says where it came from. A literal and a resolved address are the same thing once
-  # resolved; only the provenance differs.
-  #
-  # merge([...]...) over an empty list is merge(), which is {} -- so no names means no addresses
-  # rather than an error.
-  debug_addresses = merge(
-    { for address in var.debug_ips : address => "declared operator address" },
-    merge([
-      for name in var.debug_dns_names : {
-        for address in data.dns_a_record_set.runner_ingress[name].addrs : address => "resolved from ${name}"
-      }
-    ]...)
-  )
-
-  # One grant per transport per address, keyed so that an address appearing as BOTH the runner
-  # and an operator collapses to a single rule instead of colliding: AWS would reject the
-  # duplicate, and the two would be asking for the identical opening anyway. Debug is merged
-  # last, so a shared address keeps the wider transport set and the operator's provenance.
+  # One grant per transport per address, keyed by both so that an address given as BOTH the
+  # runner and the operator collapses to a single rule instead of colliding: AWS would reject the
+  # duplicate, and the two would be asking for the identical opening anyway. The operator is
+  # merged last, so a shared address keeps the wider transport set.
   runner_ingress_grants = merge(
     var.runner_ip == null ? {} : {
       for transport, rule in local.runner_ingress_rules :
@@ -456,17 +441,15 @@ locals {
         transport = transport
       }
     },
-    merge([
-      for address, origin in local.debug_addresses : {
-        for transport, rule in local.debug_ingress_rules :
-        "${transport}-${address}" => {
-          address   = address
-          origin    = origin
-          rule      = rule
-          transport = transport
-        }
+    var.debug_ip == null ? {} : {
+      for transport, rule in local.debug_ingress_rules :
+      "${transport}-${var.debug_ip}" => {
+        address   = var.debug_ip
+        origin    = "operator"
+        rule      = rule
+        transport = transport
       }
-    ]...)
+    }
   )
 
   # Every distinct VPC the fleet resolves to. One security group cannot span VPCs, so a length
