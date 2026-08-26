@@ -395,19 +395,19 @@ locals {
   # unreachable messages that make a failed connection diagnosable rather than a silent hang.
   runner_ingress_rules = {
     ssh = {
-      description = "Run-scoped CI runner SSH ingress."
+      description = "Run-scoped SSH ingress."
       ip_protocol = "tcp"
       from_port   = 22
       to_port     = 22
     }
     winrm = {
-      description = "Run-scoped CI runner WinRM ingress."
+      description = "Run-scoped WinRM ingress."
       ip_protocol = "tcp"
       from_port   = 5986
       to_port     = 5986
     }
     icmp = {
-      description = "Run-scoped CI runner ICMP ingress for reachability checks."
+      description = "Run-scoped ICMP ingress for reachability checks."
       ip_protocol = "icmp"
       from_port   = -1
       to_port     = -1
@@ -420,7 +420,7 @@ locals {
   # and a port list invites 0-65535.
   debug_ingress_rules = merge(local.runner_ingress_rules, {
     rdp = {
-      description = "Run-scoped operator RDP ingress."
+      description = "Run-scoped RDP ingress."
       ip_protocol = "tcp"
       from_port   = 3389
       to_port     = 3389
@@ -435,19 +435,17 @@ locals {
     var.runner_ip == null ? {} : {
       for transport, rule in local.runner_ingress_rules :
       "${transport}-${var.runner_ip}" => {
-        address   = var.runner_ip
-        origin    = "CI runner"
-        rule      = rule
-        transport = transport
+        address = var.runner_ip
+        origin  = "CI runner"
+        rule    = rule
       }
     },
     var.debug_ip == null ? {} : {
       for transport, rule in local.debug_ingress_rules :
       "${transport}-${var.debug_ip}" => {
-        address   = var.debug_ip
-        origin    = "operator"
-        rule      = rule
-        transport = transport
+        address = var.debug_ip
+        origin  = "operator"
+        rule    = rule
       }
     }
   )

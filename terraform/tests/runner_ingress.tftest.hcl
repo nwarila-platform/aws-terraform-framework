@@ -129,7 +129,7 @@ run "null_runner_ip_creates_nothing_and_attaches_nothing" {
 
 # CASE 2 and 5: one group, exactly the two transport ports, sourced from the /32 the module
 # derives, attached to every ENI, and carrying the framework tag block.
-run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
+run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
   command = plan
 
   variables {
