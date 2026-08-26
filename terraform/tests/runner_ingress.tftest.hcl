@@ -161,10 +161,10 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
   assert {
     condition = (
       length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 3 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh"].from_port == 22 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh"].to_port == 22 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm"].from_port == 5986 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm"].to_port == 5986
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh-203.0.113.7"].from_port == 22 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-ssh-203.0.113.7"].to_port == 22 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm-203.0.113.7"].from_port == 5986 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm-203.0.113.7"].to_port == 5986
     )
     error_message = "The group must carry exactly tcp/22 and tcp/5986."
   }
@@ -173,9 +173,9 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
   # runner's single address.
   assert {
     condition = (
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].ip_protocol == "icmp" &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].from_port == -1 &&
-      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp"].to_port == -1
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].ip_protocol == "icmp" &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].from_port == -1 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-icmp-203.0.113.7"].to_port == -1
     )
     error_message = "The group must carry an ICMP rule covering every type and code."
   }
@@ -188,12 +188,13 @@ run "valid_runner_ip_creates_one_group_two_rules_on_every_eni" {
     error_message = "Every runner rule must be sourced from the single-host /32 built from runner_ip."
   }
 
-  # Nothing beyond the three module-owned transports may appear, whatever else changes.
+  # Nothing beyond the three module-owned runner transports may appear, whatever else changes.
+  # A key names its transport AND its source, because several sources may now grant access.
   assert {
     condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
-      "runner-ingress-123456789-test-ssh",
-      "runner-ingress-123456789-test-winrm",
-      "runner-ingress-123456789-test-icmp",
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
     ])
     error_message = "The runner group must carry exactly the ssh, winrm and icmp rules and nothing else."
   }
@@ -494,3 +495,150 @@ run "runner_ip_across_two_vpcs_fails_the_precondition" {
 
   expect_failures = [aws_security_group.runner_ingress_us_east_1]
 }
+
+
+# The operator half. debug_ips carries the runner's three transports PLUS RDP, because a person
+# on a Windows host needs a desktop and CI never does -- so granting an operator access must not
+# be expressible as widening what the automation may reach.
+run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
+  command = plan
+
+  variables {
+    runner_ip = null
+    debug_ip  = "198.51.100.20"
+  }
+
+  assert {
+    condition     = length(aws_security_group.runner_ingress_us_east_1) == 1
+    error_message = "debug_ip alone must create the run-scoped group, exactly as runner_ip does."
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-198.51.100.20",
+      "runner-ingress-123456789-test-winrm-198.51.100.20",
+      "runner-ingress-123456789-test-icmp-198.51.100.20",
+      "runner-ingress-123456789-test-rdp-198.51.100.20",
+    ])
+    error_message = "A debug address must carry ssh, winrm, icmp and rdp, and nothing else."
+  }
+
+  assert {
+    condition = (
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].from_port == 3389 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].to_port == 3389 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].ip_protocol == "tcp"
+    )
+    error_message = "The RDP rule must be tcp/3389 exactly."
+  }
+
+  assert {
+    condition = alltrue([
+      for _, rule in aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1 :
+      rule.cidr_ipv4 == "198.51.100.20/32"
+    ])
+    error_message = "Every debug rule must be sourced from the single-host /32 built from the address."
+  }
+}
+
+# The runner never gains a desktop just because an operator asked for one.
+run "runner_and_debug_addresses_keep_their_own_transports" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+    debug_ip  = "198.51.100.20"
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
+      "runner-ingress-123456789-test-ssh-198.51.100.20",
+      "runner-ingress-123456789-test-winrm-198.51.100.20",
+      "runner-ingress-123456789-test-icmp-198.51.100.20",
+      "runner-ingress-123456789-test-rdp-198.51.100.20",
+    ])
+    error_message = "The runner address must carry no RDP rule while the debug address does."
+  }
+}
+
+
+# An address that is both the runner and an operator asks for the same opening twice. AWS rejects
+# a duplicate rule, so the two must collapse rather than collide -- and the surviving set is the
+# wider one, because the person still needs their desktop.
+run "an_address_that_is_both_runner_and_operator_collapses" {
+  command = plan
+
+  variables {
+    runner_ip = "203.0.113.7"
+    debug_ip  = "203.0.113.7"
+  }
+
+  assert {
+    condition = sort(keys(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1)) == sort([
+      "runner-ingress-123456789-test-ssh-203.0.113.7",
+      "runner-ingress-123456789-test-winrm-203.0.113.7",
+      "runner-ingress-123456789-test-icmp-203.0.113.7",
+      "runner-ingress-123456789-test-rdp-203.0.113.7",
+    ])
+    error_message = "One address named twice must yield one rule per transport, not two."
+  }
+}
+
+# Empty is the default and grants nothing, the same posture runner_ip holds at null.
+run "empty_debug_inputs_create_nothing" {
+  command = plan
+
+  variables {
+    runner_ip = null
+    debug_ip  = null
+  }
+
+  assert {
+    condition = (
+      length(aws_security_group.runner_ingress_us_east_1) == 0 &&
+      length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
+    )
+    error_message = "No runner and no operator must create no group and no rule."
+  }
+}
+
+# The same structural guarantee runner_ip carries: a range must not be representable.
+run "cidr_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ip = "198.51.100.0/24"
+  }
+
+  expect_failures = [var.debug_ip]
+}
+
+run "unspecified_address_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ip = "0.0.0.0"
+  }
+
+  expect_failures = [var.debug_ip]
+}
+
+run "malformed_debug_ip_is_rejected" {
+  command = plan
+
+  variables {
+    debug_ip = "198.51.100.999"
+  }
+
+  expect_failures = [var.debug_ip]
+}
+
+# A name is resolved; an address is not a name. Passing one where the other belongs is refused so
+
+
+
+# The point of a name: an address the configuration never records. A resolved address is treated
+

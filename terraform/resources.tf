@@ -67,8 +67,9 @@ resource "aws_security_group" "runner_ingress_us_east_1" {
       condition = length(local.runner_ingress_vpc_ids.us_east_1) == 1
       error_message = format(
         join(" ", [
-          "runner_ip is set, but all_systems resolves to %d VPCs (%s). One security group cannot",
-          "span VPCs. Deploy the systems sharing a VPC separately, or clear runner_ip.",
+          "run-scoped ingress is granted, but all_systems resolves to %d VPCs (%s). One security",
+          "group cannot span VPCs. Deploy the systems sharing a VPC separately, or clear",
+          "runner_ip and debug_ip.",
         ]),
         length(local.runner_ingress_vpc_ids.us_east_1),
         join(", ", local.runner_ingress_vpc_ids.us_east_1),

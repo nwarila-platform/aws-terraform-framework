@@ -14,6 +14,7 @@ terraform {
       version = "= 6.47.0"
     }
 
+
   }
 
 }

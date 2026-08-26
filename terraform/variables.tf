@@ -1125,13 +1125,17 @@ variable "run_id" {
 variable "runner_ip" {
   description = <<-EOT
     Public IPv4 address of the CI runner that must reach every instance for the life of one run.
-    Non-null creates ONE security group carrying tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all
-    sourced from "<runner_ip>/32", and attaches it to every network interface this framework
-    creates. Null, the default, creates nothing and attaches nothing: the posture for local
-    operator runs and for on-prem targets.
+    Non-null contributes tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all sourced from
+    "<runner_ip>/32", to the one run-scoped group this framework attaches to every network
+    interface it creates. Null, the default, contributes nothing: the posture for local operator
+    runs and for on-prem targets.
+
+    These are the transports a RUN drives. A human who needs to sit on the host reaches it
+    through debug_ip instead, which carries a different set -- so widening what an operator can
+    do never widens what CI can do.
 
     The protocols are module-owned literals, not a consumer input, so no deployment can widen
-    this group beyond the transports it exists to serve.
+    this beyond the transports it exists to serve.
 
     A bare address, never a CIDR. Accepting a prefix would make a range representable at all;
     requiring a single host makes one structurally impossible, which is a stronger guarantee
@@ -1161,6 +1165,54 @@ variable "runner_ip" {
     condition = var.runner_ip != "0.0.0.0"
     error_message = join(" ", [
       "runner_ip must not be 0.0.0.0. It is the unspecified address, never a reachable runner,",
+      "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
+    ])
+  }
+}
+
+variable "debug_ip" {
+  description = <<-EOT
+    Public IPv4 address a HUMAN works from while the host stands. Non-null contributes tcp/22
+    (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP, all sourced from "<debug_ip>/32", to the
+    same run-scoped group runner_ip feeds. Null, the default, contributes nothing -- the same
+    optional posture as runner_ip, so a run that needs no human grants no human anything.
+
+    A separate input from runner_ip because the two want different transports. CI drives SSH,
+    WinRM and ICMP and has no use for a desktop; a person debugging a Windows host needs RDP as
+    well, which nothing else here opens. Keeping them apart means an operator's access can be
+    granted without widening what the automation may reach, and withdrawn without touching CI.
+
+    The protocols are module-owned literals, not a consumer input, so no deployment can widen
+    this beyond the transports it exists to serve.
+
+    A bare address, never a CIDR, for the same reason runner_ip is: a range must not be
+    representable at all.
+
+    Pass it at apply time, not from a value file. An operator's address belongs to a single run,
+    and a committed one publishes where that person sits -- which is why a caller that cannot
+    know the address up front resolves it in the pipeline and passes the result, rather than
+    naming the operator anywhere this configuration records.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition = var.debug_ip == null || can(regex(
+      "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
+      var.debug_ip
+    ))
+    error_message = join(" ", [
+      "debug_ip must be a single bare IPv4 address such as 198.51.100.20, carrying no prefix",
+      "length. A CIDR is rejected so that a range cannot be expressed at all.",
+    ])
+  }
+
+  # 0.0.0.0/32 is a host route, not /0, so the world-open ingress ban does not catch it. It is
+  # never a real operator address either way, so reject it outright rather than reason about it.
+  validation {
+    condition = var.debug_ip != "0.0.0.0"
+    error_message = join(" ", [
+      "debug_ip must not be 0.0.0.0. It is the unspecified address, never a reachable operator,",
       "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
     ])
   }
