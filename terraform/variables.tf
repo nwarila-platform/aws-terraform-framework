@@ -1157,8 +1157,6 @@ variable "runner_ip" {
     ])
   }
 
-  # 0.0.0.0/32 is a host route, not /0, so the world-open ingress ban does not catch it. It is
-  # never a real runner address either way, so reject it outright rather than reason about it.
   validation {
     condition = var.runner_ip != "0.0.0.0"
     error_message = join(" ", [
@@ -1198,8 +1196,6 @@ variable "debug_ip" {
     ])
   }
 
-  # 0.0.0.0/32 is a host route, not /0, so the world-open ingress ban does not catch it. It is
-  # never a real operator address either way, so reject it outright rather than reason about it.
   validation {
     condition = var.debug_ip != "0.0.0.0"
     error_message = join(" ", [

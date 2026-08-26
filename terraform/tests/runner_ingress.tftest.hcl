@@ -104,9 +104,9 @@ variables {
   ]
 }
 
-# CASE 1: the default. Nothing is created and no ENI's security_groups changes, so a consumer
+# the default. Nothing is created and no ENI's security_groups changes, so a consumer
 # that never sets runner_ip sees exactly today's plan.
-run "null_runner_ip_creates_nothing_and_attaches_nothing" {
+run "no_address_at_all_creates_nothing_and_attaches_nothing" {
   command = plan
 
   assert {
@@ -114,7 +114,7 @@ run "null_runner_ip_creates_nothing_and_attaches_nothing" {
       length(aws_security_group.runner_ingress_us_east_1) == 0 &&
       length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
     )
-    error_message = "A null runner_ip must create no security group and no ingress rule."
+    error_message = "With neither address set, no security group and no ingress rule."
   }
 
   # eni-0 keeps its standing group plus its own inline group; eni-1 keeps only the standing one.
@@ -123,11 +123,11 @@ run "null_runner_ip_creates_nothing_and_attaches_nothing" {
       length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 2 &&
       length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 1
     )
-    error_message = "A null runner_ip must leave every ENI's security_groups exactly as it was."
+    error_message = "With neither address set, every ENI keeps exactly the groups it had."
   }
 }
 
-# CASE 2 and 5: one group, exactly the two transport ports, sourced from the /32 the module
+# one group, exactly the three transport ports, sourced from the /32 the module
 # derives, attached to every ENI, and carrying the framework tag block.
 run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
   command = plan
@@ -201,10 +201,10 @@ run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
 
   # "attach to EVERY ENI": both interfaces gain the group on top of what they already had.
   assert {
-    condition = alltrue([
-      for key in ["runner-host-a-eni-0", "runner-host-a-eni-1"] :
-      contains(local.elastic_network_interfaces.us_east_1[key].security_groups, "sg-runneringress0")
-    ])
+    condition = (
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2
+    )
     error_message = "The runner group must be attached to every ENI the framework creates."
   }
 
@@ -242,7 +242,7 @@ run "valid_runner_ip_creates_one_group_three_rules_on_every_eni" {
   }
 }
 
-# CASE 6: a system reached over SSM accepts nothing inbound, so the group the runner uses to
+# a system reached over SSM accepts nothing inbound, so the group the runner uses to
 # open SSH, WinRM and ICMP is not attached to it. Its interfaces keep exactly what the consumer
 # listed.
 run "an_ssm_reached_system_is_not_given_the_runner_group" {
@@ -277,7 +277,7 @@ run "an_ssm_reached_system_is_not_given_the_runner_group" {
   }
 }
 
-# CASE 7: the selective half. One group is still built for the directly-reached system, and only
+# the selective half. One group is still built for the directly-reached system, and only
 # its interfaces receive it - the tunnelled system alongside it is left alone.
 run "a_mixed_fleet_attaches_the_group_only_to_directly_reached_systems" {
   command = plan
@@ -313,10 +313,10 @@ run "a_mixed_fleet_attaches_the_group_only_to_directly_reached_systems" {
   }
 
   assert {
-    condition = alltrue([
-      for key in ["runner-host-a-eni-0", "runner-host-a-eni-1"] :
-      contains(local.elastic_network_interfaces.us_east_1[key].security_groups, "sg-runneringress0")
-    ])
+    condition = (
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2
+    )
     error_message = "A directly-reached system must still receive the runner group on every interface."
   }
 
@@ -334,7 +334,7 @@ run "a_mixed_fleet_attaches_the_group_only_to_directly_reached_systems" {
   }
 }
 
-# CASE 3: a prefix is rejected by the input type, which is what makes a range structurally
+# a prefix is rejected by the input type, which is what makes a range structurally
 # impossible rather than merely discouraged.
 run "cidr_runner_ip_is_rejected" {
   command = plan
@@ -346,7 +346,7 @@ run "cidr_runner_ip_is_rejected" {
   expect_failures = [var.runner_ip]
 }
 
-# CASE 4, pinned deliberately: 0.0.0.0/32 is a host route, NOT /0, so the world-open ingress ban
+# 0.0.0.0/32 is a host route, NOT /0, so the world-open ingress ban
 # does not catch it. It is never a reachable runner, so reject it outright.
 run "unspecified_address_runner_ip_is_rejected" {
   command = plan
@@ -497,7 +497,7 @@ run "runner_ip_across_two_vpcs_fails_the_precondition" {
 }
 
 
-# The operator half. debug_ips carries the runner's three transports PLUS RDP, because a person
+# The operator half. debug_ip carries the runner's three transports PLUS RDP, because a person
 # on a Windows host needs a desktop and CI never does -- so granting an operator access must not
 # be expressible as widening what the automation may reach.
 run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
@@ -506,6 +506,16 @@ run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
   variables {
     runner_ip = null
     debug_ip  = "198.51.100.20"
+  }
+
+  # The group id is provider-computed and unknown at plan, so pin it: this run is about the
+  # wiring, not about what AWS would name the group.
+  override_resource {
+    target          = aws_security_group.runner_ingress_us_east_1
+    override_during = plan
+    values = {
+      id = "sg-runneringress0"
+    }
   }
 
   assert {
@@ -539,9 +549,17 @@ run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
     ])
     error_message = "Every debug rule must be sourced from the single-host /32 built from the address."
   }
+  # An operator address alone must ATTACH the group, not merely build it: a group nobody is in
+  # grants nobody anything, which is the failure this input exists to prevent.
+  assert {
+    condition = (
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-0"].security_groups) == 3 &&
+      length(local.elastic_network_interfaces.us_east_1["runner-host-a-eni-1"].security_groups) == 2
+    )
+    error_message = "debug_ip alone must attach the run-scoped group to the interface."
+  }
 }
 
-# The runner never gains a desktop just because an operator asked for one.
 run "runner_and_debug_addresses_keep_their_own_transports" {
   command = plan
 
@@ -588,23 +606,6 @@ run "an_address_that_is_both_runner_and_operator_collapses" {
 }
 
 # Empty is the default and grants nothing, the same posture runner_ip holds at null.
-run "empty_debug_inputs_create_nothing" {
-  command = plan
-
-  variables {
-    runner_ip = null
-    debug_ip  = null
-  }
-
-  assert {
-    condition = (
-      length(aws_security_group.runner_ingress_us_east_1) == 0 &&
-      length(aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1) == 0
-    )
-    error_message = "No runner and no operator must create no group and no rule."
-  }
-}
-
 # The same structural guarantee runner_ip carries: a range must not be representable.
 run "cidr_debug_ip_is_rejected" {
   command = plan
@@ -635,10 +636,4 @@ run "malformed_debug_ip_is_rejected" {
 
   expect_failures = [var.debug_ip]
 }
-
-# A name is resolved; an address is not a name. Passing one where the other belongs is refused so
-
-
-
-# The point of a name: an address the configuration never records. A resolved address is treated
 

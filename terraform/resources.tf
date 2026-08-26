@@ -49,9 +49,9 @@ resource "aws_security_group" "us_east_1" {
 
 resource "aws_security_group" "runner_ingress_us_east_1" {
 
-  # Iterate through the Run-Scoped Runner Ingress Security Group in the US-East-1 region.
+  # Iterate through the Run-Scoped Ingress Security Group in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = local.runner_ingress_security_groups.us_east_1
+  for_each = local.run_ingress_security_groups.us_east_1
 
   # Define the Security Group Properties
   description = each.value.description
@@ -64,15 +64,15 @@ resource "aws_security_group" "runner_ingress_us_east_1" {
     # across several. Fail here rather than attach to whichever VPC sorted first and leave the
     # rest silently unreachable.
     precondition {
-      condition = length(local.runner_ingress_vpc_ids.us_east_1) == 1
+      condition = length(local.run_ingress_vpc_ids.us_east_1) == 1
       error_message = format(
         join(" ", [
           "run-scoped ingress is granted, but all_systems resolves to %d VPCs (%s). One security",
           "group cannot span VPCs. Deploy the systems sharing a VPC separately, or clear",
           "runner_ip and debug_ip.",
         ]),
-        length(local.runner_ingress_vpc_ids.us_east_1),
-        join(", ", local.runner_ingress_vpc_ids.us_east_1),
+        length(local.run_ingress_vpc_ids.us_east_1),
+        join(", ", local.run_ingress_vpc_ids.us_east_1),
       )
     }
 
@@ -122,9 +122,9 @@ resource "aws_vpc_security_group_ingress_rule" "us_east_1" {
 
 resource "aws_vpc_security_group_ingress_rule" "runner_ingress_us_east_1" {
 
-  # Iterate through all Run-Scoped Runner Ingress Rules in the US-East-1 region.
+  # Iterate through all Run-Scoped Ingress Rules in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = local.runner_ingress_security_group_rules.us_east_1
+  for_each = local.run_ingress_security_group_rules.us_east_1
 
   # Define the Security Group Ingress Rule Properties
   cidr_ipv4                    = each.value.cidr_ipv4

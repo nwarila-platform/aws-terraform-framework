@@ -375,10 +375,10 @@ locals {
   #endregion --- [ Interface-Owned Security Groups ] ------------------------------------------- #
 
 
-  #region ------ [ Runner Ingress Security Group ] --------------------------------------------- #
+  #region ------ [ Run-Scoped Ingress Security Group ] --------------------------------------------- #
 
-  # One group, attached to every interface the framework builds, so a CI runner can reach the
-  # fleet for the life of a single run. var.runner_ip == null collapses every map below to {},
+  # One group, attached to every interface the framework builds, so whoever must reach the fleet
+  # can for the life of a single run: the CI runner, an operator, or both. No address at all collapses every map below to {},
   # so the resources plan to nothing and no ENI gains a group.
   #
   # The name has to be unique per VPC: several repositories deploy into one shared subnet and
@@ -431,7 +431,7 @@ locals {
   # runner and the operator collapses to a single rule instead of colliding: AWS would reject the
   # duplicate, and the two would be asking for the identical opening anyway. The operator is
   # merged last, so a shared address keeps the wider transport set.
-  runner_ingress_grants = merge(
+  run_ingress_grants = merge(
     var.runner_ip == null ? {} : {
       for transport, rule in local.runner_ingress_rules :
       "${transport}-${var.runner_ip}" => {
@@ -455,7 +455,7 @@ locals {
   #
   # Counts only systems that will actually receive the group, so a region reached entirely over
   # SSM contributes no VPC and builds no group rather than an orphan attached to nothing.
-  runner_ingress_vpc_ids = {
+  run_ingress_vpc_ids = {
     for region in var.aws_config.regions : region => distinct([
       for system in var.all_systems :
       data.aws_subnet.us_east_1[system.subnet_id].vpc_id
@@ -466,9 +466,9 @@ locals {
 
   # Empty when nothing grants access, and also when a region declares no systems: with nothing
   # to attach to there is no group to build, and indexing an empty VPC list would fail.
-  runner_ingress_security_groups = {
+  run_ingress_security_groups = {
     for region in var.aws_config.regions : region => (
-      length(local.runner_ingress_grants) == 0 || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
+      length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0 ? {} : {
         (local.runner_ingress_name) = {
 
           # AWS Security Group Properties
@@ -476,7 +476,7 @@ locals {
           name        = local.runner_ingress_name
           # [0] rather than one(): one() is absent from Packer and unused here by style. A list
           # longer than 1 is caught by the single-VPC precondition on the group resource.
-          vpc_id = local.runner_ingress_vpc_ids[region][0]
+          vpc_id = local.run_ingress_vpc_ids[region][0]
 
           # The group declares no consumer tags, so this map is wholly framework-owned.
           tags = merge(local.identity_tags, {
@@ -487,10 +487,10 @@ locals {
     )
   }
 
-  runner_ingress_security_group_rules = {
+  run_ingress_security_group_rules = {
     for region in var.aws_config.regions : region => (
-      length(local.runner_ingress_grants) == 0 || length(local.runner_ingress_vpc_ids[region]) == 0 ? {} : {
-        for key, grant in local.runner_ingress_grants :
+      length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0 ? {} : {
+        for key, grant in local.run_ingress_grants :
         "${local.runner_ingress_name}-${key}" => {
 
           # AWS Security Group Ingress Rule Properties
@@ -510,12 +510,12 @@ locals {
     )
   }
 
-  # Name -> runner-ingress SG id, mirroring network_interface_security_group_ids.
-  runner_ingress_security_group_ids = {
+  # Name -> run-scoped SG id, mirroring network_interface_security_group_ids.
+  run_ingress_security_group_ids = {
     us_east_1 = { for name, group in aws_security_group.runner_ingress_us_east_1 : name => group.id }
   }
 
-  #endregion --- [ Runner Ingress Security Group ] --------------------------------------------- #
+  #endregion --- [ Run-Scoped Ingress Security Group ] --------------------------------------------- #
 
 
   #region ------ [ Elastic IPs ] --------------------------------------------------------------- #
@@ -822,9 +822,9 @@ locals {
             # ec2:ModifyNetworkInterfaceAttribute would force every consumer to widen its policy.
             # Skipped for tunnelled systems, which accept no inbound connection at all.
             (
-              var.runner_ip == null ||
+              length(local.run_ingress_grants) == 0 ||
               local.connection_over_ssm[system.hostname]
-            ) ? [] : [local.runner_ingress_security_group_ids[region][local.runner_ingress_name]],
+            ) ? [] : [local.run_ingress_security_group_ids[region][local.runner_ingress_name]],
           )
           subnet_id = system.subnet_id
 
