@@ -82,8 +82,11 @@ index as a string and `device_index` to that index as a number. For example, the
 `HOSTNAME-ebs-0` entry becomes `{ resource_key = "0", device_index = 0, ... }`.
 
 If you choose a descriptive resource key, move the existing volume and attachment addresses
-before applying. Use `aws_volume_attachment.us_east_1_refresh` instead for a system with
-`refresh = true`:
+before applying. The attachment destination is now always `aws_volume_attachment.us_east_1`:
+
+For `refresh = true`, run the consolidation move below first, then these descriptive-key moves;
+the attachment rename source exists only after consolidation. For `refresh = false`, the order
+does not matter because attachments do not move between resources.
 
 ```console
 terraform -chdir=terraform state mv \
@@ -93,6 +96,19 @@ terraform -chdir=terraform state mv \
   'aws_volume_attachment.us_east_1["HOSTNAME-ebs-0"]' \
   'aws_volume_attachment.us_east_1["HOSTNAME-ebs-data"]'
 ```
+
+This release consolidates refresh and stable attachments into that one resource. For every
+affected state and every attachment on a `refresh = true` system, move its existing instance
+before applying the new configuration:
+
+```console
+terraform -chdir=terraform state mv \
+  'aws_volume_attachment.us_east_1_refresh["KEY"]' \
+  'aws_volume_attachment.us_east_1["KEY"]'
+```
+
+Run `terraform -chdir=terraform plan` after the moves and verify that Terraform plans no EBS
+volume detach or reattachment.
 
 Standalone EBS volumes also now have one resource address regardless of their instance's
 `refresh` setting. Existing deployments with refresh volumes must combine the old positional
@@ -170,7 +186,6 @@ deployment near a ceiling.
 | [aws_security_group.runner_ingress_us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/security_group) | resource |
 | [aws_security_group.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/security_group) | resource |
 | [aws_volume_attachment.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
-| [aws_volume_attachment.us_east_1_refresh](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/volume_attachment) | resource |
 | [aws_vpc_security_group_egress_rule.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/vpc_security_group_egress_rule) | resource |
 | [aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/vpc_security_group_ingress_rule) | resource |
 | [aws_vpc_security_group_ingress_rule.us_east_1](https://registry.terraform.io/providers/hashicorp/aws/6.47.0/docs/resources/vpc_security_group_ingress_rule) | resource |
@@ -193,6 +208,7 @@ deployment near a ceiling.
 | repository\_id | Numeric, rename-stable GitHub repository id — the anchor of the deployment identity, stamped as the RepositoryId tag. | `string` | n/a | yes |
 | run\_id | Numeric GitHub Actions run id, stamped as the RunId tag. The run record holds actors, timestamps, and approvals; those stay in deployment evidence rather than in tags. | `string` | n/a | yes |
 | runner\_ip | Public IPv4 address of the CI runner that must reach every instance for the life of one run.<br/>Non-null contributes tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all sourced from<br/>"<runner\_ip>/32", to the one run-scoped group this framework attaches to every network<br/>interface it creates. Null, the default, contributes nothing: the posture for local operator<br/>runs and for on-prem targets.<br/><br/>These are the transports a RUN drives; a human sitting on the host is debug\_ip's business<br/>and carries its own set, so widening one never widens the other. Both sets are module-owned<br/>literals rather than consumer inputs, so no deployment can widen either beyond the<br/>transports it exists to serve.<br/><br/>A bare address, never a CIDR. Accepting a prefix would make a range representable at all;<br/>requiring a single host makes one structurally impossible, which is a stronger guarantee<br/>than the world-open ingress ban because the input type enforces it rather than a validation<br/>rule someone could later relax.<br/><br/>Pass it at apply time (-var "runner\_ip=..."), not from a value file: the address belongs to<br/>a single run, not to a deployment's committed configuration. | `string` | `null` | no |
+| shared\_ebs\_volumes | Define encrypted io2 EBS Multi-Attach volumes shared by existing systems in one Availability<br/>Zone. AWS additionally requires Nitro instances and a multi-writer-safe clustered storage<br/>design; ordinary filesystems are not safe for concurrent writers. Each volume supports at most<br/>16 attachments. These are new resources: do not move an existing standalone volume into this<br/>map, because the pinned provider treats enabling Multi-Attach as a replacement operation. An<br/>empty map creates no shared volumes or attachments. | <pre>map(object({<br/>    region            = string<br/>    availability_zone = string<br/>    aws_kms_alias     = string<br/>    iops              = string<br/>    volume_size       = string<br/>    tags              = map(string)<br/>    attachments = list(object({<br/>      hostname     = string<br/>      device_index = number<br/>    }))<br/>  }))</pre> | `{}` | no |
 
 ## Outputs
 

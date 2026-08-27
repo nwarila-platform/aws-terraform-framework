@@ -851,69 +851,121 @@ locals {
   #region ------ [ Elastic Block Store (EBS) ] ------------------------------------------------- #
 
   ebs_block_devices = {
-    for region in var.aws_config.regions : region => merge([
-      for system in var.all_systems : {
-        for volume in system.ebs_block_devices :
-        "${system.hostname}-ebs-${volume.resource_key}" => {
+    for region in var.aws_config.regions : region => merge(
+      merge([
+        for system in var.all_systems : {
+          for volume in system.ebs_block_devices :
+          "${system.hostname}-ebs-${volume.resource_key}" => {
 
-          # AWS Elastic Block Store Properties
-          availability_zone = system.availability_zone
-          hostname          = system.hostname
-          index             = volume.device_index
-          iops              = volume.iops
-          kms_key_id        = system.aws_kms_alias
-          refresh           = system.refresh
-          resource_key      = volume.resource_key
-          skip_destroy      = volume.skip_destroy
-          snapshot_id       = volume.snapshot_id
-          throughput        = volume.throughput
-          volume_size       = volume.volume_size
-          volume_type       = volume.volume_type
+            # AWS Elastic Block Store Properties
+            availability_zone    = system.availability_zone
+            hostname             = system.hostname
+            index                = volume.device_index
+            iops                 = volume.iops
+            kms_key_id           = system.aws_kms_alias
+            multi_attach_enabled = null
+            refresh              = system.refresh
+            resource_key         = volume.resource_key
+            skip_destroy         = volume.skip_destroy
+            snapshot_id          = volume.snapshot_id
+            throughput           = volume.throughput
+            volume_size          = volume.volume_size
+            volume_type          = volume.volume_type
 
-          device_name = (
-            local.elastic_compute_cloud[region][system.hostname].is_windows
-            ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-            : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-          )
+            device_name = (
+              local.elastic_compute_cloud[region][system.hostname].is_windows
+              ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+              : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+            )
 
-          tags = merge(
-            try(volume.tags, {}),
-            # Non-Overwritable Default Tags
-            local.identity_tags,
-            {
-              Index = volume.device_index
-              Name  = system.hostname
+            tags = merge(
+              try(volume.tags, {}),
+              # Non-Overwritable Default Tags
+              local.identity_tags,
+              {
+                Index = volume.device_index
+                Name  = system.hostname
 
-              # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
-              DeviceName = (
-                local.elastic_compute_cloud[region][system.hostname].is_windows
-                ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-                : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-              )
+                # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
+                DeviceName = (
+                  local.elastic_compute_cloud[region][system.hostname].is_windows
+                  ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                  : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                )
 
-            }
-          )
+              }
+            )
+          }
         }
-      }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
-    ]...)
+        # Normalize 'region' variable input to align with Terraform best practices.
+        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
+      ]...),
+      {
+        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
+        volume_key => {
+          availability_zone    = volume.availability_zone
+          iops                 = volume.iops
+          kms_key_id           = volume.aws_kms_alias
+          multi_attach_enabled = true
+          snapshot_id          = null
+          throughput           = null
+          volume_size          = volume.volume_size
+          volume_type          = "io2"
+
+          tags = merge(volume.tags, local.identity_tags, {
+            Name = volume_key
+          })
+        }
+        if try(replace(volume.region, "-", "_") == region, false)
+      },
+    )
   }
 
-  # Attachments follow their instance's refresh setting. Volumes do not consume this split so
-  # changing refresh never changes a standalone data volume's resource address.
-  ebs_block_devices_stable = {
-    for region in var.aws_config.regions : region => {
-      for key, volume in local.ebs_block_devices[region] : key => volume
-      if volume.refresh == false
-    }
-  }
+  # The one attachment map spans stable, refresh, standalone, and shared lifecycles. Standalone
+  # keys stay unchanged; JSON tuple keys keep shared volume/host identities unambiguous.
+  ebs_volume_attachments = {
+    for region in var.aws_config.regions : region => merge(
+      merge([
+        for system in var.all_systems : {
+          for volume in system.ebs_block_devices :
+          "${system.hostname}-ebs-${volume.resource_key}" => {
+            device_name = local.ebs_block_devices[region][
+              "${system.hostname}-ebs-${volume.resource_key}"
+            ].device_name
+            hostname     = system.hostname
+            skip_destroy = volume.skip_destroy
+            volume_key   = "${system.hostname}-ebs-${volume.resource_key}"
+          }
+        }
+        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
+      ]...),
+      merge([
+        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : {
+          for hostname in distinct([
+            for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
+            try(attachment.hostname, null)
+            ]) : jsonencode([volume_key, hostname]) => {
+            hostname     = hostname
+            skip_destroy = false
+            volume_key   = volume_key
 
-  ebs_block_devices_refresh = {
-    for region in var.aws_config.regions : region => {
-      for key, volume in local.ebs_block_devices[region] : key => volume
-      if volume.refresh == true
-    }
+            device_name = try(local.elastic_compute_cloud[region][hostname].is_windows, false) ? (
+              "xvd${jsondecode(format("\"\\u%04x\"", 100 + [
+                for attachment in volume.attachments : attachment.device_index
+                if attachment.hostname == hostname
+              ][0]))}"
+              ) : (
+              "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + [
+                for attachment in volume.attachments : attachment.device_index
+                if attachment.hostname == hostname
+              ][0]))}"
+            )
+          }
+          if try(hostname != null && contains(keys(local.elastic_compute_cloud[region]), hostname), false)
+        }
+        if try(replace(volume.region, "-", "_") == region, false)
+      ]...),
+    )
   }
 
   #endregion --- [ Elastic Block Store (EBS) ] ------------------------------------------------- #

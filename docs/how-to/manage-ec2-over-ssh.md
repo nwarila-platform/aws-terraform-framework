@@ -405,7 +405,11 @@ former zero-based list index as a string (for example, `"0"` or `"1"`) and set
 resource address and device name while making later list edits safe.
 
 To adopt a descriptive key instead, move both existing state addresses before
-planning. Use the attachment resource matching the system's `refresh` value:
+planning. The attachment destination is now always `aws_volume_attachment.us_east_1`:
+
+For `refresh = true`, run the consolidation move below first, then these descriptive-key moves;
+the attachment rename source exists only after consolidation. For `refresh = false`, the order
+does not matter because attachments do not move between resources.
 
 ```console
 terraform -chdir=terraform state mv \
@@ -416,9 +420,18 @@ terraform -chdir=terraform state mv \
   'aws_volume_attachment.us_east_1["HOSTNAME-ebs-data"]'
 ```
 
-For a system with `refresh = true`, the attachment address is
-`aws_volume_attachment.us_east_1_refresh[...]`. Run `terraform plan` after every
-migration and verify that it creates or destroys no EBS volume or attachment.
+This release consolidates refresh and stable attachments into that one resource. For every
+affected state and every attachment on a `refresh = true` system, move its unchanged key before
+applying the new configuration:
+
+```console
+terraform -chdir=terraform state mv \
+  'aws_volume_attachment.us_east_1_refresh["KEY"]' \
+  'aws_volume_attachment.us_east_1["KEY"]'
+```
+
+Run `terraform plan` after every migration and verify that it plans no EBS volume detach or
+reattachment.
 
 AMI-defined non-root devices use a separate path. Add each such mapping to
 `ami_block_device_overrides` with the exact `device_name` from the AMI. The

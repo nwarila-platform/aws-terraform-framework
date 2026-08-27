@@ -1765,7 +1765,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-cache"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-cache"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_east_1_refresh["west-ebs-refresh-ebs-cache"].device_name == "/dev/sdd"
+    condition     = aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].device_name == "/dev/sdd"
     error_message = "The west refresh EBS attachment should preserve address -> volume -> instance -> device wiring."
   }
 

@@ -142,6 +142,31 @@ all_systems = [
   }
 ]
 
+# A shared volume is independent of either system lifecycle. Every attachment chooses its own
+# device index, so the same slot resolves to /dev/sdd on app01 and xvdd on win01.
+shared_ebs_volumes = {
+  cluster-data = {
+    region            = "us_east_1"
+    availability_zone = "us-east-1a"
+    aws_kms_alias     = "ebs-REPLACE_ME"
+    iops              = "3000"
+    volume_size       = "100"
+    tags = {
+      Function = "cluster data"
+    }
+    attachments = [
+      {
+        hostname     = "app01"
+        device_index = 0
+      },
+      {
+        hostname     = "win01"
+        device_index = 0
+      }
+    ]
+  }
+}
+
 # See docs/reference/terraform.md for fully-specified database and load balancer
 # object schemas when these collections are populated.
 all_databases      = []

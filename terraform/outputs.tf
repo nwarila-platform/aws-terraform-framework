@@ -122,6 +122,7 @@ output "ebs_volumes" {
       device_name = try(volume.tags["DeviceName"], null)
       hostname    = try(volume.tags["Name"], null)
     }
+    if volume.multi_attach_enabled != true
   }
 }
 
