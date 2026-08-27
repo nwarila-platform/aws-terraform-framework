@@ -685,15 +685,16 @@ resource "aws_ebs_volume" "us_east_1" {
   for_each = local.ebs_block_devices.us_east_1
 
   # Define the Elastic Block Store Volume Properties
-  availability_zone = each.value.availability_zone
-  encrypted         = true
-  iops              = each.value.iops
-  kms_key_id        = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
-  size              = each.value.volume_size
-  snapshot_id       = each.value.snapshot_id
-  tags              = each.value.tags
-  throughput        = each.value.throughput
-  type              = each.value.volume_type
+  availability_zone    = each.value.availability_zone
+  encrypted            = true
+  iops                 = each.value.iops
+  kms_key_id           = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  multi_attach_enabled = each.value.multi_attach_enabled
+  size                 = each.value.volume_size
+  snapshot_id          = each.value.snapshot_id
+  tags                 = each.value.tags
+  throughput           = each.value.throughput
+  type                 = each.value.volume_type
 
 }
 
@@ -1057,33 +1058,16 @@ resource "aws_volume_attachment" "us_east_1" {
 
   # Iterate through all Elastic Block Store Volume Attachments in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = local.ebs_block_devices_stable.us_east_1
+  for_each = local.ebs_volume_attachments.us_east_1
 
   # Define the Elastic Block Store Volume Attachment Properties
   # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
   # filesystem corruption on a mounted volume.
   device_name                    = each.value.device_name
-  instance_id                    = aws_instance.us_east_1[each.value.hostname].id
+  instance_id                    = local.all_ec2_instances[each.value.hostname].id
   skip_destroy                   = each.value.skip_destroy
   stop_instance_before_detaching = true
-  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
-
-}
-
-resource "aws_volume_attachment" "us_east_1_refresh" {
-
-  # Iterate through all Elastic Block Store Volume Attachments in the US-East-1 region.
-  provider = aws.us_east_1
-  for_each = local.ebs_block_devices_refresh.us_east_1
-
-  # Define the Elastic Block Store Volume Attachment Properties
-  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
-  # filesystem corruption on a mounted volume.
-  device_name                    = each.value.device_name
-  instance_id                    = aws_instance.us_east_1_refresh[each.value.hostname].id
-  skip_destroy                   = each.value.skip_destroy
-  stop_instance_before_detaching = true
-  volume_id                      = aws_ebs_volume.us_east_1[each.key].id
+  volume_id                      = aws_ebs_volume.us_east_1[each.value.volume_key].id
 
 }
 

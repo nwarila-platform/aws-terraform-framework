@@ -14,7 +14,7 @@ The module currently declares:
 - Network authorization: `aws_security_group`, `aws_vpc_security_group_ingress_rule`, and
   `aws_vpc_security_group_egress_rule` resources.
 - Addressing: `aws_network_interface`, `aws_eip`, and `aws_eip_association` resources.
-- Storage: stable and refresh `aws_ebs_volume` and `aws_volume_attachment` resources.
+- Storage: one `aws_ebs_volume` resource and one `aws_volume_attachment` resource.
 - Data: `aws_db_instance` resources.
 - Routing: `aws_lb`, `aws_lb_target_group`, `aws_lb_target_group_attachment`,
   `aws_lb_listener`, `aws_lb_listener_rule`, and `aws_lb_listener_certificate` resources.

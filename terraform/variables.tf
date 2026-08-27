@@ -421,6 +421,32 @@ variable "all_systems" {
     ])
   }
 
+  # The standalone maps use "<hostname>-ebs-<resource_key>" as their resource address. Because
+  # either component may itself contain "-ebs-", uniqueness of the components does not imply
+  # uniqueness of the generated key. Match the locals' normalized, per-region partition so an
+  # identical key in two different regions remains valid.
+  validation {
+    condition = alltrue([
+      for region in var.aws_config.regions :
+      length(distinct(compact(flatten([
+        for system in var.all_systems : [
+          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
+          try("${system.hostname}-ebs-${volume.resource_key}", null)
+        ] if try(replace(system.region, "-", "_") == region, false)
+        ])))) == length(compact(flatten([
+        for system in var.all_systems : [
+          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
+          try("${system.hostname}-ebs-${volume.resource_key}", null)
+        ] if try(replace(system.region, "-", "_") == region, false)
+      ])))
+    ])
+    error_message = join(" ", [
+      "Every generated all_systems EBS volume key must be unique within its normalized region;",
+      "choose hostname and resource_key combinations whose <hostname>-ebs-<resource_key> values",
+      "differ.",
+    ])
+  }
+
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : system.ebs_block_devices == null ? [] : [
@@ -879,6 +905,517 @@ variable "all_systems" {
     error_message = join(" ", [
       "Each all_systems readiness_script_dir must be null, which selects /home/ec2-user, or an",
       "absolute path with no trailing slash.",
+    ])
+  }
+}
+
+variable "shared_ebs_volumes" {
+  description = <<-EOT
+    Define encrypted io2 EBS Multi-Attach volumes shared by existing systems in one Availability
+    Zone. AWS additionally requires Nitro instances and a multi-writer-safe clustered storage
+    design; ordinary filesystems are not safe for concurrent writers. Each volume supports at most
+    16 attachments. These are new resources: do not move an existing standalone volume into this
+    map, because the pinned provider treats enabling Multi-Attach as a replacement operation. An
+    empty map creates no shared volumes or attachments.
+  EOT
+
+  type = map(object({
+    region            = string
+    availability_zone = string
+    aws_kms_alias     = string
+    iops              = string
+    volume_size       = string
+    tags              = map(string)
+    attachments = list(object({
+      hostname     = string
+      device_index = number
+    }))
+  }))
+
+  default  = {}
+  nullable = false
+
+  # The map key is rendered verbatim as the EC2 Name tag value. EC2 tag values are limited to
+  # 256 Unicode characters, so reject an otherwise-valid resource key before CreateVolume.
+  validation {
+    condition = alltrue([
+      for volume_key in keys(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
+      length(volume_key) <= 256
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes map key must be at most 256 characters because it is rendered",
+      "verbatim as the EC2 Name tag value.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume != null &&
+        volume.region != null &&
+        volume.availability_zone != null &&
+        volume.aws_kms_alias != null &&
+        volume.iops != null &&
+        volume.volume_size != null,
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes volume scalar must be non-null: region, availability_zone,",
+      "aws_kms_alias, iops, and volume_size all require real values.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true : volume.tags != null,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes tags map must be non-null; use {} for no tags."
+  }
+
+  # Validate the map EC2 actually receives. merge() replaces exact duplicate keys, and the six
+  # identity tags plus Name are written after the consumer map. EC2 permits at most 50 tags on a
+  # resource; AWS-generated aws:* tags are not represented here and do not count toward the limit.
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.tags == null ? true :
+        length(merge(volume.tags, {
+          CommitSha    = ""
+          Environment  = ""
+          ManagedBy    = ""
+          Name         = ""
+          Repository   = ""
+          RepositoryId = ""
+          RunId        = ""
+        })) <= 50,
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes rendered tag map must contain at most 50 tags after the six",
+      "framework identity tags and Name are merged.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true : volume.attachments != null,
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes attachments list must be non-null; use a non-empty list of",
+      "attachment objects.",
+    ])
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          attachment != null && attachment.hostname != null,
+          false,
+        )
+      ]
+    ]))
+    error_message = "Each shared_ebs_volumes attachment hostname must be non-null."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          attachment != null && attachment.device_index != null,
+          false,
+        )
+      ]
+    ]))
+    error_message = "Each shared_ebs_volumes attachment device_index must be non-null."
+  }
+
+  # merge() keeps the later value for a duplicate key. Reject a shared key that would otherwise
+  # replace an existing standalone volume at the same resource address.
+  validation {
+    condition = alltrue([
+      for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : try(
+        volume == null ? true :
+        volume.region == null ? true :
+        !contains(flatten([
+          for system in var.all_systems : [
+            for standalone in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
+            "${system.hostname}-ebs-${standalone.resource_key}"
+          ] if replace(system.region, "-", "_") == replace(volume.region, "-", "_")
+        ]), volume_key),
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes map key must be distinct from every generated standalone EBS",
+      "volume key in the same region.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true : (
+          (volume.iops == null ? true : can(tonumber(volume.iops))) &&
+          (volume.volume_size == null ? true : can(tonumber(volume.volume_size)))
+        ),
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes iops and volume_size value must be numeric."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.iops == null ? true :
+        !can(tonumber(volume.iops)) ? true :
+        tonumber(volume.iops) == floor(tonumber(volume.iops)),
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes iops value must be an integer."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.volume_size == null ? true :
+        !can(tonumber(volume.volume_size)) ? true :
+        tonumber(volume.volume_size) == floor(tonumber(volume.volume_size)),
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes volume_size value must be an integer."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.iops == null ? true :
+        !can(tonumber(volume.iops)) ? true :
+        tonumber(volume.iops) >= 100,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes iops value must be at least 100."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.iops == null ? true :
+        !can(tonumber(volume.iops)) ? true :
+        tonumber(volume.iops) <= 256000,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes iops value must be at most 256000."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.volume_size == null ? true :
+        !can(tonumber(volume.volume_size)) ? true :
+        tonumber(volume.volume_size) >= 4,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes volume_size value must be at least 4 GiB."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.volume_size == null ? true :
+        !can(tonumber(volume.volume_size)) ? true :
+        tonumber(volume.volume_size) <= 65536,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes volume_size value must be at most 65536 GiB."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.iops == null ? true :
+        volume.volume_size == null ? true :
+        !can(tonumber(volume.iops)) ? true :
+        !can(tonumber(volume.volume_size)) ? true :
+        tonumber(volume.iops) <= 1000 * tonumber(volume.volume_size),
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes iops value must be at most 1000 times its volume_size in GiB.",
+    ])
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          attachment == null ? true :
+          attachment.device_index == null ? true :
+          floor(attachment.device_index) == attachment.device_index,
+          false,
+        )
+      ]
+    ]))
+    error_message = "Each shared_ebs_volumes attachment device_index must be an integer."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          attachment == null ? true :
+          attachment.device_index == null ? true :
+          (attachment.device_index >= 0 && attachment.device_index <= 22),
+          false,
+        )
+      ]
+    ]))
+    error_message = join(" ", [
+      "Each shared_ebs_volumes attachment device_index must be from 0 through 22.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.attachments == null ? true :
+        length(volume.attachments) >= 1,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes entry must have at least one attachment."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.attachments == null ? true :
+        length(volume.attachments) <= 16,
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes entry supports at most 16 attachments."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.attachments == null ? true :
+        alltrue([
+          for attachment in volume.attachments : try(
+            attachment != null && attachment.hostname != null,
+            false,
+          )
+          ]) ? length(distinct([
+            for attachment in volume.attachments : attachment.hostname
+        ])) == length(volume.attachments) : true,
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Each shared_ebs_volumes attachment hostname may appear only once per volume.",
+    ])
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          attachment == null ? true :
+          attachment.hostname == null ? true :
+          contains([for system in var.all_systems : system.hostname], attachment.hostname),
+          false,
+        )
+      ]
+    ]))
+    error_message = "Each shared_ebs_volumes attachment hostname must name an all_systems entry."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for volume in try(values(var.shared_ebs_volumes), []) : [
+        for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+          volume == null ? true :
+          volume.availability_zone == null ? true :
+          attachment == null ? true :
+          attachment.hostname == null ? true :
+          !contains([for system in var.all_systems : system.hostname], attachment.hostname) ? true :
+          [
+            for system in var.all_systems : system.availability_zone
+            if system.hostname == attachment.hostname
+          ][0] == volume.availability_zone,
+          false,
+        )
+      ]
+    ]))
+    error_message = join(" ", [
+      "Each shared_ebs_volumes attachment must name a system in the volume's Availability Zone.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.region == null ? true :
+        contains(var.aws_config.regions, replace(volume.region, "-", "_")),
+        false,
+      )
+    ])
+    error_message = "Each shared_ebs_volumes region must normalize to one of aws_config.regions."
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.aws_kms_alias == null ? true :
+        !startswith(volume.aws_kms_alias, "alias/"),
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "shared_ebs_volumes aws_kms_alias must NOT include the 'alias/' prefix (it is added",
+      "automatically).",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for volume in try(values(var.shared_ebs_volumes), []) : try(
+        volume == null ? true :
+        volume.tags == null ? true :
+        alltrue([
+          for key in keys(volume.tags) : !contains(
+            [
+              "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
+              "runid",
+            ],
+            lower(key),
+          )
+        ]),
+        false,
+      )
+    ])
+    error_message = join(" ", [
+      "Name, Environment, ManagedBy, Repository, RepositoryId, CommitSha, and RunId are written",
+      "by this framework and would be silently overwritten; shared_ebs_volumes tags must not set",
+      "them in any letter case.",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      try(length(distinct(concat(
+        [
+          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
+          volume.device_index
+        ],
+        flatten([
+          for volume in try(values(var.shared_ebs_volumes), []) : [
+            for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
+            attachment.device_index if try(
+              attachment != null &&
+              attachment.hostname != null &&
+              attachment.device_index != null &&
+              attachment.hostname == system.hostname,
+              false,
+            )
+          ]
+        ]),
+        ))) == length(concat(
+        [
+          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
+          volume.device_index
+        ],
+        flatten([
+          for volume in try(values(var.shared_ebs_volumes), []) : [
+            for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
+            attachment.device_index if try(
+              attachment != null &&
+              attachment.hostname != null &&
+              attachment.device_index != null &&
+              attachment.hostname == system.hostname,
+              false,
+            )
+          ]
+        ]),
+      )), false)
+    ])
+    error_message = join(" ", [
+      "Each host's device_index claims must be unique across all_systems ebs_block_devices and",
+      "every shared_ebs_volumes attachment.",
+    ])
+  }
+
+  # The target AMI's platform is data-resolved, so conservatively reserve both spellings for every
+  # shared device index just as the standalone-volume validation does above.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for volume in try(values(var.shared_ebs_volumes), []) : [
+          for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
+            attachment == null ? true :
+            attachment.device_index == null ? true :
+            floor(attachment.device_index) != attachment.device_index ? true :
+            attachment.device_index < 0 || attachment.device_index > 22 ? true :
+            !contains(
+              [
+                for override in(
+                  system.ami_block_device_overrides == null ? [] : system.ami_block_device_overrides
+                ) : override.device_name
+              ],
+              "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + attachment.device_index))}",
+            ) &&
+            !contains(
+              [
+                for override in(
+                  system.ami_block_device_overrides == null ? [] : system.ami_block_device_overrides
+                ) : override.device_name
+              ],
+              "xvd${jsondecode(format("\"\\u%04x\"", 100 + attachment.device_index))}",
+            ),
+            false,
+            ) if try(
+            attachment != null &&
+            attachment.hostname != null &&
+            attachment.hostname == system.hostname,
+            false,
+          )
+        ]
+      ]
+    ]))
+    error_message = join(" ", [
+      "Each shared_ebs_volumes attachment device_index must be distinct from its host's",
+      "ami_block_device_overrides in both /dev/sdd../dev/sdz and xvdd..xvdz spellings.",
     ])
   }
 }

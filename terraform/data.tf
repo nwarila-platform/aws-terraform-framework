@@ -125,6 +125,10 @@ data "aws_kms_alias" "us_east_1" {
       for database in var.all_databases : database.aws_kms_alias
       if replace(database.region, "-", "_") == "us_east_1"
     ],
+    [
+      for volume in values(var.shared_ebs_volumes) : volume.aws_kms_alias
+      if replace(volume.region, "-", "_") == "us_east_1"
+    ],
   )))
 
   # Define the KMS Alias Properties
