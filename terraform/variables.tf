@@ -172,8 +172,18 @@ variable "all_systems" {
         interface_type = string
         # Omit (null) to let AWS pick a free address from the subnet CIDR. A pinned address is
         # checked against the real subnet at plan time by a network-interface precondition.
-        private_ip      = string
-        security_groups = list(string)
+        private_ip = string
+        # Further private IPv4 addresses this interface carries alongside private_ip, for software
+        # that must own an address the operating system itself never configures - a Windows failover
+        # cluster brings its client access point online on one of these, and AWS requires such an
+        # address to already exist on the owning interface. Null and [] are both the off switch and
+        # leave the interface exactly as it was before this attribute existed. A non-empty list
+        # requires a non-null private_ip, because the framework then hands AWS an ordered list whose
+        # first element becomes the interface's primary address; that primary has to be the one the
+        # consumer authored, not one AWS picked. Values pass through unchanged, must be distinct
+        # across every address in the subnet, and the provider and AWS validate their spelling.
+        additional_private_ips = optional(list(string))
+        security_groups        = list(string)
         # Non-null ingress and egress declare this interface's own group, named
         # "<hostname>-eni-<interface index>-sg" and attached only to this interface. Both null
         # means attach only the pre-created groups listed above. At creation, the group's
@@ -787,22 +797,70 @@ variable "all_systems" {
   validation {
     condition = length(flatten([
       for system in var.all_systems : [
-        for nic in(system.network_interfaces == null ? [] : system.network_interfaces) :
-        "${system.subnet_id}|${nic.private_ip}"
-        if nic.private_ip != null
+        for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
+          for address in concat(
+            nic.private_ip == null ? [] : [nic.private_ip],
+            nic.additional_private_ips == null ? [] : nic.additional_private_ips,
+          ) :
+          "${system.subnet_id}|${address}"
+          if address != null
+        ]
       ]
       ])) == length(distinct(flatten([
         for system in var.all_systems : [
-          for nic in(system.network_interfaces == null ? [] : system.network_interfaces) :
-          "${system.subnet_id}|${nic.private_ip}"
-          if nic.private_ip != null
+          for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
+            for address in concat(
+              nic.private_ip == null ? [] : [nic.private_ip],
+              nic.additional_private_ips == null ? [] : nic.additional_private_ips,
+            ) :
+            "${system.subnet_id}|${address}"
+            if address != null
+          ]
         ]
     ])))
     error_message = join(" ", [
-      "Each pinned all_systems network_interfaces private_ip must be unique within its subnet;",
-      "two interfaces in one subnet cannot claim the same address. Leave private_ip null to let",
-      "AWS",
-      "pick.",
+      "Each pinned all_systems network_interfaces private IPv4 address must be unique within its",
+      "subnet, counting private_ip and every additional_private_ips entry together; two interfaces",
+      "cannot claim the same address and one interface cannot repeat one. Leave private_ip null to",
+      "let AWS pick.",
+    ])
+  }
+
+  # The first element of the ordered list the provider receives is the address AWS marks primary, so
+  # an interface asking for further addresses has to name that primary itself. With private_ip null
+  # there is nothing to put first, and one of the additional addresses would be promoted - the exact
+  # opposite of what a cluster address is for, since the operating system configures the primary and
+  # a cluster address has to stay unconfigured for the cluster to bring it online.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in(system.network_interfaces == null ? [] : system.network_interfaces) :
+        nic.private_ip != null
+        if length(nic.additional_private_ips == null ? [] : nic.additional_private_ips) > 0
+      ]
+    ]))
+    error_message = join(" ", [
+      "A network interface that sets additional_private_ips must also pin private_ip: the primary",
+      "address is the one the operating system configures and it cannot be left for AWS to pick.",
+    ])
+  }
+
+  # A written additional address is a value, not an omission. The attribute's own null and an empty
+  # list are the off switch; once a list has entries, a null or blank one is silently discarded by
+  # the provider's expander and the interface is created carrying fewer addresses than authored.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
+        for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
+          for address in(nic.additional_private_ips == null ? [] : nic.additional_private_ips) :
+          try(address != "" && trimspace(address) == address, false)
+        ]
+      ]
+    ]))
+    error_message = join(" ", [
+      "Each all_systems network_interfaces additional_private_ips entry must be a non-null,",
+      "non-empty address with no surrounding whitespace; use null or [] to request no further",
+      "addresses.",
     ])
   }
 

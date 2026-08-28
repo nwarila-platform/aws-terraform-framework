@@ -5961,3 +5961,832 @@ run "all_systems_allows_auto_assigned_private_ip_in_a_preexisting_subnet" {
     error_message = "Interfaces omitting private_ip in a pre-existing subnet must leave private_ips null on every interface so AWS assigns each address."
   }
 }
+
+# An interface that asks for further addresses is handed the ordered provider form, so the authored
+# order survives to AWS and element 0 is the address AWS marks primary. private_ips is null on that
+# interface and, being computed, is unknown in the plan - the local carries the authored intent, so
+# the resource is asserted for the form it does configure and the local for the form it suppresses.
+run "network_interfaces_carry_additional_private_addresses_in_authored_order" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "wsfc-node"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-cluster"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Cluster node carrying its client access point addresses"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.100", "10.0.1.101"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      aws_network_interface.us_east_1["wsfc-node-eni-0"].private_ip_list == tolist([
+        "10.0.1.10",
+        "10.0.1.100",
+        "10.0.1.101",
+      ]),
+      aws_network_interface.us_east_1["wsfc-node-eni-0"].private_ip_list_enabled == true,
+      local.elastic_network_interfaces.us_east_1["wsfc-node-eni-0"].private_ips == null,
+    ])
+    error_message = "An interface declaring further addresses must receive them as one ordered list led by its authored private_ip, because the unordered set would hand AWS a primary chosen by hash order."
+  }
+}
+
+# The zero-diff proof. A system that never mentions the attribute must produce exactly the interface
+# keys and attribute values it produced before the attribute existed: the unordered set for a pinned
+# address, nulls throughout for an auto-assigned one, and the ordered form left entirely switched off.
+run "network_interfaces_omitting_additional_private_ips_plan_unchanged" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "unchanged-consumer"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-unchanged"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Pinned consumer that never mentions the new attribute"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.2.10"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = toset(keys(aws_network_interface.us_east_1)) == toset([
+      "unchanged-consumer-eni-0",
+      "unchanged-consumer-eni-1",
+    ])
+    error_message = "Omitting additional_private_ips must not add, remove, or rekey any network interface."
+  }
+
+  assert {
+    condition = alltrue([
+      aws_network_interface.us_east_1["unchanged-consumer-eni-0"].private_ips == toset(["10.0.2.10"]),
+      aws_network_interface.us_east_1["unchanged-consumer-eni-0"].private_ip_list_enabled == false,
+      aws_network_interface.us_east_1["unchanged-consumer-eni-1"].private_ip_list_enabled == false,
+      local.elastic_network_interfaces.us_east_1["unchanged-consumer-eni-0"].private_ip_list == null,
+      local.elastic_network_interfaces.us_east_1["unchanged-consumer-eni-1"].private_ips == null,
+      local.elastic_network_interfaces.us_east_1["unchanged-consumer-eni-1"].private_ip_list == null,
+    ])
+    error_message = "A consumer that never mentions additional_private_ips must keep the exact addressing it had before the attribute existed."
+  }
+}
+
+# Both off spellings have to reach the same place. If [] engaged the ordered form it would rewrite a
+# consumer's interface into a one-element list and move the attribute that carries it, which is a
+# diff for a consumer that asked for nothing.
+run "network_interfaces_treat_null_and_empty_additional_private_ips_alike" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "off-switch"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-offswitch"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Both documented off spellings side by side"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.3.10"
+            additional_private_ips = null
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          },
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.3.11"
+            additional_private_ips = []
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      aws_network_interface.us_east_1["off-switch-eni-0"].private_ips == toset(["10.0.3.10"]),
+      aws_network_interface.us_east_1["off-switch-eni-1"].private_ips == toset(["10.0.3.11"]),
+      aws_network_interface.us_east_1["off-switch-eni-0"].private_ip_list_enabled == false,
+      aws_network_interface.us_east_1["off-switch-eni-1"].private_ip_list_enabled == false,
+      local.elastic_network_interfaces.us_east_1["off-switch-eni-0"].private_ip_list == null,
+      local.elastic_network_interfaces.us_east_1["off-switch-eni-1"].private_ip_list == null,
+    ])
+    error_message = "An empty additional_private_ips list must be the same off switch as null and must leave the interface on the unordered set."
+  }
+}
+
+run "all_systems_rejects_additional_private_ip_equal_to_its_own_primary" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "dup-own-primary"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "An interface repeating its own primary as a further address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.10"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_duplicate_addresses_within_one_additional_private_ips_list" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "dup-within-list"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "One list naming the same address twice"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.100", "10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_additional_private_ip_claimed_by_another_interface" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "dup-across-interfaces"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "A further address colliding with a second interface's primary"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.20"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          },
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = "10.0.1.20"
+            security_groups = ["sg-eeeeeeee"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_duplicate_additional_private_ips_across_systems_in_one_subnet" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "dup-additional-a"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-shared"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "First claimant of a shared-subnet cluster address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      },
+      {
+        region                     = "us-east-1"
+        hostname                   = "dup-additional-b"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-shared"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Second claimant of the same cluster address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.11"
+            additional_private_ips = ["10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_additional_private_ips_without_a_pinned_primary" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "no-primary"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Further addresses with no authored primary to lead them"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = null
+            additional_private_ips = ["10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_empty_additional_private_ip_entry" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "blank-entry"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "A blank string standing in for an address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = [""]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_null_additional_private_ip_entry" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "null-entry"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-test"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "A null standing in for an address"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = [null]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+# The collision rule is scoped to a subnet, and widening it to the whole authored address set must
+# not have widened that scope: two systems in different subnets may still name the same address.
+run "all_systems_allows_one_additional_address_reused_across_distinct_subnets" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "reuse-additional-a"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-alpha"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Cluster address in the first subnet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      },
+      {
+        region                     = "us-east-1"
+        hostname                   = "reuse-additional-b"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-beta"
+        key_name                   = "test-key"
+        iam_instance_profile       = "test-profile"
+        aws_kms_alias              = "test"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = false
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "The same cluster address in a second subnet"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            description            = null
+            interface_type         = null
+            ingress                = null
+            egress                 = null
+            private_ip             = "10.0.1.10"
+            additional_private_ips = ["10.0.1.100"]
+            security_groups        = ["sg-eeeeeeee"]
+            tags                   = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  assert {
+    condition = alltrue([
+      aws_network_interface.us_east_1["reuse-additional-a-eni-0"].private_ip_list == tolist(["10.0.1.10", "10.0.1.100"]),
+      aws_network_interface.us_east_1["reuse-additional-b-eni-0"].private_ip_list == tolist(["10.0.1.10", "10.0.1.100"]),
+    ])
+    error_message = "Two systems in different subnets must each be able to name the same further address, exactly as they can for a primary."
+  }
+}
