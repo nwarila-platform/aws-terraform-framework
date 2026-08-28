@@ -4073,18 +4073,20 @@ run "systems_render_readiness_user_data_per_os" {
     error_message = "Windows instances should receive rendered SSH user_data."
   }
 
-  # Windows enables and starts sshd, then installs the launch key, because EC2Launch populates
-  # the Administrator password path rather than administrators_authorized_keys. It must not
-  # INSTALL OpenSSH - the capability is AMI responsibility.
+  # Windows installs OpenSSH when the image lacks it, enables and starts sshd, then installs the
+  # launch key, because EC2Launch populates the Administrator password path rather than
+  # administrators_authorized_keys. With windows_fod_source unset the install branch renders an
+  # empty bucket, so an image without OpenSSH fails loudly at boot.
   assert {
     condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Add-WindowsCapability -Online -Name $capability -Source $stagingDir -LimitAccess"),
+      can(regex("[$]fodBucket\\s+= \"\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Set-Service -Name sshd -StartupType Automatic"),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Start-Service -Name sshd"),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "administrators_authorized_keys"),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "X-aws-ec2-metadata-token"),
-      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Add-WindowsCapability"),
     ])
-    error_message = "Windows user_data must enable and start sshd and install the launch key, without installing the OpenSSH capability."
+    error_message = "Windows user_data must install OpenSSH from the FoD source when absent, enable and start sshd, and install the launch key."
   }
 
   assert {
@@ -4109,6 +4111,98 @@ run "systems_render_readiness_user_data_per_os" {
   assert {
     condition     = local.elastic_compute_cloud.us_east_1["linux-ssh"].user_data != local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data
     error_message = "Linux and Windows user_data should differ so platform-based OS selection is covered."
+  }
+}
+
+run "systems_render_windows_fod_bucket_into_user_data" {
+  command = plan
+
+  variables {
+    windows_fod_source = {
+      bucket     = "123456789012-apprepo"
+      region     = "us-west-2"
+      key_prefix = "windows/fod"
+    }
+
+    all_systems = [
+      {
+        region               = "us-east-1"
+        hostname             = "win-ssh-01"
+        availability_zone    = "us-east-1a"
+        subnet_id            = "subnet-west-windows"
+        key_name             = "west-key"
+        iam_instance_profile = "example-instance-profile"
+        aws_kms_alias        = "west"
+        ami                  = "windows@2022"
+
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+
+        tags = {
+          Function = "Windows SSH user data"
+          Backup   = true
+        }
+
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+
+        ebs_block_devices = []
+
+        ami_block_device_overrides = []
+
+        network_interfaces = [
+          {
+            private_ip      = "10.0.8.11"
+            security_groups = ["sg-11111111"]
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            tags            = {}
+          }
+        ]
+
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
+    values = {
+      state            = "available"
+      id               = "ami-00000000000000006"
+      platform         = "windows"
+      platform_details = "Windows"
+    }
+  }
+
+  # Bucket, its region and the key prefix are rendered in at plan time and must reach the script
+  # verbatim: Read-S3Object signs for the bucket's region (not the instance's) and pulls
+  # <key_prefix>/<build>/<cab>. Nothing about the bucket is looked up on the instance.
+  assert {
+    condition = alltrue([
+      can(regex("[$]fodBucket\\s+= \"123456789012-apprepo\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
+      can(regex("[$]fodRegion\\s+= \"us-west-2\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
+      can(regex("[$]fodKeyPrefix\\s+= \"windows/fod\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key \"$fodKeyPrefix/$build/$cab\" -File \"$stagingDir\\$cab\""),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "placement/region"),
+    ])
+    error_message = "windows_fod_source must render bucket, region and key_prefix into the Windows SSH user_data for Read-S3Object, with no instance-side region lookup."
   }
 }
 

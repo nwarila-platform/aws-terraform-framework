@@ -1824,6 +1824,59 @@ variable "aws_config" {
   }
 }
 
+variable "windows_fod_source" {
+  description = <<-EOT
+    Where the Windows SSH bootstrap fetches Feature-on-Demand payloads to install OpenSSH.Server on
+    images that ship without it (Server 2022), since an isolated instance cannot reach Windows
+    Update. One account-wide bucket, rendered into user_data at plan time - nothing is looked up
+    on the instance. bucket is its name; region is the region it lives in, which S3 requests are
+    signed for (the instance needs a route to S3 there: a gateway endpoint when it is the
+    instance's own region, otherwise an internet or NAT route); key_prefix is the folder under
+    which cabs sit as <key_prefix>/<OS build>/<package>.cab (e.g.
+    fod/20348/OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab), no leading or trailing slash.
+    Instance roles need s3:GetObject on <key_prefix>/* in this bucket. Null disables the step; a
+    Windows image lacking OpenSSH then fails loudly at boot instead of stranding an unreachable
+    instance.
+  EOT
+  type = object({
+    bucket     = string
+    region     = string
+    key_prefix = string
+  })
+
+  default = null
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.windows_fod_source.bucket)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.bucket must be a valid S3 bucket name: lowercase letters, digits, dots",
+      "and hyphens, 3-63 characters, starting and ending alphanumeric.",
+    ])
+  }
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]$", var.windows_fod_source.region)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.region must be the AWS region the bucket lives in, written like",
+      "us-east-1 or us-gov-west-1.",
+    ])
+  }
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[^/](.*[^/])?$", var.windows_fod_source.key_prefix)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.key_prefix must be a non-empty key prefix with no leading or trailing",
+      "slash, such as fod or windows/fod; the bootstrap appends /<OS build>/<package>.cab.",
+    ])
+  }
+}
+
 variable "all_load_balancers" {
   description = <<-EOT
     Define all Elastic Load Balancers managed by this framework.
