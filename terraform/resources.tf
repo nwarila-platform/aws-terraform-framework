@@ -244,12 +244,17 @@ resource "aws_network_interface" "us_east_1" {
   for_each = local.elastic_network_interfaces.us_east_1
 
   # Define the Elastic Network Interface Properties
-  description     = each.value.description
-  interface_type  = each.value.interface_type
-  private_ips     = each.value.private_ips
-  security_groups = each.value.security_groups
-  subnet_id       = each.value.subnet_id
-  tags            = each.value.tags
+  description    = each.value.description
+  interface_type = each.value.interface_type
+  # An interface carrying further addresses is handed the ordered list, whose first element AWS marks
+  # primary; every other interface keeps the unordered set. Exactly one of the two is non-null, which
+  # is what the provider's mutual exclusivity requires.
+  private_ip_list         = each.value.private_ip_list
+  private_ip_list_enabled = each.value.private_ip_list_enabled
+  private_ips             = each.value.private_ips
+  security_groups         = each.value.security_groups
+  subnet_id               = each.value.subnet_id
+  tags                    = each.value.tags
 
   # These two checks used to be variable validations fed by caller-declared subnet metadata. The
   # subnet is now read directly, so they compare against the real thing instead - which means they
@@ -290,6 +295,59 @@ resource "aws_network_interface" "us_east_1" {
         each.value.hostname,
         each.value.subnet_id,
         data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block,
+      )
+    }
+
+    # Every further address has to clear the same subnet and reserved-range test as the primary; a
+    # cluster address outside the CIDR or on a reserved host fails at AssignPrivateIpAddresses,
+    # after the interface already exists.
+    precondition {
+      condition = alltrue([
+        for address in each.value.additional_private_ips : (
+          cidrhost(
+            "${address}/${split("/", data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block)[1]}",
+            0
+          ) == cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, 0) &&
+          !contains(
+            [
+              for reserved in [0, 1, 2, 3, -1] :
+              cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, reserved)
+            ],
+            address,
+          )
+        )
+      ])
+      error_message = format(
+        "An additional_private_ips entry on %s (%v) falls outside subnet %s (%s) or lands on one of the five addresses AWS reserves in it.",
+        each.value.hostname,
+        each.value.additional_private_ips,
+        each.value.subnet_id,
+        data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block,
+      )
+    }
+
+    # The ordered form's whole contract is that element 0 is the address AWS marks primary, but the
+    # provider fills private_ip_list straight from the order AWS happened to return and never reads
+    # the per-address primary flag. private_ip comes from the API's own scalar primary field, so
+    # comparing the two checks the contract against an independent source. The address set is
+    # compared as well, because the provider discards an element it cannot expand rather than
+    # refusing it, which would otherwise leave the interface carrying fewer addresses than authored
+    # with no diagnostic anywhere. Order among the secondaries is AWS's to choose.
+    postcondition {
+      condition = (
+        each.value.private_ip_list == null ||
+        (
+          self.private_ip == each.value.private_ip_list[0] &&
+          toset(self.private_ip_list) == toset(each.value.private_ip_list)
+        )
+      )
+      error_message = format(
+        "Network interface %s was authored with primary address %s and addresses %v, but AWS reports primary %s and addresses %v. Every further address must reach the interface and must remain a secondary the operating system never configures.",
+        each.key,
+        each.value.private_ip_list == null ? "" : each.value.private_ip_list[0],
+        each.value.private_ip_list,
+        self.private_ip,
+        self.private_ip_list,
       )
     }
   }

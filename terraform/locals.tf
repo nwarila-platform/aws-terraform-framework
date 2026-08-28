@@ -790,6 +790,59 @@ locals {
 
   #region ------ [ Elastic Network Interfaces (ENIs) ] ----------------------------------------- #
 
+  # Each interface's authored private IPv4 addresses, normalized. additional_private_ips has two off
+  # spellings - the attribute's own null and an empty list - and both have to mean "this interface is
+  # unchanged", so they collapse to one empty list here instead of at each place that reads them.
+  interface_authored_addresses = merge([
+    for system in var.all_systems : {
+      for index in range(length(system.network_interfaces)) :
+      "${system.hostname}-eni-${index}" => {
+        primary = system.network_interfaces[index].private_ip
+        additional = (
+          system.network_interfaces[index].additional_private_ips == null
+          ? []
+          : system.network_interfaces[index].additional_private_ips
+        )
+      }
+    }
+  ]...)
+
+  # What the provider is actually handed for each interface's private IPv4 addressing.
+  #
+  # An interface carrying at most one authored address keeps the unordered `private_ips` set this
+  # framework has always written, so an interface that asks for no further address plans no change.
+  #
+  # Further addresses move the interface to `private_ip_list`, which reaches AWS in authored order
+  # and whose first element AWS marks primary. The set cannot carry them, for two reasons. Its
+  # members reach AWS in SDKv2 hash order, so the primary would be whichever address hashed lowest
+  # rather than the one the consumer authored - for ["10.0.0.5", "10.0.0.6"] the primary becomes
+  # 10.0.0.6. And that 32-bit hash collides on real addresses: 10.200.129.167 and 10.200.142.0
+  # share one code, so a set holding both would silently keep only one. A Windows failover cluster
+  # needs the opposite of both: the node's own address primary, and every cluster address a
+  # secondary the operating system never configures.
+  #
+  # The provider declares the two mutually exclusive, so exactly one of them is ever non-null. An
+  # explicit null does not count as a configured value for that exclusivity, which is what lets both
+  # attributes stay listed on the resource.
+  interface_private_addressing = {
+    for key, addresses in local.interface_authored_addresses :
+    key => {
+      private_ip_list_enabled = length(addresses.additional) > 0
+
+      private_ips = (
+        length(addresses.additional) > 0 || addresses.primary == null
+        ? null
+        : [addresses.primary]
+      )
+
+      private_ip_list = (
+        length(addresses.additional) > 0
+        ? concat([addresses.primary], addresses.additional)
+        : null
+      )
+    }
+  }
+
   elastic_network_interfaces = {
     for region in var.aws_config.regions : region => merge([
       for system in var.all_systems : {
@@ -805,8 +858,11 @@ locals {
           # Null lets AWS pick a free address from the subnet CIDR. Carried both ways: the
           # scalar is what the pinned-address precondition reasons about, the list is what
           # the aws_network_interface attribute takes.
-          private_ip  = system.network_interfaces[index].private_ip
-          private_ips = system.network_interfaces[index].private_ip == null ? null : [system.network_interfaces[index].private_ip]
+          private_ip              = system.network_interfaces[index].private_ip
+          additional_private_ips  = local.interface_authored_addresses["${system.hostname}-eni-${index}"].additional
+          private_ips             = local.interface_private_addressing["${system.hostname}-eni-${index}"].private_ips
+          private_ip_list         = local.interface_private_addressing["${system.hostname}-eni-${index}"].private_ip_list
+          private_ip_list_enabled = local.interface_private_addressing["${system.hostname}-eni-${index}"].private_ip_list_enabled
           # The pre-existing security-group ids the consumer listed plus this interface's own
           # group when its rule collections are non-null. The same per-interface predicate guards
           # both validation and attachment, so an interface can never silently receive the VPC

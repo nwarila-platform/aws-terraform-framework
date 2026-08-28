@@ -48,8 +48,12 @@ all_systems = [
         # Null lets AWS pick a free address from the subnet CIDR, and the aws_instances output
         # reports whichever address it picked. Prefer this: a generated Ansible inventory reads
         # the address back after apply, so nothing needs it hand-allocated up front.
-        private_ip      = null
-        security_groups = ["sg-REPLACE_ME"]
+        private_ip = null
+        # Null is the off switch, and [] means the same: this interface carries the one address
+        # above and nothing more. An interface needs further addresses only when software on it
+        # owns an address the operating system itself never configures.
+        additional_private_ips = null
+        security_groups        = ["sg-REPLACE_ME"]
         # Non-null ingress and egress declare this interface's own "app01-eni-0-sg" group. Its
         # description and tags come from this same interface, and the framework attaches it only
         # here. security_groups remains exclusively for pre-created group IDs.
@@ -127,10 +131,16 @@ all_systems = [
         # IP. A pinned address must be a bare IPv4 address, unique within its subnet, inside the
         # subnet's real CIDR, and clear of the five addresses AWS reserves in every subnet (the
         # first four and the last). All of that is checked at plan time against the subnet itself.
-        private_ip      = "10.0.2.10"
-        security_groups = ["sg-REPLACE_ME"]
-        description     = null
-        interface_type  = null
+        private_ip = "10.0.2.10"
+        # Further addresses carried alongside the pinned one, for software that owns an address the
+        # operating system never configures - a Windows failover cluster brings its client access
+        # point online on one of these. Pinning private_ip is required alongside them: the first
+        # address is the one AWS marks primary and the operating system configures, so every address
+        # below stays a secondary. They share the primary's subnet-uniqueness rule.
+        additional_private_ips = ["10.0.2.100", "10.0.2.101"]
+        security_groups        = ["sg-REPLACE_ME"]
+        description            = null
+        interface_type         = null
         # Paired nulls are the off switch: attach only the pre-created group above.
         ingress = null
         egress  = null
