@@ -45,7 +45,7 @@ locals {
   # .block_device_mappings from here and never learn whether the id was pinned or resolved.
   amazon_machine_images = {
     for ami in local.ami_selectors : ami => {
-      us_east_1 = try(data.aws_ami.us_east_1_verified[ami], null)
+      us_east_1 = data.aws_ami.us_east_1_verified[ami]
     }
   }
 
@@ -56,13 +56,7 @@ locals {
 
   # The identity keys whose value is identical on every resource, applied as provider
   # default_tags in providers.tf.
-  #
-  # That placement is load-bearing, not stylistic. default_tags is the only mechanism that puts
-  # tags inside the create API call itself: RunInstances carries them in its TagSpecifications,
-  # so the volumes it creates are tagged as they are born and a launch policy conditioning on
-  # aws:RequestTag matches. Tags written in a resource's own tags block are applied by a separate
-  # CreateTags call after the resource exists - too late for that condition, which sees a request
-  # carrying no aws:RequestTag key at all and cannot match.
+
   #
   # This does not replace the per-resource tag maps. Those carry the keys whose value varies by
   # resource - Name, Index, DeviceName, OS, Backup, Function - which one static provider map
@@ -122,11 +116,7 @@ locals {
   #
   # The launch key is the only metadata read, so the IMDSv2 token is fetched right before it,
   # after the install, where a slow DISM run cannot outlive it.
-  #
-  # The launch key goes into administrators_authorized_keys before sshd starts, so the listener
-  # never accepts a connection it cannot authenticate. sshd only creates C:\ProgramData\ssh on
-  # its first start, so the bootstrap creates the directory itself - after a fresh capability
-  # install there is nothing there yet.
+
   #
   # The single try/catch is the whole failure path: any error - unstaged build, unset bucket,
   # missing S3 object, DISM rejecting the cab - becomes one readable line in the EC2Launch log
@@ -271,9 +261,9 @@ locals {
 
   #region ------ [ Readiness Gate Wait Commands ] ---------------------------------------------- #
 
-  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
-  # over SSH. Each blocks until the OS launch/provisioning agent reports completion after
-  # Terraform has first connected.
+  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate). Each blocks
+  # until the OS launch/provisioning agent reports completion after Terraform has first
+  # connected.
   windows_readiness_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
   linux_readiness_command   = "cloud-init status --wait"
 
@@ -288,15 +278,6 @@ locals {
 # Dynamically Configured LOCALS
 locals {
 
-  #region ------ [ EC2 Key Pairs ] ------------------------------------------------------------- #
-
-  # Every referenced key pair is pre-existing: this framework consumes key pairs, it never
-  # creates them, so the data lookup is the only source.
-  key_pair_names = {
-    us_east_1 = { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name }
-  }
-
-  #endregion --- [ EC2 Key Pairs ] ------------------------------------------------------------- #
 
 
   #region ------ [ Interface-Owned Security Groups ] ------------------------------------------- #
@@ -306,7 +287,7 @@ locals {
   # and VPC come from the parent system because every interface already uses that system's subnet.
   # Description and tags come from the interface itself; a null description uses a stable
   # framework string.
-  network_interface_security_groups = merge(concat([{}], [
+  network_interface_security_groups = merge([
     for system in var.all_systems : {
       for interface_index, network_interface in system.network_interfaces :
       "${system.hostname}-eni-${interface_index}-sg" => {
@@ -327,7 +308,7 @@ locals {
       }
       if network_interface.ingress != null && network_interface.egress != null
     }
-  ])...)
+  ]...)
 
   # Interface-owned security groups partitioned per region (same normalization rule the systems
   # use).
@@ -534,11 +515,16 @@ locals {
     ])
   }
 
-  # Empty when nothing grants access, and also when a region declares no systems: with nothing
-  # to attach to there is no group to build, and indexing an empty VPC list would fail.
+  # True when nothing grants access, and when a region declares no systems: with nothing to
+  # attach to there is no group to build, and indexing an empty VPC list would fail.
+  run_ingress_disabled = {
+    for region in var.aws_config.regions : region =>
+    length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0
+  }
+
   run_ingress_security_groups = {
     for region in var.aws_config.regions : region => (
-      length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0 ? {} : {
+      local.run_ingress_disabled[region] ? {} : {
         (local.runner_ingress_name) = {
 
           # AWS Security Group Properties
@@ -635,7 +621,7 @@ locals {
         # data-resolved and a variable validation cannot see it.
         connection_type     = coalesce(system.connection_type, "ssh")
         connection_protocol = local.connection_protocol[system.hostname]
-        connection_over_ssm = local.connection_over_ssm[system.hostname]
+
 
         # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
         # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
@@ -752,57 +738,47 @@ locals {
   # Config entries keyed by hostname across all regions (disjoint union; see above).
   systems_by_hostname = merge(values(local.elastic_compute_cloud)...)
 
-  # Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the
-  # readiness gate can pick the right login user and wait command per instance. Both platforms
-  # authenticate over SSH with the launch key pair (the Windows bootstrap installs the launch
-  # public key for Administrator); WinRM is decommissioned. Systems that set
-  # readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded entirely.
+  # Combine each instance's runtime facts (id, private IP) with its system's OS and transport, so
+  # the readiness gate can pick the right login user, wait command and connection per instance.
+  # Systems that set readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded
+  # entirely.
   readiness_targets = {
     for region in var.aws_config.regions : region => {
-      for hostname, instance in local.all_ec2_instances : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
+      for hostname, system in local.systems_by_hostname : hostname => {
+        id         = local.all_ec2_instances[hostname].id
+        private_ip = local.all_ec2_instances[hostname].private_ip
         # Everything the gate needs is decided here: the connection mechanics and both
         # OS-specific fallbacks, so the resource reads fields and makes no choices.
         readiness_user = coalesce(
-          local.systems_by_hostname[hostname].readiness_user,
-          local.systems_by_hostname[hostname].is_windows ? "Administrator" : "ec2-user",
+          system.readiness_user,
+          system.is_windows ? "Administrator" : "ec2-user",
         )
         readiness_command = coalesce(
-          local.systems_by_hostname[hostname].readiness_command,
-          local.systems_by_hostname[hostname].is_windows
-          ? local.windows_readiness_command
-          : local.linux_readiness_command,
+          system.readiness_command,
+          system.is_windows ? local.windows_readiness_command : local.linux_readiness_command,
         )
-        target_platform = local.systems_by_hostname[hostname].is_windows ? "windows" : "unix"
+        target_platform = system.is_windows ? "windows" : "unix"
         script_path = (
-          local.systems_by_hostname[hostname].is_windows
+          system.is_windows
           ? null
-          : format("%s/terraform_%%RAND%%.sh", coalesce(
-            local.systems_by_hostname[hostname].readiness_script_dir,
-            local.linux_readiness_script_dir,
-          ))
+          : "${coalesce(system.readiness_script_dir, local.linux_readiness_script_dir)}/terraform_%RAND%.sh"
         )
-        private_key_path = local.systems_by_hostname[hostname].readiness_private_key_path
+        private_key_path = system.readiness_private_key_path
 
         # WinRM reaches 5986 over TLS with a certificate the instance generated for itself, so the
         # client cannot verify it and insecure has to be true. NTLM carries the authentication.
-        connection_type     = local.systems_by_hostname[hostname].connection_type
-        connection_protocol = local.systems_by_hostname[hostname].connection_protocol
-        use_winrm           = local.systems_by_hostname[hostname].connection_protocol == "winrm"
-        winrm_port          = 5986
+        use_winrm  = system.connection_protocol == "winrm"
+        winrm_port = 5986
 
         # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
         # gate already requires. Only the ciphertext ever reaches state.
         password = (
-          local.systems_by_hostname[hostname].connection_protocol == "winrm" &&
-          local.systems_by_hostname[hostname].readiness_private_key_path != null
-          ? rsadecrypt(instance.password_data, file(local.systems_by_hostname[hostname].readiness_private_key_path))
+          system.connection_protocol == "winrm" && system.readiness_private_key_path != null
+          ? rsadecrypt(local.all_ec2_instances[hostname].password_data, file(system.readiness_private_key_path))
           : null
         )
       }
-      if local.systems_by_hostname[hostname].readiness_gate &&
-      local.systems_by_hostname[hostname].region == region
+      if system.readiness_gate && system.region == region
     }
   }
 
@@ -989,13 +965,12 @@ locals {
             iops                 = volume.iops
             kms_key_id           = system.aws_kms_alias
             multi_attach_enabled = null
-            refresh              = system.refresh
-            resource_key         = volume.resource_key
-            skip_destroy         = volume.skip_destroy
-            snapshot_id          = volume.snapshot_id
-            throughput           = volume.throughput
-            volume_size          = volume.volume_size
-            volume_type          = volume.volume_type
+
+            skip_destroy = volume.skip_destroy
+            snapshot_id  = volume.snapshot_id
+            throughput   = volume.throughput
+            volume_size  = volume.volume_size
+            volume_type  = volume.volume_type
 
             device_name = (
               local.elastic_compute_cloud[region][system.hostname].is_windows
@@ -1067,26 +1042,18 @@ locals {
       merge([
         for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : {
           for hostname in distinct([
-            for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
-            try(attachment.hostname, null)
+            for attachment in volume.attachments : attachment.hostname
             ]) : jsonencode([volume_key, hostname]) => {
             hostname     = hostname
             skip_destroy = false
             volume_key   = volume_key
 
-            device_name = try(local.elastic_compute_cloud[region][hostname].is_windows, false) ? (
-              "xvd${jsondecode(format("\"\\u%04x\"", 100 + [
-                for attachment in volume.attachments : attachment.device_index
-                if attachment.hostname == hostname
-              ][0]))}"
-              ) : (
-              "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + [
-                for attachment in volume.attachments : attachment.device_index
-                if attachment.hostname == hostname
-              ][0]))}"
-            )
+            device_name = "${local.elastic_compute_cloud[region][hostname].is_windows ? "xvd" : "/dev/sd"}${substr("defghijklmnopqrstuvwxyz", [
+              for attachment in volume.attachments : attachment.device_index
+              if attachment.hostname == hostname
+            ][0], 1)}"
           }
-          if try(hostname != null && contains(keys(local.elastic_compute_cloud[region]), hostname), false)
+          if contains(keys(local.elastic_compute_cloud[region]), hostname)
         }
         if try(replace(volume.region, "-", "_") == region, false)
       ]...),

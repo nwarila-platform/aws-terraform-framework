@@ -240,18 +240,7 @@ variable "all_systems" {
     condition = alltrue([
       for system in var.all_systems : (
         can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) ||
-        (
-          can(regex("^[a-z][a-z0-9-]+(@[0-9][0-9.]*)?$", system.ami)) &&
-          length(try(split(".", split("@", system.ami)[1]), [])) <= 3 &&
-          alltrue([
-            for index, segment in try(split(".", split("@", system.ami)[1]), []) :
-            can(regex("^[0-9]{1,4}$", segment)) ||
-            (
-              can(regex("^[0-9]{8}$", segment)) &&
-              index == length(try(split(".", split("@", system.ami)[1]), [])) - 1
-            )
-          ])
-        )
+        can(regex("^[a-z][a-z0-9-]+(@([0-9]{1,4}[.]){0,2}([0-9]{1,4}|[0-9]{8}))?$", system.ami))
       )
     ])
     error_message = join(" ", [
@@ -263,9 +252,6 @@ variable "all_systems" {
     ])
   }
 
-  # An omitted attribute is already rejected by the type checker, so this only fires on an
-  # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
-  # null there silently produces zero volumes instead of failing.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -300,6 +286,9 @@ variable "all_systems" {
     ])
   }
 
+  # An omitted attribute is already rejected by the type checker, so this only fires on an
+  # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
+  # null there silently produces zero volumes instead of failing.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -350,8 +339,7 @@ variable "all_systems" {
     ])
   }
 
-  # IMDS hop limit: explicit and bounded. 1 is the former hardcode; 2 exists only for
-  # container hosts whose workloads need IMDS credentials through Docker's NAT hop.
+
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -879,8 +867,7 @@ variable "all_systems" {
   }
 
   # Backup selects a normalized True/False tag, so it has to read as a boolean rather than as
-  # whatever string happens to be written. The object type enforced this by being typed bool;
-  # a map of strings cannot, so the check moves here.
+  # whatever string happens to be written.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -997,7 +984,7 @@ variable "shared_ebs_volumes" {
   # 256 Unicode characters, so reject an otherwise-valid resource key before CreateVolume.
   validation {
     condition = alltrue([
-      for volume_key in keys(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
+      for volume_key in keys(var.shared_ebs_volumes) :
       length(volume_key) <= 256
     ])
     error_message = join(" ", [
@@ -1324,11 +1311,10 @@ variable "shared_ebs_volumes" {
           volume.availability_zone == null ? true :
           attachment == null ? true :
           attachment.hostname == null ? true :
-          !contains([for system in var.all_systems : system.hostname], attachment.hostname) ? true :
-          [
-            for system in var.all_systems : system.availability_zone
+          alltrue([
+            for system in var.all_systems : system.availability_zone == volume.availability_zone
             if system.hostname == attachment.hostname
-          ][0] == volume.availability_zone,
+          ]),
           false,
         )
       ]
@@ -1716,7 +1702,7 @@ variable "run_id" {
   }
 }
 
-# Define Provider Configuration Options.
+
 variable "runner_ip" {
   description = <<-EOT
     Public IPv4 address of the CI runner that must reach every instance for the life of one run.

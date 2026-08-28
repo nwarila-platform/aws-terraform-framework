@@ -19,9 +19,9 @@ mock_provider "aws" {
 }
 
 # secure-wazuh-shaped baseline: a plain Linux system that references only pre-existing
-# infrastructure, sets both interface rule collections to null, and sets none of the managed_*
-# variables. It is the mechanical guarantee that this explicit pre-created-group path creates no
-# additional resources and preserves existing resource keys.
+# infrastructure and sets both interface rule collections to null. It is the mechanical guarantee
+# that this explicit pre-created-group path creates no additional resources and preserves existing
+# resource keys.
 variables {
   repository    = "nwarila-platform/aws-terraform-framework"
   repository_id = "123456789"

@@ -3,8 +3,6 @@
 
 terraform {
 
-  # Store state file in S3 bucket.
-  #
   # PARTIAL by design, split along ownership: the framework fixes the invariants that hold for
   # EVERY consumer, and the consumer supplies only what is specific to its deployment (bucket,
   # key, region) via -backend-config. Setting `encrypt` here rather than merely documenting it

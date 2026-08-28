@@ -256,9 +256,8 @@ resource "aws_network_interface" "us_east_1" {
   subnet_id               = each.value.subnet_id
   tags                    = each.value.tags
 
-  # These two checks used to be variable validations fed by caller-declared subnet metadata. The
-  # subnet is now read directly, so they compare against the real thing instead - which means they
-  # must be preconditions: a variable validation runs before any data source is read.
+  # A variable validation runs before any data source is read, so a check that compares against
+  # the real subnet has to be a precondition.
   lifecycle {
     precondition {
       condition = (
@@ -777,7 +776,7 @@ resource "aws_instance" "us_east_1" {
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
@@ -894,7 +893,7 @@ resource "aws_instance" "us_east_1_refresh" {
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
@@ -1049,18 +1048,19 @@ resource "aws_network_interface_attachment" "us_east_1_refresh" {
 
 #region ------ [ terraform_data.readiness_gate - us-east-1 ] ----------------------------------- #
 
-# Block `apply` until each instance finishes provisioning and is reachable over SSH — the single
-# readiness transport for every platform (WinRM is decommissioned). The connection retry
-# (10-minute timeout) waits for sshd; the OS-native inline command then waits for the launch agent
-# to finish (cloud-init on Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit.
-# Both platforms authenticate with the launch key pair (path supplied by
+# Block `apply` until each instance finishes provisioning and is reachable over the transport its
+# connection_type selects: SSH on either platform, or WinRM on a Windows system that asks for it.
+# The connection retry (10-minute timeout) waits for the listener; the OS-native inline command
+# then waits for the launch agent to finish (cloud-init on Linux, EC2Launch v2 on Windows) and
+# fails the apply on a non-zero exit. SSH authenticates with the launch key pair (path supplied by
 # each system's readiness_private_key_path; the Windows bootstrap installs the launch public key
-# for Administrator). No `host_key` is pinned: the instance host key is generated at first boot
-# and is not retrievable through the provider, so the gate trusts the first host answering at the
-# private IP. Public-key auth means the launch key cannot be captured, and the channel carries
-# only the launch-agent wait command. Systems with readiness_gate = false are absent from
-# readiness_targets and create no gate at all. On a SEPARATE terraform_data so a gate failure
-# taints only this resource, never the EC2 instance.
+# for Administrator), so the key cannot be captured; WinRM authenticates as Administrator with the
+# launch password, decrypted in flight with that same key. No `host_key` is pinned: the instance
+# host key is generated at first boot and is not retrievable through the provider, so the gate
+# trusts the first host answering at the private IP, and the channel carries only the launch-agent
+# wait command. Systems with readiness_gate = false are absent from readiness_targets and create
+# no gate at all. On a SEPARATE terraform_data so a gate failure taints only this resource, never
+# the EC2 instance.
 resource "terraform_data" "readiness_gate" {
 
   # Iterate through all Readiness Gates in the US-East-1 region.
@@ -1072,8 +1072,7 @@ resource "terraform_data" "readiness_gate" {
   }
 
   lifecycle {
-    # The WinRM/Windows rule lives on the instance, not here: a system reached over SSM has no
-    # readiness gate, so a copy of it on this resource would not cover "winrm-ssm".
+
     precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."
@@ -1174,10 +1173,10 @@ resource "aws_db_instance" "us_east_1" {
   vpc_security_group_ids              = each.value.vpc_security_group_ids
 
   dynamic "blue_green_update" {
-    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+    for_each = each.value.blue_green_update ? [true] : []
 
     content {
-      enabled = blue_green_update.value
+      enabled = true
     }
   }
 
