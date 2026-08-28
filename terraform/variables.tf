@@ -833,22 +833,20 @@ variable "all_systems" {
     ])
   }
 
-  # A written additional address is a value, not an omission. The attribute's own null and an empty
-  # list are the off switch; once a list has entries, a null or blank one is silently discarded by
-  # the provider's expander and the interface is created carrying fewer addresses than authored.
+  # The provider discards an element it cannot expand instead of refusing it, so a malformed entry
+  # creates the interface carrying fewer addresses than authored and reports nothing.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
         for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
           for address in(nic.additional_private_ips == null ? [] : nic.additional_private_ips) :
-          try(address != "" && trimspace(address) == address, false)
+          can(cidrhost("${address}/32", 0))
         ]
       ]
     ]))
     error_message = join(" ", [
-      "Each all_systems network_interfaces additional_private_ips entry must be a non-null,",
-      "non-empty address with no surrounding whitespace; use null or [] to request no further",
-      "addresses.",
+      "Each all_systems network_interfaces additional_private_ips entry must be a valid IP address;",
+      "use null or [] to request no further addresses.",
     ])
   }
 

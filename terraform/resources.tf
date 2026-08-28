@@ -317,9 +317,24 @@ resource "aws_network_interface" "us_east_1" {
         )
       ])
       error_message = format(
-        "An additional_private_ips entry on %s (%v) falls outside subnet %s (%s) or lands on one of the five addresses AWS reserves in it.",
+        "These additional_private_ips entries on %s (%v) fall outside subnet %s (%s) or land on one of the five addresses AWS reserves in it.",
         each.value.hostname,
-        each.value.additional_private_ips,
+        [
+          for address in each.value.additional_private_ips : address
+          if !(
+            cidrhost(
+              "${address}/${split("/", data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block)[1]}",
+              0
+            ) == cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, 0) &&
+            !contains(
+              [
+                for reserved in [0, 1, 2, 3, -1] :
+                cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, reserved)
+              ],
+              address,
+            )
+          )
+        ],
         each.value.subnet_id,
         data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block,
       )

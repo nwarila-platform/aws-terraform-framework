@@ -56,7 +56,6 @@ locals {
 
   # The identity keys whose value is identical on every resource, applied as provider
   # default_tags in providers.tf.
-
   #
   # This does not replace the per-resource tag maps. Those carry the keys whose value varies by
   # resource - Name, Index, DeviceName, OS, Backup, Function - which one static provider map
@@ -277,8 +276,6 @@ locals {
 
 # Dynamically Configured LOCALS
 locals {
-
-
 
   #region ------ [ Interface-Owned Security Groups ] ------------------------------------------- #
 
