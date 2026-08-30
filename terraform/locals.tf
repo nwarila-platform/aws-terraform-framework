@@ -99,6 +99,19 @@ locals {
     contains(["ssh-ssm", "winrm-ssm"], coalesce(system.connection_type, "ssh"))
   }
 
+  # The same fact published where a consumer can read it back. connection_type is terraform-side
+  # input and reaches no instance, so a dynamic inventory -- which sees only tags -- had no way to
+  # learn the transport it should use. Protocol and channel joined, because "ssh" alone does not
+  # say whether the system is reachable: "ssh-direct", "ssh-ssm", "winrm-direct", "winrm-ssm".
+  connection_tag = {
+    for system in var.all_systems : system.hostname =>
+    format(
+      "%s-%s",
+      local.connection_protocol[system.hostname],
+      local.connection_over_ssm[system.hostname] ? "ssm" : "direct",
+    )
+  }
+
   #endregion --- [ Connection Transport ] ------------------------------------------------------ #
 
 
@@ -730,8 +743,9 @@ locals {
           # Non-Overwritable Default Tags
           local.identity_tags,
           {
-            Name = system.hostname
-            OS   = local.amazon_machine_images[system.ami][region].platform_details
+            Connection = local.connection_tag[system.hostname]
+            Name       = system.hostname
+            OS         = local.amazon_machine_images[system.ami][region].platform_details
           }
         )
       }

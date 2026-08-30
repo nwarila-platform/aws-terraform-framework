@@ -73,7 +73,8 @@ tfvars cannot override who a deployment says it is:
 
 The framework writes `ManagedBy`, `Repository`, `RepositoryId`, `Environment`, `CommitSha`,
 and `RunId` into the tag map of every taggable resource it creates, alongside
-`Name` and the per-resource `OS`, `Index`, and `DeviceName` keys where they apply. Tags are
+`Name` and the per-resource `OS`, `Index`, `DeviceName`, and `Connection` keys where they
+apply. Tags are
 composed per resource rather than through provider `default_tags`, so each resource's own tag
 map is the complete record and is directly assertable in tests.
 
