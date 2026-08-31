@@ -1281,47 +1281,71 @@ locals {
     ]...)
   }
 
-  lb_listener_rules = {
-    for region in var.aws_config.regions : region => merge(flatten([
+  # A rendered key that collides fails the plan here instead of silently losing a resource:
+  # merge() keeps the last value for a duplicate key, a single for expression refuses it. The
+  # entries carry identity components; the map below renders the key, as the security-group rule
+  # pair above does.
+  lb_listener_rule_entries = {
+    for region in var.aws_config.regions : region => flatten([
       for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : {
-          for rule in listener.rules :
-          "${load_balancer.resource_key}/${listener.resource_key}/${rule.resource_key}" => {
-
-            conditions   = rule.conditions
-            listener_key = "${load_balancer.resource_key}/${listener.resource_key}"
-            priority     = rule.priority
-
-            action = {
-              type             = rule.action.type
-              target_group_key = rule.action.target_group_key == null ? null : "${load_balancer.resource_key}/${rule.action.target_group_key}"
-              redirect         = rule.action.redirect
-              fixed_response   = rule.action.fixed_response
-            }
-
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules : {
+            load_balancer_key = load_balancer.resource_key
+            listener_key      = listener.resource_key
+            rule              = rule
           }
-        }
+        ]
       ]
       # Normalize 'region' variable input to align with Terraform best practices.
       if replace(load_balancer.region, "-", "_") == region
-    ])...)
+    ])
+  }
+
+  lb_listener_rules = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.lb_listener_rule_entries[region] :
+      "${entry.load_balancer_key}/${entry.listener_key}/${entry.rule.resource_key}" => {
+
+        conditions   = entry.rule.conditions
+        listener_key = "${entry.load_balancer_key}/${entry.listener_key}"
+        priority     = entry.rule.priority
+
+        action = {
+          type             = entry.rule.action.type
+          target_group_key = entry.rule.action.target_group_key == null ? null : "${entry.load_balancer_key}/${entry.rule.action.target_group_key}"
+          redirect         = entry.rule.action.redirect
+          fixed_response   = entry.rule.action.fixed_response
+        }
+
+      }
+    }
+  }
+
+  lb_listener_certificate_entries = {
+    for region in var.aws_config.regions : region => flatten([
+      for load_balancer in var.all_load_balancers : [
+        for listener in load_balancer.listeners : [
+          for certificate_arn in listener.additional_certificate_arns : {
+            load_balancer_key = load_balancer.resource_key
+            listener_key      = listener.resource_key
+            certificate_arn   = certificate_arn
+          }
+        ]
+      ]
+      # Normalize 'region' variable input to align with Terraform best practices.
+      if replace(load_balancer.region, "-", "_") == region
+    ])
   }
 
   lb_listener_certificates = {
-    for region in var.aws_config.regions : region => merge(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : {
-          for certificate_arn in listener.additional_certificate_arns :
-          "${load_balancer.resource_key}/${listener.resource_key}/${certificate_arn}" => {
+    for region in var.aws_config.regions : region => {
+      for entry in local.lb_listener_certificate_entries[region] :
+      "${entry.load_balancer_key}/${entry.listener_key}/${entry.certificate_arn}" => {
 
-            listener_key    = "${load_balancer.resource_key}/${listener.resource_key}"
-            certificate_arn = certificate_arn
-          }
-        }
-      ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
-    ])...)
+        listener_key    = "${entry.load_balancer_key}/${entry.listener_key}"
+        certificate_arn = entry.certificate_arn
+      }
+    }
   }
 
   #endregion --- [ Elastic Load Balancers (ELBs) ] --------------------------------------------- #
