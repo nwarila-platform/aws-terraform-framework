@@ -45,14 +45,16 @@ Absent from Packer and accepted here:
 
 | Construct | Sites | Why it stays |
 |---|---|---|
-| `sensitive` / `nonsensitive` | ~40 | No Packer analogue exists at all - Packer has a `sensitive` variable *attribute*, not functions. Structural to the RDS credential path. |
-| `toset` / `tolist` / `tostring` / `tonumber` | ~14 | Packer exposes a single `convert` function instead of the `to*` family. Several feed `for_each`, which requires a set. |
-| `lifecycle` / `precondition` | 5 | Packer has neither. These carry the plan-time guards, including the AMI block-device encryption check. |
+| `sensitive` / `nonsensitive` | 1 | No Packer analogue exists at all - Packer has a `sensitive` variable *attribute*, not functions. Structural to the RDS credential path. |
+| `toset` / `tolist` / `tostring` / `tonumber` | 16 | Packer exposes a single `convert` function instead of the `to*` family. Several feed `for_each`, which requires a set. |
+| `lifecycle` / `precondition` / `postcondition` | 7 / 11 / 4 | Packer has none. These carry plan-time guards and provider-result checks, including AMI block-device encryption and ordered ENI-address verification. |
 
 `one()` is also absent from Packer and is NOT used: where a value is null-or-single, carry the
-scalar in locals rather than indexing or unwrapping a list. `local.elastic_network_interfaces`
-carries both `private_ip` (scalar, for the pinned-address precondition) and `private_ips` (list,
-for the resource attribute) for exactly this reason.
+provider-shaped value directly rather than indexing or unwrapping a list.
+`local.elastic_network_interfaces` renders an interface's authored addresses in whichever
+provider-shaped collection that interface needs: null or the singleton `private_ips` set when it
+carries at most one address, and the ordered `private_ip_list` when `additional_private_ips` gives
+it more.
 
 ## Value-file-compatible variable surfaces
 

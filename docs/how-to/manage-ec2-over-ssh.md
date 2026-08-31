@@ -1,23 +1,25 @@
-# Manage EC2 over SSH
+# Manage EC2 readiness transports
 
 Use this guide when adding EC2 instances whose Terraform readiness gate runs
-over SSH before hand-off to a separate configuration-management pipeline. SSH
-is the single readiness transport for every platform; WinRM is decommissioned.
+over direct SSH or Windows WinRM before hand-off to a separate
+configuration-management pipeline. It also covers the SSH and WinRM bootstrap
+used when a later management pipeline reaches the instance through SSM.
 
 ## Operating model
 
-Readiness and management use SSH on TCP 22 on both Linux and Windows. The
-Windows `user_data` bootstraps the OpenSSH server at first boot, installing it
-first from a staged Feature-on-Demand cab when the image ships without it, and
-installs the launch key pair's public key for Administrator. The repository
-does not configure a long-term Windows management transport. Ansible runs
-outside this repository, in a separate pipeline job, using its own connection
-settings. Zero-inbound systems reached only through SSM set
-`readiness_gate = false` and skip the gate entirely.
+Linux uses SSH. Windows defaults to SSH, whose `user_data` bootstraps OpenSSH
+and installs the launch key pair's public key for Administrator. Selecting
+WinRM instead configures HTTPS on TCP 5986 and authenticates with the AWS launch
+password. The `-ssm` forms render the same protocol bootstrap but open no
+run-scoped inbound path and require `readiness_gate = false`; Terraform does not
+establish the Session Manager tunnel. Ansible runs outside this repository, in
+a separate pipeline job, using its own connection settings.
 
 This repository stops at creating reachable instances, gating initial readiness,
 and emitting a non-secret inventory hand-off. It does not run Ansible, create IAM
-roles, create networking, or create shared/cross-system security groups.
+roles, create networking, or create general-purpose shared/cross-system security
+groups. Its only cross-system group is the optional run-scoped readiness ingress
+group described below.
 
 All four readiness inputs are per-system and fall back by OS when left null:
 
@@ -38,10 +40,11 @@ script there and a `noexec` mount fails the upload rather than the command. `/tm
 `/var/tmp` and `/dev/shm` are commonly `noexec` on hardened images, which is why the login
 user's home is the default rather than `/tmp`.
 
-`readiness_private_key_path` is per system rather than per key pair, so two systems sharing
-a key pair may still read it from different paths. A plan-time precondition rejects a path
-that does not exist on the machine running Terraform, instead of letting the gate fail after
-its ten-minute connection timeout.
+`readiness_private_key_path` is per system rather than per key pair, so two
+systems sharing a key pair may still read it from different paths. SSH uses the
+key directly; WinRM uses it to decrypt the AWS launch-password blob. A real
+apply of a gated system needs a path that exists on the machine running
+Terraform.
 
 ## Configure the instance profile
 
@@ -66,6 +69,7 @@ all_systems = [
     ami                        = "app-linux"
     refresh                    = false
     instance_type              = "m6i.large"
+    connection_type            = null
     readiness_user             = null
     readiness_command          = null
     readiness_script_dir       = null
@@ -80,12 +84,11 @@ all_systems = [
     }
 
     root_block_device = {
-      delete_on_termination = true
-      iops                  = null
-      tags                  = {}
-      throughput            = null
-      volume_type           = "gp3"
-      volume_size           = "100"
+      iops        = null
+      tags        = {}
+      throughput  = null
+      volume_type = "gp3"
+      volume_size = "100"
     }
 
     ebs_block_devices = []
@@ -97,8 +100,11 @@ all_systems = [
         # Null lets AWS pick a free address from the subnet CIDR, and the aws_instances output
         # reports whichever address it picked. Prefer this: a generated Ansible inventory reads
         # the address back after apply, so nothing needs it hand-allocated up front.
-        private_ip      = null
-        security_groups = ["sg-REPLACE_ME"]
+        private_ip = null
+        # Null is the off switch, and [] means the same: this interface carries no further
+        # private addresses.
+        additional_private_ips = null
+        security_groups        = ["sg-REPLACE_ME"]
         # Non-null ingress and egress declare this interface's own "app01-eni-0-sg" group. Its
         # description and tags come from this same interface, and the framework attaches it only
         # here. security_groups remains exclusively for pre-created group IDs.
@@ -267,9 +273,10 @@ directly or only through an SSM tunnel.
 SSM is a channel rather than a protocol, so the `-ssm` forms still render the same bootstrap as
 their direct counterparts - something has to be listening for the tunnel to carry.
 
-What the `-ssm` forms change is inbound exposure: nothing connects to those systems from outside,
-so they are not given the run-scoped runner ingress group. If every system in a region is
-reached that way, no such group is created at all.
+What the `-ssm` forms change inside this framework is run-scoped inbound exposure: those systems
+are not given the runner ingress group. Consumer-supplied security groups remain unchanged and
+can still contain their own inbound rules. If every system in a region is reached through SSM,
+no run-scoped group is created at all.
 
 They also cannot use the readiness gate, and setting `readiness_gate = true` alongside one is
 rejected at plan time rather than ignored. Terraform's `connection` block speaks direct SSH and
@@ -289,8 +296,8 @@ Choosing `winrm` changes three things:
   5985 is never opened: Terraform's WinRM client authenticates with NTLM but does not seal
   messages, so an unencrypted listener would be refused by the service anyway.
 - `get_password_data` turns on, because WinRM authenticates as Administrator with the launch
-  password. The gate decrypts it in flight with `readiness_private_key_path`; only the encrypted
-  blob reaches Terraform state.
+  password. A direct gate decrypts it in flight with `readiness_private_key_path`; an SSM form
+  has no gate and does not decrypt it in this module.
 - The gate connects with `https`, `insecure` and `use_ntlm` set. `insecure` is required because
   the certificate is self-signed and no client can verify it.
 
@@ -311,16 +318,21 @@ Setting non-null `ingress` and `egress` additionally creates a framework-owned
 
 Use this network posture:
 
-- Allow inbound TCP 22 from the Terraform apply host and management or controller
-  source in either a pre-created group or the interface-owned group's `ingress`
-  list for readiness and SSH management on both platforms.
+- For direct SSH, allow inbound TCP 22 from the Terraform apply host in either
+  a pre-created group or the interface-owned group's `ingress` list.
+- For direct WinRM, allow inbound TCP 5986 from the Terraform apply host. The
+  framework opens only HTTPS/5986 in the Windows host firewall; it never opens
+  HTTP/5985.
 - Ensure private subnet instances are reachable from the Ansible controller
   through routing, VPN, a bastion path, or another consumer-managed path.
-- RDP on 3389 and WinRM remain consumer opt-in and are not the management
-  path for this framework; the framework no longer configures any WinRM
-  listener.
-- Systems with `readiness_gate = false` need no inbound access at all from
-  the apply host (SSM-only posture).
+- RDP on 3389 is opened by the framework, not the consumer, whenever `debug_ip`
+  is non-null: the run-scoped group carries a module-owned tcp/3389 rule so a
+  person can sit on a Windows desktop. What stays consumer-owned is the guest
+  side - the framework never enables the Windows RDP service or its host
+  firewall. WinRM is configured only when the system selects a WinRM connection
+  type.
+- Systems with `readiness_gate = false` need no inbound access from the apply
+  host for readiness. The `-ssm` forms require this posture.
 
 ## Hand off inventory
 
@@ -331,7 +343,9 @@ contains only neutral, non-secret values:
 - `instance_id`: the EC2 instance ID.
 - `region`: the normalized framework region key.
 - `private_ip`: the primary private IP from the framework-owned
-  `<hostname>-eni-0` network interface.
+  `<hostname>-eni-0` network interface. If the interface also sets
+  `additional_private_ips`, the pinned `private_ip` remains primary and the
+  further addresses are deliberately absent from this inventory.
 - `private_dns`: the EC2 private DNS name.
 - `function`: supplied by `all_systems[*].tags.Function`.
 - `os_family`: `linux` or `windows`, derived from the resolved AMI `platform`.
@@ -344,11 +358,12 @@ output resolves their `<hostname>-eni-0` address from the shared regional ENI
 map.
 
 Because these values are read back from the created interface, `private_ip`
-resolves identically whether the consumer pinned the address or left
-`private_ip = null` for AWS to assign. A generated inventory therefore never
-needs a hand-allocated address, and AWS gives no guarantee about *which* free
-address it picks - treat an auto-assigned address as stable for the life of the
-interface but never predictable ahead of apply.
+resolves identically whether the consumer pinned the address, left
+`private_ip = null` for AWS to assign, or pinned it and added further addresses
+beside it. A generated inventory therefore never needs a hand-allocated
+address, and AWS gives no guarantee about *which* free address it picks - treat
+an auto-assigned address as stable for the life of the interface but never
+predictable ahead of apply.
 
 Example:
 
@@ -371,41 +386,43 @@ This module only prepares the EC2 systems and emits infrastructure facts.
 
 This module gates instance readiness before configuration management. On
 `terraform apply`, `terraform_data.readiness_gate` runs a per-instance
-`remote-exec` probe that first waits for SSH with Terraform's 10-minute
-connection timeout, then runs the
-OS-native launch-agent wait:
+`remote-exec` probe for each directly reached system with the gate enabled. It
+first waits for the selected direct transport with Terraform's 10-minute
+connection timeout, then runs the OS-native launch-agent wait:
 `cloud-init status --wait` on Linux and
 `"C:\Program Files\Amazon\EC2Launch\EC2Launch.exe" status -b` on Windows.
 The Terraform step does not complete, and its duration captures the wait, until
-each instance is provisioned and reachable.
+each gated instance is provisioned and reachable. SSM-tunnelled systems must
+disable the gate because this module does not establish a tunnel for
+`remote-exec`.
 
-Both platforms authenticate with the instance key pair using each system's
-`readiness_private_key_path`; on Windows the bootstrap has installed the matching
-public key for Administrator, so no password decryption occurs and `password_data`
-is never fetched. Leave it null for plan and CI; a real apply must give every gated
-system a readable path.
+SSH authenticates with the instance key pair using each system's
+`readiness_private_key_path`; the Windows SSH bootstrap installs its matching
+public key for Administrator. WinRM asks AWS for the encrypted Administrator
+password and decrypts it with that same private key. Leave the path null for
+plan and CI; a real apply must give every gated system a readable path.
 
 ## Treat the key pair as the readiness credential
 
-`key_name` is required for every `all_systems` entry. On both platforms it
-names the EC2 key pair whose private key the controller uses for SSH readiness
-and later SSH management; the Windows bootstrap installs that key pair's
-public key for Administrator at first boot.
+`key_name` is required for every `all_systems` entry. It names the EC2 key pair
+whose private key the controller uses directly for SSH readiness or uses to
+decrypt the Windows launch password for WinRM. The Windows SSH bootstrap
+installs that key pair's public key for Administrator at first boot.
 
 The login user and Ansible inventory variables stay in the separate pipeline
 job.
 
-The EC2 resources set `user_data_replace_on_change = true`. Changing either
-platform's SSH bootstrap later forces instance replacement so the boot payload
+The EC2 resources set `user_data_replace_on_change = true`. Changing a platform
+or transport bootstrap later forces instance replacement so the boot payload
 actually runs.
 
 ## Manage EBS data volumes
 
 `ebs_block_devices` entries become standalone `aws_ebs_volume` resources and
-`aws_volume_attachment` attachments. Their lifecycle is independent from the
-EC2 instance, so data volumes do not delete automatically when an instance is
-terminated. That is why data-volume entries do not have
-`delete_on_termination`; use `skip_destroy` instead.
+`aws_volume_attachment` attachments. Their lifecycle is independent from an
+individual EC2 instance, so a data volume can survive instance replacement.
+The volume remains owned by Terraform and deletes when the deployment is
+destroyed.
 
 Give every data volume a unique, durable `resource_key` and `device_index`.
 Terraform addresses the volume and attachment as
@@ -451,30 +468,35 @@ AMI-defined non-root devices use a separate path. Add each such mapping to
 `ami_block_device_overrides` with the exact `device_name` from the AMI. The
 framework then renders an encrypted inline `ebs_block_device` that replaces the
 AMI mapping at launch. Do not copy the AMI's `snapshot_id` into the override;
-the AMI mapping supplies it. Use `ami_block_device_overrides = []` only when the
-AMI defines no device beyond its root mapping.
+the AMI mapping supplies it. Inline override volumes always delete with their
+instance. Use `ami_block_device_overrides = []` only when the AMI defines no
+device beyond its root mapping.
 
-`skip_destroy` defaults to `false`. With the default, Terraform detaches the
-volume when destroying the attachment. When `skip_destroy = true`, Terraform
-leaves the attachment in place while removing it from state.
+`skip_destroy` is module-owned and fixed to `false`, so destroying an attachment
+really detaches it before Terraform destroys the external volume.
 
 All data-volume attachments use `stop_instance_before_detaching = true`.
 Removing or replacing a data volume on a running instance stops the instance
 before detach to avoid `VolumeInUse` failures and force-detach corruption. This
-stop is not obvious in the plan, and the instance stays stopped unless the
-system sets `set_state = "running"`.
+stop is not obvious in the plan. Do not rely on a simultaneous
+`set_state = "running"` transition to restart it: this tree has no ordering edge
+from external attachment changes to the instance-state resource.
 
-If you are upgrading from an older configuration that set
-`ebs_block_devices[*].delete_on_termination`, switch that setting to
-`skip_destroy`; the old data-volume field is no longer part of the schema.
+When upgrading a configuration from the older consumer-controlled lifecycle
+surface, remove these attributes before planning with this version:
+
+- `root_block_device.delete_on_termination`
+- `ami_block_device_overrides[*].delete_on_termination`
+- `ebs_block_devices[*].skip_destroy`
 
 ## Non-goals
 
 These responsibilities stay outside this repository:
 
-- Windows management methods beyond the OpenSSH readiness bootstrap.
+- Long-term Windows or Linux management orchestration.
 - Ansible execution.
 - Controller IAM for the Ansible job.
-- Networking, NAT, VPC endpoints, and shared/cross-system security groups.
+- Networking, NAT, VPC endpoints, and general-purpose shared/cross-system
+  security groups beyond the optional run-scoped readiness group.
 - IAM role, policy, and instance-profile creation.
 - OS hostname setting.
