@@ -15,8 +15,7 @@ locals {
   # one parameter read and one image lookup, not twenty of each.
   ami_selectors = {
     for region in var.aws_config.regions : region => toset([
-      for system in var.all_systems : system.ami
-      if replace(system.region, "-", "_") == region
+      for system in local.systems_by_region[region] : system.ami
     ])
   }
 
@@ -69,31 +68,26 @@ locals {
   kms_alias_selectors = {
     for region in var.aws_config.regions : region => toset(concat(
       [
-        for system in var.all_systems : system.aws_kms_alias
-        if replace(system.region, "-", "_") == region
+        for system in local.systems_by_region[region] : system.aws_kms_alias
       ],
       [
-        for database in var.all_databases : database.aws_kms_alias
-        if replace(database.region, "-", "_") == region
+        for database in local.databases_by_region[region] : database.aws_kms_alias
       ],
       [
-        for volume in values(var.shared_ebs_volumes) : volume.aws_kms_alias
-        if replace(volume.region, "-", "_") == region
+        for volume in values(local.shared_volumes_by_region[region]) : volume.aws_kms_alias
       ],
     ))
   }
 
   key_pair_selectors = {
     for region in var.aws_config.regions : region => toset([
-      for system in var.all_systems : system.key_name
-      if replace(system.region, "-", "_") == region
+      for system in local.systems_by_region[region] : system.key_name
     ])
   }
 
   subnet_selectors = {
     for region in var.aws_config.regions : region => toset([
-      for system in var.all_systems : system.subnet_id
-      if replace(system.region, "-", "_") == region
+      for system in local.systems_by_region[region] : system.subnet_id
     ])
   }
 
@@ -101,8 +95,7 @@ locals {
   # that reference it rather than a property of the profile itself.
   iam_instance_profile_selectors = {
     for region in var.aws_config.regions : region => toset([
-      for system in var.all_systems : system.iam_instance_profile
-      if replace(system.region, "-", "_") == region
+      for system in local.systems_by_region[region] : system.iam_instance_profile
     ])
   }
 
@@ -346,6 +339,40 @@ locals {
 # Dynamically Configured LOCALS
 locals {
 
+  #region ------ [ Inputs Partitioned By Region ] ---------------------------------------------- #
+
+  # Region normalization lives here so every downstream consumer shares one partition rule.
+  systems_by_region = {
+    for region in var.aws_config.regions : region => [
+      for system in var.all_systems : system
+      if replace(system.region, "-", "_") == region
+    ]
+  }
+
+  load_balancers_by_region = {
+    for region in var.aws_config.regions : region => [
+      for load_balancer in var.all_load_balancers : load_balancer
+      if replace(load_balancer.region, "-", "_") == region
+    ]
+  }
+
+  databases_by_region = {
+    for region in var.aws_config.regions : region => [
+      for database in var.all_databases : database
+      if replace(database.region, "-", "_") == region
+    ]
+  }
+
+  shared_volumes_by_region = {
+    for region in var.aws_config.regions : region => {
+      for volume_key, volume in var.shared_ebs_volumes : volume_key => volume
+      if replace(volume.region, "-", "_") == region
+    }
+  }
+
+  #endregion --- [ Inputs Partitioned By Region ] ---------------------------------------------- #
+
+
   #region ------ [ Interface-Owned Security Groups ] ------------------------------------------- #
 
   # Each interface with non-null rule collections declares one group at its raw interface index.
@@ -574,10 +601,9 @@ locals {
   # SSM contributes no VPC and builds no group rather than an orphan attached to nothing.
   run_ingress_vpc_ids = {
     for region in var.aws_config.regions : region => distinct([
-      for system in var.all_systems :
+      for system in local.systems_by_region[region] :
       data.aws_subnet.us_east_1[system.subnet_id].vpc_id
-      if replace(system.region, "-", "_") == region &&
-      !local.connection_over_ssm[system.hostname]
+      if !local.connection_over_ssm[system.hostname]
     ])
   }
 
@@ -646,14 +672,14 @@ locals {
   # primary ENI.
   eip_systems = {
     for region in var.aws_config.regions : region => {
-      for system in var.all_systems : system.hostname => {
+      for system in local.systems_by_region[region] : system.hostname => {
 
         # An Elastic IP declares no consumer tags, so this map is wholly framework-owned.
         tags = merge(local.identity_tags, {
           Name = system.hostname
         })
       }
-      if replace(system.region, "-", "_") == region && system.associate_public_ip
+      if system.associate_public_ip
     }
   }
 
@@ -664,7 +690,7 @@ locals {
 
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
-      for system in var.all_systems : system.hostname => {
+      for system in local.systems_by_region[region] : system.hostname => {
 
         ami                        = system.ami
         availability_zone          = system.availability_zone
@@ -786,8 +812,6 @@ locals {
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(system.region, "-", "_") == region
     }
   }
 
@@ -957,7 +981,7 @@ locals {
 
   elastic_network_interfaces = {
     for region in var.aws_config.regions : region => merge([
-      for system in var.all_systems : {
+      for system in local.systems_by_region[region] : {
         for index in range(length(system.network_interfaces)) :
         "${system.hostname}-eni-${index}" => {
 
@@ -1008,8 +1032,6 @@ locals {
           )
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(system.region, "-", "_") == region
     ]...)
   }
 
@@ -1021,7 +1043,7 @@ locals {
   ebs_block_devices = {
     for region in var.aws_config.regions : region => merge(
       merge([
-        for system in var.all_systems : {
+        for system in local.systems_by_region[region] : {
           for volume in system.ebs_block_devices :
           "${system.hostname}-ebs-${volume.resource_key}" => {
 
@@ -1063,11 +1085,10 @@ locals {
             )
           }
         }
-        # Normalize 'region' variable input to align with Terraform best practices.
-        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
+        if system.ebs_block_devices != null
       ]...),
       {
-        for volume_key, volume in var.shared_ebs_volumes :
+        for volume_key, volume in local.shared_volumes_by_region[region] :
         volume_key => {
           availability_zone    = volume.availability_zone
           iops                 = volume.iops
@@ -1082,7 +1103,6 @@ locals {
             Name = volume_key
           })
         }
-        if try(replace(volume.region, "-", "_") == region, false)
       },
     )
   }
@@ -1101,7 +1121,7 @@ locals {
   ebs_volume_attachments = {
     for region in var.aws_config.regions : region => merge(
       merge([
-        for system in var.all_systems : {
+        for system in local.systems_by_region[region] : {
           for volume in system.ebs_block_devices :
           "${system.hostname}-ebs-${volume.resource_key}" => {
             device_name = local.ebs_block_devices[region][
@@ -1112,10 +1132,10 @@ locals {
             volume_key   = "${system.hostname}-ebs-${volume.resource_key}"
           }
         }
-        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
+        if system.ebs_block_devices != null
       ]...),
       merge([
-        for volume_key, volume in var.shared_ebs_volumes : {
+        for volume_key, volume in local.shared_volumes_by_region[region] : {
           for hostname in distinct([
             for attachment in volume.attachments : attachment.hostname
             ]) : jsonencode([volume_key, hostname]) => {
@@ -1132,7 +1152,6 @@ locals {
           }
           if contains(keys(local.elastic_compute_cloud[region]), hostname)
         }
-        if try(replace(volume.region, "-", "_") == region, false)
       ]...),
     )
   }
@@ -1144,7 +1163,7 @@ locals {
 
   elastic_load_balancers = {
     for region in var.aws_config.regions : region => {
-      for load_balancer in var.all_load_balancers : load_balancer.resource_key => {
+      for load_balancer in local.load_balancers_by_region[region] : load_balancer.resource_key => {
 
         access_logs                                                  = load_balancer.access_logs
         client_keep_alive                                            = load_balancer.client_keep_alive
@@ -1187,14 +1206,12 @@ locals {
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     }
   }
 
   lb_target_groups = {
     for region in var.aws_config.regions : region => merge([
-      for load_balancer in var.all_load_balancers : {
+      for load_balancer in local.load_balancers_by_region[region] : {
         for target_group in load_balancer.target_groups :
         "${load_balancer.resource_key}/${target_group.resource_key}" => {
 
@@ -1225,16 +1242,14 @@ locals {
           )
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ]...)
   }
 
   lb_target_group_attachments = {
     for region in var.aws_config.regions : region => merge(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in local.load_balancers_by_region[region] : [
         for target_group in load_balancer.target_groups : {
-          for system in var.all_systems :
+          for system in local.systems_by_region[region] :
           "${load_balancer.resource_key}/${target_group.resource_key}/${system.hostname}" => {
 
             hostname = system.hostname
@@ -1243,20 +1258,17 @@ locals {
 
           }
           if(
-            replace(system.region, "-", "_") == region &&
             system.tags.Function == target_group.function &&
             data.aws_subnet.us_east_1[system.subnet_id].vpc_id == target_group.vpc_id
           )
         }
       ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ])...)
   }
 
   lb_listeners = {
     for region in var.aws_config.regions : region => merge([
-      for load_balancer in var.all_load_balancers : {
+      for load_balancer in local.load_balancers_by_region[region] : {
         for listener in load_balancer.listeners :
         "${load_balancer.resource_key}/${listener.resource_key}" => {
 
@@ -1276,8 +1288,6 @@ locals {
           }
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ]...)
   }
 
@@ -1287,7 +1297,7 @@ locals {
   # pair above does.
   lb_listener_rule_entries = {
     for region in var.aws_config.regions : region => flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in local.load_balancers_by_region[region] : [
         for listener in load_balancer.listeners : [
           for rule in listener.rules : {
             load_balancer_key = load_balancer.resource_key
@@ -1296,8 +1306,6 @@ locals {
           }
         ]
       ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ])
   }
 
@@ -1323,7 +1331,7 @@ locals {
 
   lb_listener_certificate_entries = {
     for region in var.aws_config.regions : region => flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in local.load_balancers_by_region[region] : [
         for listener in load_balancer.listeners : [
           for certificate_arn in listener.additional_certificate_arns : {
             load_balancer_key = load_balancer.resource_key
@@ -1332,8 +1340,6 @@ locals {
           }
         ]
       ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ])
   }
 
@@ -1360,7 +1366,7 @@ locals {
   # local destroys must pass a different run_id.
   relational_database_service = {
     for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+      for database in local.databases_by_region[region] : database.db_name => {
 
         allocated_storage                   = database.allocated_storage
         availability_zone                   = database.availability_zone
@@ -1399,18 +1405,14 @@ locals {
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
     }
   }
 
   relational_database_service_credentials = {
     for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+      for database in local.databases_by_region[region] : database.db_name => {
         username = sensitive(database.username)
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
     }
   }
 
