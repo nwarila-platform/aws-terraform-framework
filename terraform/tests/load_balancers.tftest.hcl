@@ -366,12 +366,11 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices   = []
@@ -419,12 +418,11 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices   = []
@@ -471,12 +469,11 @@ run "load_balancer_target_groups_attach_matching_function_systems" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices   = []
@@ -755,12 +752,11 @@ run "load_balancer_listeners_rules_and_certificates_wire_to_target_groups" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices   = []

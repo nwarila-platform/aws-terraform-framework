@@ -748,12 +748,11 @@ locals {
         )
 
         root_block_device = {
-          delete_on_termination = system.root_block_device.delete_on_termination
-          iops                  = system.root_block_device.iops
-          kms_key_id            = system.aws_kms_alias
-          throughput            = system.root_block_device.throughput
-          volume_size           = system.root_block_device.volume_size
-          volume_type           = system.root_block_device.volume_type
+          iops        = system.root_block_device.iops
+          kms_key_id  = system.aws_kms_alias
+          throughput  = system.root_block_device.throughput
+          volume_size = system.root_block_device.volume_size
+          volume_type = system.root_block_device.volume_type
 
           tags = merge(
             system.root_block_device.tags,
@@ -768,10 +767,9 @@ locals {
 
         ami_block_device_overrides = [
           for override in system.ami_block_device_overrides : {
-            delete_on_termination = override.delete_on_termination
-            device_name           = override.device_name
-            iops                  = override.iops
-            kms_key_id            = system.aws_kms_alias
+            device_name = override.device_name
+            iops        = override.iops
+            kms_key_id  = system.aws_kms_alias
             # Identity on the volume itself. default_tags puts it in the launch request, but only
             # a tag on the resource survives into state where an ec2:ResourceTag-scoped grant for
             # DeleteVolume, DetachVolume or ModifyVolume can be written against it - and where a
@@ -1060,7 +1058,6 @@ locals {
             iops                 = volume.iops
             kms_key_id           = system.aws_kms_alias
             multi_attach_enabled = null
-            skip_destroy         = volume.skip_destroy
             snapshot_id          = volume.snapshot_id
             throughput           = volume.throughput
             volume_size          = volume.volume_size
@@ -1133,9 +1130,8 @@ locals {
             device_name = local.ebs_block_devices[region][
               "${system.hostname}-ebs-${volume.resource_key}"
             ].device_name
-            hostname     = system.hostname
-            skip_destroy = volume.skip_destroy
-            volume_key   = "${system.hostname}-ebs-${volume.resource_key}"
+            hostname   = system.hostname
+            volume_key = "${system.hostname}-ebs-${volume.resource_key}"
           }
         }
         if system.ebs_block_devices != null
@@ -1145,9 +1141,8 @@ locals {
           for hostname in distinct([
             for attachment in volume.attachments : attachment.hostname
             ]) : jsonencode([volume_key, hostname]) => {
-            hostname     = hostname
-            skip_destroy = false
-            volume_key   = volume_key
+            hostname   = hostname
+            volume_key = volume_key
 
             # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
             device_name = (

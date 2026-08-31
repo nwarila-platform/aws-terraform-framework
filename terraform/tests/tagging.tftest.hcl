@@ -65,11 +65,10 @@ variables {
         tags = {
           Team = "platform"
         }
-        delete_on_termination = true
-        iops                  = null
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = [
@@ -79,7 +78,6 @@ variables {
           volume_size  = "10"
           iops         = null
           snapshot_id  = null
-          skip_destroy = false
           tags         = {}
           throughput   = null
           volume_type  = "gp3"
@@ -388,11 +386,10 @@ run "rejects_reserved_prefix_in_consumer_tags" {
           tags = {
             "Repository" = "me"
           }
-          delete_on_termination = true
-          iops                  = null
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []

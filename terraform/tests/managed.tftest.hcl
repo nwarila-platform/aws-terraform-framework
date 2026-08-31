@@ -57,12 +57,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -154,12 +153,11 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -252,12 +250,11 @@ run "literal_byo_subnet_plans_eip_and_association" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []

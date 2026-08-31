@@ -114,12 +114,11 @@ run "uncovered_ami_mapping_fails_the_instance_precondition" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -181,12 +180,11 @@ run "covering_every_mapping_satisfies_the_precondition" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -194,12 +192,11 @@ run "covering_every_mapping_satisfies_the_precondition" {
         # The root device and the ephemeral mapping need no entry; only /dev/sdf does.
         ami_block_device_overrides = [
           {
-            delete_on_termination = true
-            device_name           = "/dev/sdf"
-            iops                  = null
-            throughput            = null
-            volume_type           = "gp3"
-            volume_size           = "40"
+            device_name = "/dev/sdf"
+            iops        = null
+            throughput  = null
+            volume_type = "gp3"
+            volume_size = "40"
           }
         ]
 
@@ -258,12 +255,11 @@ run "refresh_instances_are_guarded_on_the_same_terms" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []

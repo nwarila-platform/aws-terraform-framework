@@ -61,12 +61,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_size           = "100"
-        volume_type           = "gp3"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_size = "100"
+        volume_type = "gp3"
       }
 
       ebs_block_devices = [
@@ -74,7 +73,6 @@ variables {
           resource_key = "standalone"
           device_index = 0
           iops         = null
-          skip_destroy = false
           snapshot_id  = null
           tags         = {}
           throughput   = null
@@ -85,12 +83,11 @@ variables {
 
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "/dev/sdf"
-          iops                  = null
-          throughput            = null
-          volume_size           = "20"
-          volume_type           = "gp3"
+          device_name = "/dev/sdf"
+          iops        = null
+          throughput  = null
+          volume_size = "20"
+          volume_type = "gp3"
         }
       ]
 
@@ -135,12 +132,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_size           = "100"
-        volume_type           = "gp3"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_size = "100"
+        volume_type = "gp3"
       }
 
       ebs_block_devices = [
@@ -148,7 +144,6 @@ variables {
           resource_key = "standalone"
           device_index = 0
           iops         = null
-          skip_destroy = false
           snapshot_id  = null
           tags         = {}
           throughput   = null
@@ -159,12 +154,11 @@ variables {
 
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "xvdg"
-          iops                  = null
-          throughput            = null
-          volume_size           = "20"
-          volume_type           = "gp3"
+          device_name = "xvdg"
+          iops        = null
+          throughput  = null
+          volume_size = "20"
+          volume_type = "gp3"
         }
       ]
 

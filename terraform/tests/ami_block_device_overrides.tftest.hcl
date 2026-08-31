@@ -62,12 +62,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices          = []
@@ -114,23 +113,21 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "/dev/sdf"
-          iops                  = null
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "40"
+          device_name = "/dev/sdf"
+          iops        = null
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "40"
         }
       ]
 
@@ -175,23 +172,21 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "/dev/sdf"
-          iops                  = null
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "40"
+          device_name = "/dev/sdf"
+          iops        = null
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "40"
         }
       ]
 
@@ -245,9 +240,8 @@ run "single_override_renders_encrypted_ebs_block_device" {
       one(local.elastic_compute_cloud.us_east_1["ami-override"].ami_block_device_overrides).volume_size == "40",
       one(local.elastic_compute_cloud.us_east_1["ami-override"].ami_block_device_overrides).iops == null,
       one(local.elastic_compute_cloud.us_east_1["ami-override"].ami_block_device_overrides).throughput == null,
-      one(local.elastic_compute_cloud.us_east_1["ami-override"].ami_block_device_overrides).delete_on_termination == true,
     ])
-    error_message = "A single AMI override must normalize to one encrypted block carrying every authored property and the system's KMS alias."
+    error_message = "A single AMI override must normalize to one block carrying every consumer-authored property and the system's KMS alias."
   }
 
   # These volumes carried no tags at all until the identity map was added, so every
@@ -276,7 +270,7 @@ run "refresh_override_matches_normal_override" {
 
   assert {
     condition = alltrue([
-      for field in ["device_name", "kms_key_id", "volume_type", "volume_size", "iops", "throughput", "delete_on_termination"] :
+      for field in ["device_name", "kms_key_id", "volume_type", "volume_size", "iops", "throughput"] :
       one(local.elastic_compute_cloud.us_east_1["ami-override"].ami_block_device_overrides)[field] ==
       one(local.elastic_compute_cloud.us_east_1["ami-override-refresh"].ami_block_device_overrides)[field]
     ])
@@ -324,12 +318,11 @@ run "override_rejects_standalone_volume_device_collision" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = [
@@ -338,7 +331,6 @@ run "override_rejects_standalone_volume_device_collision" {
             device_index = 0
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -347,12 +339,11 @@ run "override_rejects_standalone_volume_device_collision" {
         ]
         ami_block_device_overrides = [
           {
-            delete_on_termination = true
-            device_name           = "/dev/sdd"
-            iops                  = null
-            throughput            = null
-            volume_type           = "gp3"
-            volume_size           = "40"
+            device_name = "/dev/sdd"
+            iops        = null
+            throughput  = null
+            volume_type = "gp3"
+            volume_size = "40"
           }
         ]
 
@@ -408,31 +399,28 @@ run "override_rejects_duplicate_device_names" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
         ami_block_device_overrides = [
           {
-            delete_on_termination = true
-            device_name           = "/dev/sdf"
-            iops                  = null
-            throughput            = null
-            volume_type           = "gp3"
-            volume_size           = "40"
+            device_name = "/dev/sdf"
+            iops        = null
+            throughput  = null
+            volume_type = "gp3"
+            volume_size = "40"
           },
           {
-            delete_on_termination = true
-            device_name           = "/dev/sdf"
-            iops                  = null
-            throughput            = null
-            volume_type           = "gp3"
-            volume_size           = "40"
+            device_name = "/dev/sdf"
+            iops        = null
+            throughput  = null
+            volume_type = "gp3"
+            volume_size = "40"
           }
         ]
 
@@ -456,28 +444,30 @@ run "override_rejects_duplicate_device_names" {
   expect_failures = [var.all_systems]
 }
 
-run "inline_ami_override_blocks_are_encrypted" {
+run "inline_ami_override_blocks_are_encrypted_and_deleted_on_termination" {
   command = apply
 
   # The length check keeps alltrue() from passing vacuously if the override ever stops rendering
-  # an inline block, which is the failure this run exists to catch.
+  # an inline block. Both lifecycle values are module-owned and must reach the resource itself.
   assert {
     condition = (
       length(aws_instance.us_east_1["ami-override"].ebs_block_device) == 1 &&
       alltrue([
-        for device in aws_instance.us_east_1["ami-override"].ebs_block_device : device.encrypted
+        for device in aws_instance.us_east_1["ami-override"].ebs_block_device :
+        device.encrypted && device.delete_on_termination
       ])
     )
-    error_message = "Every normal instance AMI override block must enable EBS encryption."
+    error_message = "Every normal instance AMI override block must enable encryption and deletion on termination."
   }
 
   assert {
     condition = (
       length(aws_instance.us_east_1_refresh["ami-override-refresh"].ebs_block_device) == 1 &&
       alltrue([
-        for device in aws_instance.us_east_1_refresh["ami-override-refresh"].ebs_block_device : device.encrypted
+        for device in aws_instance.us_east_1_refresh["ami-override-refresh"].ebs_block_device :
+        device.encrypted && device.delete_on_termination
       ])
     )
-    error_message = "Every refresh instance AMI override block must enable EBS encryption."
+    error_message = "Every refresh instance AMI override block must enable encryption and deletion on termination."
   }
 }

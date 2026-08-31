@@ -127,7 +127,7 @@ variable "all_systems" {
     imds_hop_limit = number
 
     root_block_device = object({
-      delete_on_termination = bool
+      #delete_on_termination = # Statically set to 'true'
       #encrypted            = # Statically set to 'true'
       iops = string
       #kms_key_id           = # Calculated automatically from system.aws_kms_alias
@@ -146,12 +146,12 @@ variable "all_systems" {
         #encrypted            = # Statically set to 'true'
         iops = string
         #kms_key_id           = # Calculated automatically from system.aws_kms_alias
-        skip_destroy = bool
-        snapshot_id  = string
-        tags         = map(string)
-        throughput   = string
-        volume_size  = string
-        volume_type  = string
+        #skip_destroy         = # Statically set to 'false'
+        snapshot_id = string
+        tags        = map(string)
+        throughput  = string
+        volume_size = string
+        volume_type = string
       })
     )
 
@@ -160,8 +160,8 @@ variable "all_systems" {
     # the AMI ships unencrypted. Use [] when the AMI defines nothing beyond its root device.
     ami_block_device_overrides = list(
       object({
-        delete_on_termination = bool
-        device_name           = string
+        #delete_on_termination = # Statically set to 'true'
+        device_name = string
         #encrypted            = # Statically set to 'true'
         iops = string
         #kms_key_id           = # Calculated automatically from system.aws_kms_alias

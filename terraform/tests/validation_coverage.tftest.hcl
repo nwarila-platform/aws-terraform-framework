@@ -268,12 +268,11 @@ run "all_systems_rejects_null_region" {
           Function = "Null region validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -367,12 +366,11 @@ run "all_systems_rejects_null_aws_kms_alias" {
           Function = "Null KMS alias validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -421,12 +419,11 @@ run "all_systems_rejects_null_tags" {
         set_state                  = null
         tags                       = null
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []

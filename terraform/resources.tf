@@ -796,13 +796,14 @@ resource "aws_instance" "us_east_1" {
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
-  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
-  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  # Fixed true per ADR repo/0001. A volume created by ebs_block_device with
+  # delete_on_termination = false is not reattached when the instance is replaced: the old volume
+  # is abandoned and a new one is created, so allowing false would strand a disk on every refresh.
   dynamic "ebs_block_device" {
     for_each = each.value.ami_block_device_overrides
 
     content {
-      delete_on_termination = ebs_block_device.value.delete_on_termination
+      delete_on_termination = true
       device_name           = ebs_block_device.value.device_name
       encrypted             = true
       iops                  = ebs_block_device.value.iops
@@ -836,8 +837,10 @@ resource "aws_instance" "us_east_1" {
     network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
   }
 
+  # Fixed true per ADR repo/0001. Instance replacement is the OS-upgrade path, and retaining the
+  # old root volume would strand an obsolete OS disk that the replacement instance cannot reuse.
   root_block_device {
-    delete_on_termination = each.value.root_block_device.delete_on_termination
+    delete_on_termination = true
     encrypted             = true
     iops                  = each.value.root_block_device.iops
     kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
@@ -913,13 +916,14 @@ resource "aws_instance" "us_east_1_refresh" {
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
-  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
-  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  # Fixed true per ADR repo/0001. A volume created by ebs_block_device with
+  # delete_on_termination = false is not reattached when the instance is replaced: the old volume
+  # is abandoned and a new one is created, so allowing false would strand a disk on every refresh.
   dynamic "ebs_block_device" {
     for_each = each.value.ami_block_device_overrides
 
     content {
-      delete_on_termination = ebs_block_device.value.delete_on_termination
+      delete_on_termination = true
       device_name           = ebs_block_device.value.device_name
       encrypted             = true
       iops                  = ebs_block_device.value.iops
@@ -953,8 +957,10 @@ resource "aws_instance" "us_east_1_refresh" {
     network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
   }
 
+  # Fixed true per ADR repo/0001. Instance replacement is the OS-upgrade path, and retaining the
+  # old root volume would strand an obsolete OS disk that the replacement instance cannot reuse.
   root_block_device {
-    delete_on_termination = each.value.root_block_device.delete_on_termination
+    delete_on_termination = true
     encrypted             = true
     iops                  = each.value.root_block_device.iops
     kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
@@ -1131,12 +1137,17 @@ resource "aws_volume_attachment" "us_east_1" {
   provider = aws.us_east_1
   for_each = local.ebs_volume_attachments.us_east_1
 
-  # Define the Elastic Block Store Volume Attachment Properties
-  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
-  # filesystem corruption on a mounted volume.
+  # Define the Elastic Block Store Volume Attachment Properties. skip_destroy is fixed false per
+  # ADR repo/0001: true makes destroy a no-op and leaves the attachment in AWS after Terraform drops
+  # it from state. It also prevents a refresh replacement from detaching the volume from the old
+  # instance before reattaching it to the new one.
+  #
+  # Consumer data volumes are unaffected by refresh: aws_ebs_volume uses the stable
+  # <hostname>-ebs-<resource_key> key with no refresh dimension. Only this attachment is replaced,
+  # and stopping the instance before detaching prevents VolumeInUse wedges and filesystem damage.
   device_name                    = each.value.device_name
   instance_id                    = local.all_ec2_instances[each.value.hostname].id
-  skip_destroy                   = each.value.skip_destroy
+  skip_destroy                   = false
   stop_instance_before_detaching = true
   volume_id                      = aws_ebs_volume.us_east_1[each.value.volume_key].id
 
