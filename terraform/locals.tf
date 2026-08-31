@@ -809,7 +809,7 @@ locals {
   # entirely.
   readiness_targets = {
     for region in var.aws_config.regions : region => {
-      for hostname, system in local.systems_by_hostname : hostname => {
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => {
         id         = local.all_ec2_instances[hostname].id
         private_ip = local.all_ec2_instances[hostname].private_ip
         # Everything the gate needs is decided here: the connection mechanics and both
@@ -843,7 +843,7 @@ locals {
           : null
         )
       }
-      if system.readiness_gate && system.region == region
+      if system.readiness_gate
     }
   }
 
@@ -887,11 +887,11 @@ locals {
   # Only systems that explicitly asked for a power state get an aws_ec2_instance_state.
   ec2_instance_states = {
     for region in var.aws_config.regions : region => {
-      for hostname, instance in local.all_ec2_instances : hostname => {
-        instance_id = instance.id
-        state       = local.elastic_compute_cloud[region][hostname].set_state
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => {
+        instance_id = local.all_ec2_instances[hostname].id
+        state       = system.set_state
       }
-      if local.elastic_compute_cloud[region][hostname].set_state != null
+      if system.set_state != null
     }
   }
 
