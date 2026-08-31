@@ -338,6 +338,234 @@ run "all_databases_rejects_null_region" {
   expect_failures = [var.all_databases]
 }
 
+run "all_systems_rejects_null_aws_kms_alias" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "null-kms-alias"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-validation"
+        key_name                   = "validation-key"
+        iam_instance_profile       = "validation-profile"
+        aws_kms_alias              = null
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags = {
+          Backup   = true
+          Function = "Null KMS alias validation"
+        }
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-validation"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_systems_rejects_null_tags" {
+  command = plan
+
+  variables {
+    all_systems = [
+      {
+        region                     = "us-east-1"
+        hostname                   = "null-tags"
+        availability_zone          = "us-east-1a"
+        subnet_id                  = "subnet-validation"
+        key_name                   = "validation-key"
+        iam_instance_profile       = "validation-profile"
+        aws_kms_alias              = "validation"
+        ami                        = "test-linux"
+        refresh                    = false
+        instance_type              = "m6i.large"
+        connection_type            = null
+        readiness_user             = null
+        readiness_command          = null
+        readiness_script_dir       = null
+        readiness_private_key_path = null
+        readiness_gate             = true
+        imds_hop_limit             = 1
+        set_state                  = null
+        tags                       = null
+        root_block_device = {
+          delete_on_termination = true
+          iops                  = null
+          tags                  = {}
+          throughput            = null
+          volume_type           = "gp3"
+          volume_size           = "100"
+        }
+        ebs_block_devices          = []
+        ami_block_device_overrides = []
+        network_interfaces = [
+          {
+            description     = null
+            interface_type  = null
+            ingress         = null
+            egress          = null
+            private_ip      = null
+            security_groups = ["sg-validation"]
+            tags            = {}
+          }
+        ]
+        associate_public_ip = false
+      }
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}
+
+run "all_databases_rejects_null_tags" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "nulltags"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        instance_class                      = "db.t3.micro"
+        manage_master_user_password         = true
+        username                            = "dbadmin"
+        aws_kms_alias                       = "validation"
+        allocated_storage                   = "100"
+        backup_retention_period             = null
+        backup_window                       = null
+        blue_green_update                   = false
+        ca_cert_identifier                  = null
+        dedicated_log_volume                = true
+        delete_automated_backups            = true
+        deletion_protection                 = true
+        max_allocated_storage               = "1000"
+        skip_final_snapshot                 = false
+        storage_type                        = "gp3"
+        vpc_security_group_ids              = ["sg-validation"]
+        tags                                = null
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
+run "all_databases_rejects_null_db_name" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = null
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        instance_class                      = "db.t3.micro"
+        manage_master_user_password         = true
+        username                            = "dbadmin"
+        aws_kms_alias                       = "validation"
+        allocated_storage                   = "100"
+        backup_retention_period             = null
+        backup_window                       = null
+        blue_green_update                   = false
+        ca_cert_identifier                  = null
+        dedicated_log_volume                = true
+        delete_automated_backups            = true
+        deletion_protection                 = true
+        max_allocated_storage               = "1000"
+        skip_final_snapshot                 = false
+        storage_type                        = "gp3"
+        vpc_security_group_ids              = ["sg-validation"]
+        tags = {
+          Backup   = true
+          Function = "Null database name validation"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
+run "all_databases_rejects_null_aws_kms_alias" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "nullkmsalias"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        instance_class                      = "db.t3.micro"
+        manage_master_user_password         = true
+        username                            = "dbadmin"
+        aws_kms_alias                       = null
+        allocated_storage                   = "100"
+        backup_retention_period             = null
+        backup_window                       = null
+        blue_green_update                   = false
+        ca_cert_identifier                  = null
+        dedicated_log_volume                = true
+        delete_automated_backups            = true
+        deletion_protection                 = true
+        max_allocated_storage               = "1000"
+        skip_final_snapshot                 = false
+        storage_type                        = "gp3"
+        vpc_security_group_ids              = ["sg-validation"]
+        tags = {
+          Backup   = true
+          Function = "Null KMS alias validation"
+        }
+      }
+    ]
+  }
+
+  expect_failures = [var.all_databases]
+}
+
 run "load_balancers_reject_duplicate_resource_keys" {
   command = plan
 

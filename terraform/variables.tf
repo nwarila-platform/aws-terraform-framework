@@ -334,21 +334,30 @@ variable "all_systems" {
       system.root_block_device != null &&
       system.ebs_block_devices != null &&
       system.ami_block_device_overrides != null &&
-      system.network_interfaces != null &&
-      alltrue(flatten([
+      system.network_interfaces != null
+    ])
+    error_message = join(" ", [
+      "tags.Backup, readiness_gate, root_block_device, ebs_block_devices,",
+      "ami_block_device_overrides, and network_interfaces carry no defaults and must not be",
+      "null. Give each a real value; use [] for an empty list rather than null.",
+    ])
+  }
+
+  # An omitted ip_protocol is already rejected by the type checker; this catches an explicit null
+  # without blaming an unrelated scalar on the same system.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
         for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
           for rule in concat(
             nic.ingress == null ? [] : nic.ingress,
             nic.egress == null ? [] : nic.egress,
           ) : rule.ip_protocol != null
         ]
-      ]))
-    ])
+      ]
+    ]))
     error_message = join(" ", [
-      "tags.Backup, readiness_gate, root_block_device, ebs_block_devices,",
-      "ami_block_device_overrides, and network_interfaces carry no defaults and must not be",
-      "null. Give each a real value; use [] for an empty list rather than null.",
-      "Network-interface ingress and egress rule ip_protocol values must not be null.",
+      "Each all_systems network-interface ingress and egress rule ip_protocol must not be null.",
     ])
   }
 
@@ -572,8 +581,10 @@ variable "all_systems" {
 
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      !startswith(system.aws_kms_alias, "alias/")
+      for system in var.all_systems : try(
+        !startswith(system.aws_kms_alias, "alias/"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "all_systems aws_kms_alias must NOT include the 'alias/' prefix (it is added",
@@ -912,8 +923,10 @@ variable "all_systems" {
   # rather than discover it when a tag map renders without them.
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      contains(keys(system.tags), "Backup") && contains(keys(system.tags), "Function")
+      for system in var.all_systems : try(
+        contains(keys(system.tags), "Backup") && contains(keys(system.tags), "Function"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_systems tags map must set Backup and Function. Every other key in the map is the",
@@ -937,7 +950,9 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
-        for key in keys(system.tags) : !contains(
+        # A null map is the required-tags rule's to report; substituting keeps this rule
+        # from claiming a forbidden key that was never written.
+        for key in keys(system.tags == null ? {} : system.tags) : !contains(
           [
             "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
             "runid", "os", "index", "devicename",
@@ -1428,8 +1443,10 @@ variable "all_databases" {
   # A map of strings cannot, so both checks move here.
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      contains(keys(database.tags), "Backup") && contains(keys(database.tags), "Function")
+      for database in var.all_databases : try(
+        contains(keys(database.tags), "Backup") && contains(keys(database.tags), "Function"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_databases tags map must set Backup and Function. Every other key in the map is",
@@ -1450,7 +1467,9 @@ variable "all_databases" {
   validation {
     condition = alltrue([
       for database in var.all_databases : alltrue([
-        for key in keys(database.tags) : !contains(
+        # A null map is the required-tags rule's to report; substituting keeps this rule
+        # from claiming a forbidden key that was never written.
+        for key in keys(database.tags == null ? {} : database.tags) : !contains(
           [
             "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
             "runid",
@@ -1486,9 +1505,12 @@ variable "all_databases" {
   }
 
   validation {
-    condition = length(distinct([
-      for database in var.all_databases : lower(database.db_name)
-    ])) == length(var.all_databases)
+    condition = try(
+      length(distinct([
+        for database in var.all_databases : lower(database.db_name)
+      ])) == length(var.all_databases),
+      false,
+    )
     error_message = join(" ", [
       "Each all_databases entry must have a case-insensitively unique db_name because the RDS",
       "identifier is lowercased.",
@@ -1507,8 +1529,10 @@ variable "all_databases" {
 
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      !startswith(database.aws_kms_alias, "alias/")
+      for database in var.all_databases : try(
+        !startswith(database.aws_kms_alias, "alias/"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added",
