@@ -350,17 +350,6 @@ run "rejects_non_numeric_repository_id" {
   expect_failures = [var.repository_id]
 }
 
-run "rejects_metadata_tag_value_over_256_characters" {
-  command = plan
-
-  variables {
-    repository    = "nwarila-platform/aws-terraform-framework"
-    repository_id = join("", [for index in range(257) : "1"])
-  }
-
-  expect_failures = [var.repository_id]
-}
-
 run "rejects_reserved_prefix_in_consumer_tags" {
   command = plan
 

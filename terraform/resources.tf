@@ -246,9 +246,9 @@ resource "aws_network_interface" "us_east_1" {
   # Define the Elastic Network Interface Properties
   description    = each.value.description
   interface_type = each.value.interface_type
-  # An interface carrying further addresses is handed the ordered list, whose first element AWS marks
-  # primary; every other interface keeps the unordered set. Exactly one of the two is non-null, which
-  # is what the provider's mutual exclusivity requires.
+  # An interface carrying further addresses is handed the ordered list, whose first element AWS
+  # marks primary; every other interface keeps the unordered set. Exactly one of the two is
+  # non-null, which is what the provider's mutual exclusivity requires.
   private_ip_list         = each.value.private_ip_list
   private_ip_list_enabled = each.value.private_ip_list_enabled
   private_ips             = each.value.private_ips
@@ -340,13 +340,13 @@ resource "aws_network_interface" "us_east_1" {
       )
     }
 
-    # The ordered form's whole contract is that element 0 is the address AWS marks primary, but the
-    # provider fills private_ip_list straight from the order AWS happened to return and never reads
-    # the per-address primary flag. private_ip comes from the API's own scalar primary field, so
-    # comparing the two checks the contract against an independent source. The address set is
-    # compared as well, because the provider discards an element it cannot expand rather than
-    # refusing it, which would otherwise leave the interface carrying fewer addresses than authored
-    # with no diagnostic anywhere. Order among the secondaries is AWS's to choose.
+    # The ordered form's whole contract is that element 0 is the address AWS marks primary, but
+    # the provider fills private_ip_list straight from the order AWS happened to return and never
+    # reads the per-address primary flag. private_ip comes from the API's own scalar primary
+    # field, so comparing the two checks the contract against an independent source. The address
+    # set is compared as well, because the provider discards an element it cannot expand rather
+    # than refusing it, which would otherwise leave the interface carrying fewer addresses than
+    # authored with no diagnostic anywhere. Order among the secondaries is AWS's to choose.
     postcondition {
       condition = (
         each.value.private_ip_list == null ||
@@ -1087,7 +1087,6 @@ resource "terraform_data" "readiness_gate" {
   }
 
   lifecycle {
-
     precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."

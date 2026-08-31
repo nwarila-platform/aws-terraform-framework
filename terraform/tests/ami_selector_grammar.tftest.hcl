@@ -198,7 +198,7 @@ run "accepts_a_literal_image_id_and_keeps_it_out_of_the_catalog" {
 
   assert {
     condition = alltrue([
-      length(local.catalog_selectors) == 0,
+      length(local.catalog_selectors.us_east_1) == 0,
       length(local.ami_parameter_name) == 0,
       contains(keys(data.aws_ami.us_east_1_verified), "ami-0123456789abcdef0"),
     ])

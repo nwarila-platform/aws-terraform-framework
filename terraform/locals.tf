@@ -13,10 +13,19 @@ locals {
   #
   # Deduplicated to the distinct selectors actually in play: twenty systems sharing one image cost
   # one parameter read and one image lookup, not twenty of each.
-  ami_selectors = toset([for system in var.all_systems : system.ami])
+  ami_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in var.all_systems : system.ami
+      if replace(system.region, "-", "_") == region
+    ])
+  }
 
   # A literal id bypasses the catalog; every other selector resolves through it.
-  catalog_selectors = toset([for ami in local.ami_selectors : ami if !startswith(ami, "ami-")])
+  catalog_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for ami in local.ami_selectors[region] : ami if !startswith(ami, "ami-")
+    ])
+  }
 
   # Accounts a literal ami- id may belong to. "self" is the deploying account (793496711039),
   # which publishes the catalog; the other two are vendor accounts whose base images are pinned
@@ -36,7 +45,7 @@ locals {
   # most_recent, no discovery of any kind. An address that was never published fails the plan
   # instead of silently resolving to the closest thing available.
   ami_parameter_name = {
-    for ami in local.catalog_selectors : ami =>
+    for ami in local.catalog_selectors.us_east_1 : ami =>
     "/nwarila/ami/${strcontains(ami, "@") ? replace(ami, "@", "/") : "${ami}/latest"}"
   }
 
@@ -44,7 +53,7 @@ locals {
   # images. Consumers read .id, .platform, .platform_details, .root_device_name and
   # .block_device_mappings from here and never learn whether the id was pinned or resolved.
   amazon_machine_images = {
-    for ami in local.ami_selectors : ami => {
+    for ami in local.ami_selectors.us_east_1 : ami => {
       us_east_1 = data.aws_ami.us_east_1_verified[ami]
     }
   }
@@ -52,10 +61,65 @@ locals {
   #endregion --- [ Amazon Machine Image Resolution ] ------------------------------------------- #
 
 
+  #region ------ [ Pre-Existing Infrastructure Selectors ] ------------------------------------- #
+
+  # What each pre-existing-infrastructure lookup in data.tf iterates. Every set is deduplicated,
+  # so systems sharing an alias, key pair, subnet or instance profile cost one read between them.
+  # A KMS alias reaches this framework three ways, and all three land in the same region's key.
+  kms_alias_selectors = {
+    for region in var.aws_config.regions : region => toset(concat(
+      [
+        for system in var.all_systems : system.aws_kms_alias
+        if replace(system.region, "-", "_") == region
+      ],
+      [
+        for database in var.all_databases : database.aws_kms_alias
+        if replace(database.region, "-", "_") == region
+      ],
+      [
+        for volume in values(var.shared_ebs_volumes) : volume.aws_kms_alias
+        if replace(volume.region, "-", "_") == region
+      ],
+    ))
+  }
+
+  key_pair_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in var.all_systems : system.key_name
+      if replace(system.region, "-", "_") == region
+    ])
+  }
+
+  subnet_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in var.all_systems : system.subnet_id
+      if replace(system.region, "-", "_") == region
+    ])
+  }
+
+  # An instance profile is a global IAM object, so this partition is the region of the systems
+  # that reference it rather than a property of the profile itself.
+  iam_instance_profile_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in var.all_systems : system.iam_instance_profile
+      if replace(system.region, "-", "_") == region
+    ])
+  }
+
+  #endregion --- [ Pre-Existing Infrastructure Selectors ] ------------------------------------- #
+
+
   #region ------ [ Deployment Identity Tags ] -------------------------------------------------- #
 
   # The identity keys whose value is identical on every resource, applied as provider
   # default_tags in providers.tf.
+  #
+  # That placement is load-bearing, not stylistic. default_tags is the only mechanism that puts
+  # tags inside the create API call itself: RunInstances carries them in its TagSpecifications,
+  # so the volumes it creates are tagged as they are born and a launch policy conditioning on
+  # aws:RequestTag matches. Tags written in a resource's own tags block are applied by a separate
+  # CreateTags call after the resource exists - too late for that condition, which sees a request
+  # carrying no aws:RequestTag key at all and cannot match.
   #
   # This does not replace the per-resource tag maps. Those carry the keys whose value varies by
   # resource - Name, Index, DeviceName, OS, Backup, Function - which one static provider map
@@ -115,7 +179,11 @@ locals {
   #
   # The launch key is the only metadata read, so the IMDSv2 token is fetched right before it,
   # after the install, where a slow DISM run cannot outlive it.
-
+  #
+  # The launch key goes into administrators_authorized_keys before sshd starts, so the listener
+  # never accepts a connection it cannot authenticate. sshd only creates C:\ProgramData\ssh on
+  # its first start, so the bootstrap creates the directory itself - after a fresh capability
+  # install there is nothing there yet.
   #
   # The single try/catch is the whole failure path: any error - unstaged build, unset bucket,
   # missing S3 object, DISM rejecting the cab - becomes one readable line in the EC2Launch log
@@ -165,8 +233,9 @@ locals {
     $imdsBase       = "http://169.254.169.254/latest"
 
     try {
-      # 1. Install OpenSSH Server when the image ships without it. Each supported OS build names
-      #    its own FoD cab; the payload comes from the staged bucket and DISM stays off Windows Update.
+      # 1. Install OpenSSH Server when the image ships without it. Each supported OS build
+      #    names its own FoD cab; the payload comes from the staged bucket and DISM stays
+      #    off Windows Update.
       $state = (Get-WindowsCapability -Online -Name $capability).State
       if ($state -ne "Installed") {
         if (-not $fodBucket) { throw "OpenSSH.Server is absent and windows_fod_source is unset" }
@@ -619,7 +688,6 @@ locals {
         connection_type     = coalesce(system.connection_type, "ssh")
         connection_protocol = local.connection_protocol[system.hostname]
 
-
         # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
         # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
         # password to become available, and the SSH path has no use for it. Tunnelling over SSM
@@ -832,9 +900,10 @@ locals {
 
   #region ------ [ Elastic Network Interfaces (ENIs) ] ----------------------------------------- #
 
-  # Each interface's authored private IPv4 addresses, normalized. additional_private_ips has two off
-  # spellings - the attribute's own null and an empty list - and both have to mean "this interface is
-  # unchanged", so they collapse to one empty list here instead of at each place that reads them.
+  # Each interface's authored private IPv4 addresses, normalized. additional_private_ips has
+  # two off spellings - the attribute's own null and an empty list - and both have to mean
+  # "this interface is unchanged", so they collapse to one empty list here instead of at each
+  # place that reads them.
   interface_authored_addresses = merge([
     for system in var.all_systems : {
       for index in range(length(system.network_interfaces)) :
@@ -851,8 +920,9 @@ locals {
 
   # What the provider is actually handed for each interface's private IPv4 addressing.
   #
-  # An interface carrying at most one authored address keeps the unordered `private_ips` set this
-  # framework has always written, so an interface that asks for no further address plans no change.
+  # An interface carrying at most one authored address keeps the unordered `private_ips` set
+  # this framework has always written, so an interface that asks for no further address plans
+  # no change.
   #
   # Further addresses move the interface to `private_ip_list`, which reaches AWS in authored order
   # and whose first element AWS marks primary. The set cannot carry them, for two reasons. Its
@@ -863,9 +933,9 @@ locals {
   # needs the opposite of both: the node's own address primary, and every cluster address a
   # secondary the operating system never configures.
   #
-  # The provider declares the two mutually exclusive, so exactly one of them is ever non-null. An
-  # explicit null does not count as a configured value for that exclusivity, which is what lets both
-  # attributes stay listed on the resource.
+  # The provider declares the two mutually exclusive, so exactly one of them is ever non-null.
+  # An explicit null does not count as a configured value for that exclusivity, which is what
+  # lets both attributes stay listed on the resource.
   interface_private_addressing = {
     for key, addresses in local.interface_authored_addresses :
     key => {
@@ -962,17 +1032,16 @@ locals {
             iops                 = volume.iops
             kms_key_id           = system.aws_kms_alias
             multi_attach_enabled = null
-
-            skip_destroy = volume.skip_destroy
-            snapshot_id  = volume.snapshot_id
-            throughput   = volume.throughput
-            volume_size  = volume.volume_size
-            volume_type  = volume.volume_type
+            skip_destroy         = volume.skip_destroy
+            snapshot_id          = volume.snapshot_id
+            throughput           = volume.throughput
+            volume_size          = volume.volume_size
+            volume_type          = volume.volume_type
 
             device_name = (
               local.elastic_compute_cloud[region][system.hostname].is_windows
-              ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-              : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+              ? "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
+              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
             )
 
             tags = merge(
@@ -986,8 +1055,8 @@ locals {
                 # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
                 DeviceName = (
                   local.elastic_compute_cloud[region][system.hostname].is_windows
-                  ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-                  : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                  ? "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
+                  : "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
                 )
 
               }
@@ -998,7 +1067,7 @@ locals {
         if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
       ]...),
       {
-        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
+        for volume_key, volume in var.shared_ebs_volumes :
         volume_key => {
           availability_zone    = volume.availability_zone
           iops                 = volume.iops
@@ -1016,6 +1085,15 @@ locals {
         if try(replace(volume.region, "-", "_") == region, false)
       },
     )
+  }
+
+  # Each shared volume's device index, keyed by the host it is attached to. Attachment hostnames
+  # are validated unique within a volume, so this map is total and the attachments list is
+  # searched here once instead of at every place a device name is spelled.
+  shared_volume_device_indexes = {
+    for volume_key, volume in var.shared_ebs_volumes : volume_key => {
+      for attachment in volume.attachments : attachment.hostname => attachment.device_index
+    }
   }
 
   # The one attachment map spans stable, refresh, standalone, and shared lifecycles. Standalone
@@ -1037,7 +1115,7 @@ locals {
         if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
       ]...),
       merge([
-        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : {
+        for volume_key, volume in var.shared_ebs_volumes : {
           for hostname in distinct([
             for attachment in volume.attachments : attachment.hostname
             ]) : jsonencode([volume_key, hostname]) => {
@@ -1045,10 +1123,12 @@ locals {
             skip_destroy = false
             volume_key   = volume_key
 
-            device_name = "${local.elastic_compute_cloud[region][hostname].is_windows ? "xvd" : "/dev/sd"}${substr("defghijklmnopqrstuvwxyz", [
-              for attachment in volume.attachments : attachment.device_index
-              if attachment.hostname == hostname
-            ][0], 1)}"
+            # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
+            device_name = (
+              local.elastic_compute_cloud[region][hostname].is_windows
+              ? "xvd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume_key][hostname], 1)}"
+              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume_key][hostname], 1)}"
+            )
           }
           if contains(keys(local.elastic_compute_cloud[region]), hostname)
         }
