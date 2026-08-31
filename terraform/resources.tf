@@ -786,7 +786,7 @@ resource "aws_instance" "us_east_1" {
   for_each = local.elastic_compute_cloud_stable.us_east_1
 
   # Define the Elastic Compute Cloud Instance Properties
-  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  ami                         = local.amazon_machine_images.us_east_1[each.value.ami].id
   availability_zone           = each.value.availability_zone
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
@@ -903,7 +903,7 @@ resource "aws_instance" "us_east_1_refresh" {
   for_each = local.elastic_compute_cloud_refresh.us_east_1
 
   # Define the Elastic Compute Cloud Instance Properties
-  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  ami                         = local.amazon_machine_images.us_east_1[each.value.ami].id
   availability_zone           = each.value.availability_zone
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name

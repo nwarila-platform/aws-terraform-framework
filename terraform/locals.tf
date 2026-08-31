@@ -11,20 +11,25 @@ locals {
   # segment pins one level further until an atomic build date freezes it exactly. The grammar is
   # enforced on var.all_systems, so everything below may assume a well-formed lowercase selector.
   #
-  # Deduplicated to the distinct selectors actually in play: twenty systems sharing one image cost
-  # one parameter read and one image lookup, not twenty of each.
-  ami_selectors = {
+  # Deduplicated per region to the distinct selectors actually in play: twenty systems sharing one
+  # image in one region cost one parameter read and one image lookup, not twenty of each.
+  ami_selectors_by_region = {
     for region in var.aws_config.regions : region => toset([
       for system in local.systems_by_region[region] : system.ami
     ])
   }
 
   # A literal id bypasses the catalog; every other selector resolves through it.
-  catalog_selectors = {
+  catalog_selectors_by_region = {
     for region in var.aws_config.regions : region => toset([
-      for ami in local.ami_selectors[region] : ami if !startswith(ami, "ami-")
+      for ami in local.ami_selectors_by_region[region] : ami if !startswith(ami, "ami-")
     ])
   }
+
+  catalog_selectors = toset([
+    for system in var.all_systems : system.ami
+    if !startswith(system.ami, "ami-")
+  ])
 
   # Accounts a literal ami- id may belong to. "self" is the deploying account (793496711039),
   # which publishes the catalog; the other two are vendor accounts whose base images are pinned
@@ -44,16 +49,17 @@ locals {
   # most_recent, no discovery of any kind. An address that was never published fails the plan
   # instead of silently resolving to the closest thing available.
   ami_parameter_name = {
-    for ami in local.catalog_selectors.us_east_1 : ami =>
+    for ami in local.catalog_selectors : ami =>
     "/nwarila/ami/${strcontains(ami, "@") ? replace(ami, "@", "/") : "${ami}/latest"}"
   }
 
-  # One verified image object per selector, keyed the way the rest of the plan already keys
-  # images. Consumers read .id, .platform, .platform_details, .root_device_name and
-  # .block_device_mappings from here and never learn whether the id was pinned or resolved.
+  # One verified image object per selector in each region. Consumers read .id, .platform,
+  # .platform_details, .root_device_name and .block_device_mappings from here and never learn
+  # whether the id was pinned or resolved.
   amazon_machine_images = {
-    for ami in local.ami_selectors.us_east_1 : ami => {
-      us_east_1 = data.aws_ami.us_east_1_verified[ami]
+    us_east_1 = {
+      for ami in local.ami_selectors_by_region.us_east_1 : ami =>
+      data.aws_ami.us_east_1_verified[ami]
     }
   }
 
@@ -698,7 +704,7 @@ locals {
         iam_instance_profile       = system.iam_instance_profile
         imds_hop_limit             = system.imds_hop_limit
         instance_type              = system.instance_type
-        is_windows                 = local.amazon_machine_images[system.ami][region].platform == "windows"
+        is_windows                 = local.amazon_machine_images[region][system.ami].platform == "windows"
         key_name                   = system.key_name
         readiness_command          = system.readiness_command
         readiness_gate             = system.readiness_gate
@@ -719,7 +725,7 @@ locals {
         # password to become available, and the SSH path has no use for it. Tunnelling over SSM
         # does not change how the far end authenticates, so this keys off the protocol.
         get_password_data = (
-          local.amazon_machine_images[system.ami][region].platform == "windows" &&
+          local.amazon_machine_images[region][system.ami].platform == "windows" &&
           local.connection_protocol[system.hostname] == "winrm"
         )
 
@@ -732,7 +738,7 @@ locals {
         # through SSM by its configuration management is the normal case, so every Linux image
         # gets the agent.
         user_data = trimspace(
-          local.amazon_machine_images[system.ami][region].platform == "windows"
+          local.amazon_machine_images[region][system.ami].platform == "windows"
           ? (
             local.connection_protocol[system.hostname] == "winrm"
             ? local.windows_winrm_user_data
@@ -789,12 +795,12 @@ locals {
         # Skipped: instance-store mappings (virtual_name, no EBS volume to encrypt) and
         # suppression entries (no_device, which removes the mapping instead of creating it).
         uncovered_ami_block_devices = sort([
-          for mapping in try(local.amazon_machine_images[system.ami][region].block_device_mappings, []) :
+          for mapping in try(local.amazon_machine_images[region][system.ami].block_device_mappings, []) :
           mapping.device_name
           if length(try(mapping.ebs, {})) > 0 &&
           try(mapping.no_device, "") == "" &&
           try(mapping.virtual_name, "") == "" &&
-          mapping.device_name != try(local.amazon_machine_images[system.ami][region].root_device_name, "") &&
+          mapping.device_name != try(local.amazon_machine_images[region][system.ami].root_device_name, "") &&
           !contains([for override in system.ami_block_device_overrides : override.device_name], mapping.device_name)
         ])
 
@@ -808,7 +814,7 @@ locals {
           local.identity_tags,
           {
             Name = system.hostname
-            OS   = local.amazon_machine_images[system.ami][region].platform_details
+            OS   = local.amazon_machine_images[region][system.ami].platform_details
           }
         )
       }

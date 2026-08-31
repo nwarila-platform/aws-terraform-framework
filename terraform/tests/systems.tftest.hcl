@@ -2593,10 +2593,10 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   # the catalog resolves exactly what is asked for and nothing else.
   assert {
     condition = alltrue([
-      contains(keys(local.amazon_machine_images), "test-linux"),
-      contains(keys(local.amazon_machine_images), "prod-rhel8"),
-      contains(keys(local.amazon_machine_images), "ttc-win22-sql19@1.2"),
-      length(local.amazon_machine_images) == 3,
+      contains(keys(local.amazon_machine_images.us_east_1), "test-linux"),
+      contains(keys(local.amazon_machine_images.us_east_1), "prod-rhel8"),
+      contains(keys(local.amazon_machine_images.us_east_1), "ttc-win22-sql19@1.2"),
+      length(local.amazon_machine_images.us_east_1) == 3,
     ])
     error_message = "The resolved image map must hold exactly the selectors in use, so an unreferenced family is never looked up."
   }

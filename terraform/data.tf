@@ -7,7 +7,7 @@
 data "aws_ssm_parameter" "us_east_1_ami" {
 
   provider = aws.us_east_1
-  for_each = local.catalog_selectors.us_east_1
+  for_each = local.catalog_selectors_by_region.us_east_1
 
   # The key is computed from the selector, never searched for. A misspelled family or a version
   # that was never published fails the plan here with ParameterNotFound - which is the point:
@@ -31,7 +31,7 @@ data "aws_ami" "us_east_1_verified" {
   # id was pinned in tfvars or resolved from the catalog above. This is also the lookup the rest
   # of the plan reads image attributes from, so verification cannot be bypassed by accident.
   provider = aws.us_east_1
-  for_each = local.ami_selectors.us_east_1
+  for_each = local.ami_selectors_by_region.us_east_1
 
   # Module-owned (ADR repo/0001). An id says nothing about who produced it, so pinning the owner
   # is what stops a look-alike in an unrelated account being launched on a matching id alone.
