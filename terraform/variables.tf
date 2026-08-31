@@ -398,8 +398,10 @@ variable "all_systems" {
 
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      contains(var.aws_config.regions, replace(system.region, "-", "_"))
+      for system in var.all_systems : try(
+        contains(var.aws_config.regions, replace(system.region, "-", "_")),
+        false,
+      )
     ])
     error_message = "Each all_systems entry region must normalize to one of aws_config.regions."
   }
@@ -702,7 +704,9 @@ variable "all_systems" {
           system.network_interfaces == null ? [] : system.network_interfaces
         ) :
         jsonencode([
-          replace(system.region, "-", "_"),
+          # A null region is reported by the region rule above; substituting keeps this count
+          # from failing with a function error before that message is ever produced.
+          system.region == null ? "" : replace(system.region, "-", "_"),
           lower("${system.hostname}-eni-${interface_index}-sg"),
         ])
         if nic.ingress != null && nic.egress != null
@@ -1214,6 +1218,8 @@ variable "shared_ebs_volumes" {
     ])
   }
 
+  # A null volume or a null region is diagnosed by the scalar-non-null rule above, which names the
+  # offending attribute. Passing them through keeps this rule's message true to what it checks.
   validation {
     condition = alltrue([
       for volume in values(var.shared_ebs_volumes) : try(
@@ -1491,8 +1497,10 @@ variable "all_databases" {
 
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      contains(var.aws_config.regions, replace(database.region, "-", "_"))
+      for database in var.all_databases : try(
+        contains(var.aws_config.regions, replace(database.region, "-", "_")),
+        false,
+      )
     ])
     error_message = "Each all_databases entry region must normalize to one of aws_config.regions."
   }
@@ -1783,8 +1791,10 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue([
-      for load_balancer in var.all_load_balancers :
-      contains(var.aws_config.regions, replace(load_balancer.region, "-", "_"))
+      for load_balancer in var.all_load_balancers : try(
+        contains(var.aws_config.regions, replace(load_balancer.region, "-", "_")),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_load_balancers entry region must normalize to one of",
