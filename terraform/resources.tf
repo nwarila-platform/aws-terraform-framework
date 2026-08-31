@@ -1093,6 +1093,9 @@ resource "terraform_data" "readiness_gate" {
   }
 
   lifecycle {
+    # local.readiness_targets depends on this: it hands WinRM a null password rather than calling
+    # file() on a path that is not there, so that this precondition is the thing a consumer hears
+    # from. Removing it turns that null into a silent authentication failure.
     precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."

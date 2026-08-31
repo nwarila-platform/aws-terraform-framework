@@ -865,9 +865,17 @@ locals {
 
         # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
         # gate already requires. Only the ciphertext ever reaches state.
+        # For WinRM, fileexists adds a null password only for a non-null missing path.
+        # terraform_data.readiness_gate's file-existence precondition rejects that exact case, so
+        # this local depends on the precondition remaining in place.
         password = (
-          system.connection_protocol == "winrm" && system.readiness_private_key_path != null
-          ? rsadecrypt(local.all_ec2_instances[hostname].password_data, file(system.readiness_private_key_path))
+          system.connection_protocol == "winrm" &&
+          system.readiness_private_key_path != null &&
+          fileexists(system.readiness_private_key_path)
+          ? rsadecrypt(
+            local.all_ec2_instances[hostname].password_data,
+            file(system.readiness_private_key_path),
+          )
           : null
         )
       }
