@@ -122,7 +122,7 @@ matching Packer variable declarations for every top-level variable it assigns.
   consumer whose `ec2:RunInstances` grant is scoped that way — with no signal from
   `plan`, `validate`, or `terraform test`, none of which inspects an API request.
 - Explicit per-resource maps stay for the keys whose value varies (`Name`, `Index`,
-  `DeviceName`, `OS`, `Backup`, `Function`). `RunInstances` applies one tag set to every
+  `DeviceName`, `OS`, `Backup`, `Function`, `Connection`). `RunInstances` applies one tag set to every
   volume in the request, so per-device values could not live in `default_tags` even in
   principle. The two mechanisms are complementary, never alternatives.
 - PascalCase holds without exception because AWS recognises `Name` only in that exact

@@ -382,3 +382,83 @@ run "readiness_gate_keeps_ssh_for_the_default_transport" {
     error_message = "The SSH default must not select WinRM or decrypt a launch password."
   }
 }
+
+# The transport a consumer reads back off the instance. Each case pins one half of the
+# derivation, because "ssh" alone never appears as a tag value: the channel is always joined.
+run "the_connection_tag_joins_protocol_and_channel" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], { connection_type = "winrm" })
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
+    values = {
+      state    = "available"
+      id       = "ami-00000000000000031"
+      platform = "windows"
+    }
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["win-transport"].tags["Connection"] == "winrm-direct"
+    error_message = "A directly reached WinRM system must be tagged winrm-direct, not winrm."
+  }
+}
+
+run "the_connection_tag_names_the_ssm_channel" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        connection_type = "winrm-ssm"
+        readiness_gate  = false
+      })
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
+    values = {
+      state    = "available"
+      id       = "ami-00000000000000032"
+      platform = "windows"
+    }
+  }
+
+  assert {
+    condition     = aws_instance.us_east_1["win-transport"].tags["Connection"] == "winrm-ssm"
+    error_message = "A tunnelled system must be tagged winrm-ssm."
+  }
+}
+
+run "the_connection_tag_spells_out_the_ssh_default" {
+  command = plan
+
+  assert {
+    condition     = aws_instance.us_east_1["win-transport"].tags["Connection"] == "ssh-direct"
+    error_message = "A null connection_type must be published as ssh-direct."
+  }
+}
+
+run "a_consumer_may_not_set_the_connection_tag" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        tags = {
+          Backup     = true
+          Function   = "transport test host"
+          Connection = "ssh-direct"
+        }
+      })
+    ]
+  }
+
+  expect_failures = [var.all_systems]
+}

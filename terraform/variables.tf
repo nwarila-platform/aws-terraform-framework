@@ -76,8 +76,9 @@ variable "all_systems" {
     # still read as a boolean - the validations below restate what the object type guaranteed.
     #
     # The framework writes the rest of the tag set (Name, ManagedBy, Repository, RepositoryId,
-    # CommitSha, RunId, Environment, OS) and merges it last, so a colliding consumer key is
-    # rejected rather than silently overwritten.
+    # CommitSha, RunId, Environment, OS, Connection) and merges it last, so a colliding consumer
+    # key is rejected rather than silently overwritten.
+    #   #Connection           = <Set Automatically From 'connection_type'>
     #   #OS                   = <Set Automatically From 'each.ami' Data Object Lookup>
     #   #Name                 = <Set Automatically From 'hostname'>
     #   #ManagedBy            = <Statically Set To 'Terraform'>
@@ -929,16 +930,16 @@ variable "all_systems" {
         for key in keys(system.tags == null ? {} : system.tags) : !contains(
           [
             "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
-            "runid", "os", "index", "devicename",
+            "runid", "os", "index", "devicename", "connection",
           ],
           lower(key)
         )
       ])
     ])
     error_message = join(" ", [
-      "Name, Environment, ManagedBy, Repository, RepositoryId, CommitSha, RunId, OS, Index and",
-      "DeviceName are written by this framework onto the instance and would be silently",
-      "overwritten; an all_systems tags map must not set them, in any letter case.",
+      "Name, Environment, ManagedBy, Repository, RepositoryId, CommitSha, RunId, OS, Index,",
+      "DeviceName and Connection are written by this framework onto the instance and would be",
+      "silently overwritten; an all_systems tags map must not set them, in any letter case.",
     ])
   }
 
