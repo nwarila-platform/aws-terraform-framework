@@ -473,32 +473,6 @@ variable "all_systems" {
     ])
   }
 
-  # The standalone maps use "<hostname>-ebs-<resource_key>" as their resource address. Because
-  # either component may itself contain "-ebs-", uniqueness of the components does not imply
-  # uniqueness of the generated key. Match the locals' normalized, per-region partition so an
-  # identical key in two different regions remains valid.
-  validation {
-    condition = alltrue([
-      for region in var.aws_config.regions :
-      length(distinct(compact(flatten([
-        for system in var.all_systems : [
-          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-          try("${system.hostname}-ebs-${volume.resource_key}", null)
-        ] if try(replace(system.region, "-", "_") == region, false)
-        ])))) == length(compact(flatten([
-        for system in var.all_systems : [
-          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-          try("${system.hostname}-ebs-${volume.resource_key}", null)
-        ] if try(replace(system.region, "-", "_") == region, false)
-      ])))
-    ])
-    error_message = join(" ", [
-      "Every generated all_systems EBS volume key must be unique within its normalized region;",
-      "choose hostname and resource_key combinations whose <hostname>-ebs-<resource_key> values",
-      "differ.",
-    ])
-  }
-
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : system.ebs_block_devices == null ? [] : [
@@ -1016,11 +990,12 @@ variable "shared_ebs_volumes" {
     Zone. AWS additionally requires Nitro instances and a multi-writer-safe clustered storage
     design; ordinary filesystems are not safe for concurrent writers. Each volume supports at most
     16 attachments. These are new resources: do not move an existing standalone volume into this
-    map, because the pinned provider treats enabling Multi-Attach as a replacement operation. An
-    empty map creates no shared volumes or attachments.
+    list, because the pinned provider treats enabling Multi-Attach as a replacement operation. An
+    empty list creates no shared volumes or attachments.
   EOT
 
-  type = map(object({
+  type = list(object({
+    resource_key      = string
     region            = string
     availability_zone = string
     aws_kms_alias     = string
@@ -1033,13 +1008,14 @@ variable "shared_ebs_volumes" {
     }))
   }))
 
-  default  = {}
+  default  = []
   nullable = false
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume != null &&
+        volume.resource_key != null &&
         volume.region != null &&
         volume.availability_zone != null &&
         volume.aws_kms_alias != null &&
@@ -1049,14 +1025,14 @@ variable "shared_ebs_volumes" {
       )
     ])
     error_message = join(" ", [
-      "Each shared_ebs_volumes volume scalar must be non-null: region, availability_zone,",
-      "aws_kms_alias, iops, and volume_size all require real values.",
+      "Each shared_ebs_volumes volume scalar must be non-null: resource_key, region,",
+      "availability_zone, aws_kms_alias, iops, and volume_size all require real values.",
     ])
   }
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true : volume.tags != null,
         false,
       )
@@ -1066,7 +1042,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true : volume.attachments != null,
         false,
       )
@@ -1079,7 +1055,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment != null && attachment.hostname != null,
           false,
@@ -1091,7 +1067,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment != null && attachment.device_index != null,
           false,
@@ -1101,31 +1077,9 @@ variable "shared_ebs_volumes" {
     error_message = "Each shared_ebs_volumes attachment device_index must be non-null."
   }
 
-  # merge() keeps the later value for a duplicate key. Reject a shared key that would otherwise
-  # replace an existing standalone volume at the same resource address.
-  validation {
-    condition = alltrue([
-      for volume_key, volume in var.shared_ebs_volumes : try(
-        volume == null ? true :
-        volume.region == null ? true :
-        !contains(flatten([
-          for system in var.all_systems : [
-            for standalone in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-            "${system.hostname}-ebs-${standalone.resource_key}"
-          ] if replace(system.region, "-", "_") == replace(volume.region, "-", "_")
-        ]), volume_key),
-        false,
-      )
-    ])
-    error_message = join(" ", [
-      "Each shared_ebs_volumes map key must be distinct from every generated standalone EBS",
-      "volume key in the same region.",
-    ])
-  }
-
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.device_index == null ? true :
@@ -1139,7 +1093,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.device_index == null ? true :
@@ -1155,7 +1109,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         length(volume.attachments) >= 1,
@@ -1167,7 +1121,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         length(volume.attachments) <= 16,
@@ -1179,7 +1133,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         alltrue([
@@ -1200,7 +1154,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.hostname == null ? true :
@@ -1214,7 +1168,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in values(var.shared_ebs_volumes) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           volume == null ? true :
           volume.availability_zone == null ? true :
@@ -1237,7 +1191,7 @@ variable "shared_ebs_volumes" {
   # offending attribute. Passing them through keeps this rule's message true to what it checks.
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.region == null ? true :
         contains(var.aws_config.regions, replace(volume.region, "-", "_")),
@@ -1249,7 +1203,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.aws_kms_alias == null ? true :
         !startswith(volume.aws_kms_alias, "alias/"),
@@ -1264,7 +1218,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in values(var.shared_ebs_volumes) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.tags == null ? true :
         alltrue([
@@ -1295,7 +1249,7 @@ variable "shared_ebs_volumes" {
           volume.device_index
         ],
         flatten([
-          for volume in values(var.shared_ebs_volumes) : [
+          for volume in var.shared_ebs_volumes : [
             for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
             attachment.device_index if try(
               attachment != null &&
@@ -1312,7 +1266,7 @@ variable "shared_ebs_volumes" {
           volume.device_index
         ],
         flatten([
-          for volume in values(var.shared_ebs_volumes) : [
+          for volume in var.shared_ebs_volumes : [
             for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
             attachment.device_index if try(
               attachment != null &&
@@ -1336,7 +1290,7 @@ variable "shared_ebs_volumes" {
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
-        for volume in values(var.shared_ebs_volumes) : [
+        for volume in var.shared_ebs_volumes : [
           for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
             attachment == null ? true :
             attachment.device_index == null ? true :

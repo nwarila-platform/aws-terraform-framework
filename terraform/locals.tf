@@ -80,7 +80,7 @@ locals {
         for database in local.databases_by_region[region] : database.aws_kms_alias
       ],
       [
-        for volume in values(local.shared_volumes_by_region[region]) : volume.aws_kms_alias
+        for volume in local.shared_volumes_by_region[region] : volume.aws_kms_alias
       ],
     ))
   }
@@ -370,10 +370,10 @@ locals {
   }
 
   shared_volumes_by_region = {
-    for region in var.aws_config.regions : region => {
-      for volume_key, volume in var.shared_ebs_volumes : volume_key => volume
+    for region in var.aws_config.regions : region => [
+      for volume in var.shared_ebs_volumes : volume
       if replace(volume.region, "-", "_") == region
-    }
+    ]
   }
 
   #endregion --- [ Inputs Partitioned By Region ] ---------------------------------------------- #
@@ -1052,14 +1052,18 @@ locals {
 
   #region ------ [ Elastic Block Store (EBS) ] ------------------------------------------------- #
 
-  ebs_block_devices = {
-    for region in var.aws_config.regions : region => merge(
-      merge([
-        for system in local.systems_by_region[region] : {
-          for volume in system.ebs_block_devices :
-          "${system.hostname}-ebs-${volume.resource_key}" => {
-
-            # AWS Elastic Block Store Properties
+  # Standalone and shared entries deliberately share one list. The map comprehension below
+  # renders their resource keys together, so duplicate standalone keys, duplicate shared
+  # resource_keys, and collisions between the two kinds all fail as duplicate object keys. That
+  # failure is a locals diagnostic, which terraform test cannot target with expect_failures, so
+  # it is proven by constructing a collision and watching the plan fail, not by a committed run.
+  ebs_block_device_entries = {
+    for region in var.aws_config.regions : region => concat(
+      flatten([
+        for system in local.systems_by_region[region] : [
+          for volume in system.ebs_block_devices : {
+            kind                 = "standalone"
+            resource_key         = volume.resource_key
             availability_zone    = system.availability_zone
             hostname             = system.hostname
             index                = volume.device_index
@@ -1091,17 +1095,19 @@ locals {
                   ? "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
                   : "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
                 )
-
               }
             )
           }
-        }
+        ]
         if system.ebs_block_devices != null
-      ]...),
-      {
-        for volume_key, volume in local.shared_volumes_by_region[region] :
-        volume_key => {
+      ]),
+      [
+        for volume in local.shared_volumes_by_region[region] : {
+          kind                 = "shared"
+          resource_key         = volume.resource_key
           availability_zone    = volume.availability_zone
+          hostname             = null
+          index                = null
           iops                 = volume.iops
           kms_key_id           = volume.aws_kms_alias
           multi_attach_enabled = true
@@ -1109,60 +1115,95 @@ locals {
           throughput           = null
           volume_size          = volume.volume_size
           volume_type          = "io2"
+          device_name          = null
 
           tags = merge(volume.tags, local.identity_tags, {
-            Name = volume_key
+            Name = volume.resource_key
           })
         }
-      },
+      ],
     )
+  }
+
+  ebs_block_devices = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.ebs_block_device_entries[region] :
+      (entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : entry.resource_key) => {
+        availability_zone    = entry.availability_zone
+        hostname             = entry.hostname
+        index                = entry.index
+        iops                 = entry.iops
+        kms_key_id           = entry.kms_key_id
+        multi_attach_enabled = entry.multi_attach_enabled
+        snapshot_id          = entry.snapshot_id
+        throughput           = entry.throughput
+        volume_size          = entry.volume_size
+        volume_type          = entry.volume_type
+        device_name          = entry.device_name
+        tags                 = entry.tags
+      }
+    }
   }
 
   # Each shared volume's device index, keyed by the host it is attached to. Attachment hostnames
   # are validated unique within a volume, so this map is total and the attachments list is
   # searched here once instead of at every place a device name is spelled.
   shared_volume_device_indexes = {
-    for volume_key, volume in var.shared_ebs_volumes : volume_key => {
+    for volume in var.shared_ebs_volumes : volume.resource_key => {
       for attachment in volume.attachments : attachment.hostname => attachment.device_index
     }
   }
 
-  # The one attachment map spans stable, refresh, standalone, and shared lifecycles. Standalone
-  # keys stay unchanged; JSON tuple keys keep shared volume/host identities unambiguous.
-  ebs_volume_attachments = {
-    for region in var.aws_config.regions : region => merge(
-      merge([
-        for system in local.systems_by_region[region] : {
-          for volume in system.ebs_block_devices :
-          "${system.hostname}-ebs-${volume.resource_key}" => {
+  # Stable and refresh lifecycles converge before attachment identities are rendered. As with the
+  # volumes above, standalone and shared entries are composed by one comprehension. Standalone
+  # keys stay byte-identical to their volume keys; JSON tuple keys keep shared volume/host
+  # identities unambiguous.
+  ebs_volume_attachment_entries = {
+    for region in var.aws_config.regions : region => concat(
+      flatten([
+        for system in local.systems_by_region[region] : [
+          for volume in system.ebs_block_devices : {
+            kind         = "standalone"
+            resource_key = volume.resource_key
+            hostname     = system.hostname
             device_name = local.ebs_block_devices[region][
               "${system.hostname}-ebs-${volume.resource_key}"
             ].device_name
-            hostname   = system.hostname
-            volume_key = "${system.hostname}-ebs-${volume.resource_key}"
           }
-        }
+        ]
         if system.ebs_block_devices != null
-      ]...),
-      merge([
-        for volume_key, volume in local.shared_volumes_by_region[region] : {
+      ]),
+      flatten([
+        for volume in local.shared_volumes_by_region[region] : [
           for hostname in distinct([
             for attachment in volume.attachments : attachment.hostname
-            ]) : jsonencode([volume_key, hostname]) => {
-            hostname   = hostname
-            volume_key = volume_key
+            ]) : {
+            kind         = "shared"
+            resource_key = volume.resource_key
+            hostname     = hostname
 
             # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
             device_name = (
               local.elastic_compute_cloud[region][hostname].is_windows
-              ? "xvd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume_key][hostname], 1)}"
-              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume_key][hostname], 1)}"
+              ? "xvd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume.resource_key][hostname], 1)}"
+              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume.resource_key][hostname], 1)}"
             )
           }
           if contains(keys(local.elastic_compute_cloud[region]), hostname)
-        }
-      ]...),
+        ]
+      ]),
     )
+  }
+
+  ebs_volume_attachments = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.ebs_volume_attachment_entries[region] :
+      (entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : jsonencode([entry.resource_key, entry.hostname])) => {
+        device_name = entry.device_name
+        hostname    = entry.hostname
+        volume_key  = entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : entry.resource_key
+      }
+    }
   }
 
   #endregion --- [ Elastic Block Store (EBS) ] ------------------------------------------------- #
