@@ -53,12 +53,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices          = []
@@ -175,6 +174,31 @@ run "windows_winrm_renders_wsman_bootstrap_and_fetches_password" {
     condition     = !strcontains(local.elastic_compute_cloud.us_east_1["win-transport"].user_data, "administrators_authorized_keys")
     error_message = "The WinRM transport must not render the SSH key-install bootstrap."
   }
+}
+
+run "windows_winrm_missing_private_key_reaches_readiness_precondition" {
+  command = plan
+
+  variables {
+    all_systems = [
+      merge(var.all_systems[0], {
+        connection_type            = "winrm"
+        readiness_gate             = true
+        readiness_private_key_path = "/nonexistent/winrm-readiness-key.pem"
+      })
+    ]
+  }
+
+  override_data {
+    target = data.aws_ami.us_east_1_verified["windows@2022"]
+    values = {
+      state    = "available"
+      id       = "ami-00000000000000021"
+      platform = "windows"
+    }
+  }
+
+  expect_failures = [terraform_data.readiness_gate]
 }
 
 run "connection_type_rejects_an_unknown_transport" {

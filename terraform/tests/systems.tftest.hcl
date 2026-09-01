@@ -56,12 +56,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -109,12 +108,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -163,12 +161,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -216,12 +213,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -359,12 +355,11 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -412,12 +407,11 @@ run "backup_tags_normalize_for_ec2_and_rds_and_database_storage_defaults_to_gp3"
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -626,12 +620,11 @@ run "instance_state_includes_refresh_instances" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -703,12 +696,11 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -756,12 +748,11 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -810,12 +801,11 @@ run "aws_instances_output_exposes_non_secret_inventory" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -1037,12 +1027,11 @@ run "refresh_serial_baseline" {
           Function = "Stable lifecycle control"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -1083,12 +1072,11 @@ run "refresh_serial_baseline" {
           Function = "Refresh lifecycle subject"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -1140,12 +1128,11 @@ run "refresh_serial_replaces_only_refresh_instances" {
           Function = "Stable lifecycle control"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -1186,12 +1173,11 @@ run "refresh_serial_replaces_only_refresh_instances" {
           Function = "Refresh lifecycle subject"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -1266,7 +1252,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "125"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1277,7 +1262,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "250"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1285,7 +1269,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
           {
             resource_key = "archive"
             device_index = 2
-            skip_destroy = true
             volume_size  = "500"
             iops         = null
             snapshot_id  = null
@@ -1296,12 +1279,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1354,7 +1336,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "64"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1362,12 +1343,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1419,7 +1399,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "32"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1427,12 +1406,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1484,7 +1462,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "10"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1492,12 +1469,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1549,7 +1525,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "125"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1560,7 +1535,6 @@ run "ebs_volume_attachments_use_structured_wiring" {
             volume_size  = "250"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1568,12 +1542,11 @@ run "ebs_volume_attachments_use_structured_wiring" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1725,8 +1698,8 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = local.ebs_block_devices.us_east_1["west-ebs-ebs-archive"].skip_destroy == true
-    error_message = "The third west normal EBS local should preserve explicit skip_destroy."
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].skip_destroy == false
+    error_message = "The module-owned skip_destroy = false must reach the attachment resource that previously exercised consumer-authored true."
   }
 
   assert {
@@ -1751,7 +1724,7 @@ run "ebs_volume_attachments_use_structured_wiring" {
 
   assert {
     condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-logs"].skip_destroy == false && aws_volume_attachment.us_east_1["west-ebs-ebs-logs"].stop_instance_before_detaching == true
-    error_message = "The first west normal EBS attachment should default skip_destroy to false and stop the instance before detaching."
+    error_message = "The first west normal EBS attachment should use module-owned skip_destroy = false and stop the instance before detaching."
   }
 
   assert {
@@ -1760,13 +1733,13 @@ run "ebs_volume_attachments_use_structured_wiring" {
   }
 
   assert {
-    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].volume_id == "vol-west-ebs-2" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].instance_id == "i-west-ebs" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].device_name == "/dev/sdf" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].skip_destroy == true && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].stop_instance_before_detaching == true
-    error_message = "The third west normal EBS attachment should preserve address -> volume -> instance -> device wiring, explicit skip_destroy, and safe detach."
+    condition     = aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].volume_id == "vol-west-ebs-2" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].instance_id == "i-west-ebs" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].device_name == "/dev/sdf" && aws_volume_attachment.us_east_1["west-ebs-ebs-archive"].stop_instance_before_detaching == true
+    error_message = "The third west normal EBS attachment should preserve address -> volume -> instance -> device wiring and safe detach."
   }
 
   assert {
-    condition     = aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].device_name == "/dev/sdd"
-    error_message = "The west refresh EBS attachment should preserve address -> volume -> instance -> device wiring."
+    condition     = aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].volume_id == "vol-west-ebs-refresh-0" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].instance_id == "i-west-ebs-refresh" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].device_name == "/dev/sdd" && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].skip_destroy == false && aws_volume_attachment.us_east_1["west-ebs-refresh-ebs-cache"].stop_instance_before_detaching == true
+    error_message = "The west refresh EBS attachment should preserve wiring and use the module-owned safe-detach lifecycle."
   }
 
   assert {
@@ -1818,7 +1791,6 @@ run "systems_reject_more_than_23_ebs_block_devices" {
             volume_size  = "10"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1826,12 +1798,11 @@ run "systems_reject_more_than_23_ebs_block_devices" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1896,7 +1867,6 @@ run "systems_reject_duplicate_ebs_device_indexes" {
             volume_size  = "10"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1907,7 +1877,6 @@ run "systems_reject_duplicate_ebs_device_indexes" {
             volume_size  = "20"
             iops         = null
             snapshot_id  = null
-            skip_destroy = false
             tags         = {}
             throughput   = null
             volume_type  = "gp3"
@@ -1915,12 +1884,11 @@ run "systems_reject_duplicate_ebs_device_indexes" {
         ]
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ami_block_device_overrides = []
@@ -1979,12 +1947,11 @@ run "systems_reject_duplicate_hostnames" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2032,12 +1999,11 @@ run "systems_reject_duplicate_hostnames" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2098,12 +2064,11 @@ run "systems_reject_regions_outside_aws_config" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2194,12 +2159,11 @@ run "systems_reject_invalid_ami_identifiers" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2260,12 +2224,11 @@ run "systems_reject_invalid_set_state" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2339,12 +2302,11 @@ run "systems_accept_a_windows_catalog_selector" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2406,12 +2368,11 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2459,12 +2420,11 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2512,12 +2472,11 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2593,10 +2552,10 @@ run "systems_accept_selfbuilt_ami_names_and_versions" {
   # the catalog resolves exactly what is asked for and nothing else.
   assert {
     condition = alltrue([
-      contains(keys(local.amazon_machine_images), "test-linux"),
-      contains(keys(local.amazon_machine_images), "prod-rhel8"),
-      contains(keys(local.amazon_machine_images), "ttc-win22-sql19@1.2"),
-      length(local.amazon_machine_images) == 3,
+      contains(keys(local.amazon_machine_images.us_east_1), "test-linux"),
+      contains(keys(local.amazon_machine_images.us_east_1), "prod-rhel8"),
+      contains(keys(local.amazon_machine_images.us_east_1), "ttc-win22-sql19@1.2"),
+      length(local.amazon_machine_images.us_east_1) == 3,
     ])
     error_message = "The resolved image map must hold exactly the selectors in use, so an unreferenced family is never looked up."
   }
@@ -2662,12 +2621,11 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2715,12 +2673,11 @@ run "systems_accept_raw_ami_ids_and_classify_from_platform" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2890,12 +2847,11 @@ run "systems_reject_windows_hostnames_over_15_characters" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -2964,12 +2920,11 @@ run "systems_reject_windows_hostnames_with_invalid_characters" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3038,12 +2993,11 @@ run "systems_reject_all_numeric_windows_hostnames" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3112,12 +3066,11 @@ run "systems_accept_valid_windows_hostnames" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3187,12 +3140,11 @@ run "systems_default_linux_readiness_script_dir" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3266,12 +3218,11 @@ run "systems_override_linux_readiness_script_dir" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3345,12 +3296,11 @@ run "systems_reject_relative_readiness_script_dir" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3418,12 +3368,11 @@ run "systems_reject_trailing_slash_readiness_script_dir" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3491,12 +3440,11 @@ run "readiness_gate_allows_a_null_private_key_path" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3568,12 +3516,11 @@ run "readiness_gate_rejects_a_missing_private_key_file" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices          = []
@@ -3642,12 +3589,11 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3695,12 +3641,11 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3748,12 +3693,11 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3801,12 +3745,11 @@ run "readiness_targets_thread_per_system_readiness_user" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3930,12 +3873,11 @@ run "systems_render_readiness_user_data_per_os" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -3983,12 +3925,11 @@ run "systems_render_readiness_user_data_per_os" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -4152,12 +4093,11 @@ run "systems_render_windows_fod_bucket_into_user_data" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -4238,12 +4178,11 @@ run "systems_reject_kms_alias_prefix" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -4304,12 +4243,11 @@ run "systems_reject_empty_network_interface_security_groups" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -4370,12 +4308,11 @@ run "systems_reject_empty_network_interfaces" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -4914,6 +4851,14 @@ run "instances_enforce_imdsv2_and_password_data_default" {
   }
 
   assert {
+    condition = alltrue([
+      aws_instance.us_east_1["west-state"].root_block_device[0].delete_on_termination,
+      aws_instance.us_east_1_refresh["west-refresh"].root_block_device[0].delete_on_termination,
+    ])
+    error_message = "Module-owned delete_on_termination = true must reach normal and refresh root block device resources."
+  }
+
+  assert {
     condition     = aws_instance.us_east_1["west-no-state"].get_password_data == false
     error_message = "Linux instances should compute get_password_data = false."
   }
@@ -4951,12 +4896,11 @@ run "readiness_gate_optout_creates_no_gate" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -5004,12 +4948,11 @@ run "readiness_gate_optout_creates_no_gate" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -5124,12 +5067,11 @@ run "all_systems_rejects_null_instance_type" {
           Function = "Null instance type validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5222,12 +5164,11 @@ run "all_systems_threads_imds_hop_limit_two" {
           Function = "Container host needs one extra IMDS hop"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5269,12 +5210,11 @@ run "all_systems_threads_imds_hop_limit_two" {
           Function = "Refresh container host needs one extra IMDS hop"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5345,12 +5285,11 @@ run "all_systems_rejects_imds_hop_limit_zero" {
           Function = "Zero hop limit validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5403,12 +5342,11 @@ run "all_systems_rejects_imds_hop_limit_three" {
           Function = "Above-maximum hop limit validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5461,12 +5399,11 @@ run "all_systems_rejects_null_imds_hop_limit" {
           Function = "Null hop limit validation"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5529,12 +5466,11 @@ run "network_interface_rejects_availability_zone_mismatching_its_subnet" {
           Function = "Availability-zone mismatch precondition"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5595,12 +5531,11 @@ run "network_interface_rejects_aws_reserved_private_ip" {
           Function = "Reserved private-IP precondition"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5661,12 +5596,11 @@ run "network_interface_rejects_private_ip_outside_its_subnet" {
           Function = "Out-of-subnet private-IP precondition"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5727,12 +5661,11 @@ run "all_systems_rejects_duplicate_private_ip_on_one_system" {
           Function = "Two interfaces claiming one address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5794,12 +5727,11 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
           Function = "First claimant of a shared-subnet address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5841,12 +5773,11 @@ run "all_systems_rejects_duplicate_private_ip_across_systems_in_one_subnet" {
           Function = "Second claimant of the same address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5899,12 +5830,11 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
           Function = "Pinned address in the first subnet"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -5946,12 +5876,11 @@ run "all_systems_allows_one_address_reused_across_distinct_subnets" {
           Function = "Same address, different subnet"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6012,12 +5941,11 @@ run "all_systems_allows_auto_assigned_private_ip_in_a_preexisting_subnet" {
           Function = "AWS-assigned address in a pre-existing subnet"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6089,12 +6017,11 @@ run "network_interfaces_carry_additional_private_addresses_in_authored_order" {
           Function = "Cluster node carrying its client access point addresses"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6162,12 +6089,11 @@ run "network_interfaces_omitting_additional_private_ips_plan_unchanged" {
           Function = "Pinned consumer that never mentions the new attribute"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6250,12 +6176,11 @@ run "network_interfaces_treat_null_and_empty_additional_private_ips_alike" {
           Function = "Both documented off spellings side by side"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6329,12 +6254,11 @@ run "all_systems_rejects_additional_private_ip_equal_to_its_own_primary" {
           Function = "An interface repeating its own primary as a further address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6388,12 +6312,11 @@ run "all_systems_rejects_duplicate_addresses_within_one_additional_private_ips_l
           Function = "One list naming the same address twice"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6447,12 +6370,11 @@ run "all_systems_rejects_additional_private_ip_claimed_by_another_interface" {
           Function = "A further address colliding with a second interface's primary"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6515,12 +6437,11 @@ run "all_systems_rejects_duplicate_additional_private_ips_across_systems_in_one_
           Function = "First claimant of a shared-subnet cluster address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6563,12 +6484,11 @@ run "all_systems_rejects_duplicate_additional_private_ips_across_systems_in_one_
           Function = "Second claimant of the same cluster address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6622,12 +6542,11 @@ run "all_systems_rejects_additional_private_ips_without_a_pinned_primary" {
           Function = "Further addresses with no authored primary to lead them"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6681,12 +6600,11 @@ run "all_systems_rejects_empty_additional_private_ip_entry" {
           Function = "A blank string standing in for an address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6740,12 +6658,11 @@ run "all_systems_rejects_null_additional_private_ip_entry" {
           Function = "A null standing in for an address"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6801,12 +6718,11 @@ run "all_systems_allows_one_additional_address_reused_across_distinct_subnets" {
           Function = "Cluster address in the first subnet"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []
@@ -6849,12 +6765,11 @@ run "all_systems_allows_one_additional_address_reused_across_distinct_subnets" {
           Function = "The same cluster address in a second subnet"
         }
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
         ebs_block_devices          = []
         ami_block_device_overrides = []

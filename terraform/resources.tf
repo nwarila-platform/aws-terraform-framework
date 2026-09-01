@@ -246,9 +246,9 @@ resource "aws_network_interface" "us_east_1" {
   # Define the Elastic Network Interface Properties
   description    = each.value.description
   interface_type = each.value.interface_type
-  # An interface carrying further addresses is handed the ordered list, whose first element AWS marks
-  # primary; every other interface keeps the unordered set. Exactly one of the two is non-null, which
-  # is what the provider's mutual exclusivity requires.
+  # An interface carrying further addresses is handed the ordered list, whose first element AWS
+  # marks primary; every other interface keeps the unordered set. Exactly one of the two is
+  # non-null, which is what the provider's mutual exclusivity requires.
   private_ip_list         = each.value.private_ip_list
   private_ip_list_enabled = each.value.private_ip_list_enabled
   private_ips             = each.value.private_ips
@@ -256,9 +256,8 @@ resource "aws_network_interface" "us_east_1" {
   subnet_id               = each.value.subnet_id
   tags                    = each.value.tags
 
-  # These two checks used to be variable validations fed by caller-declared subnet metadata. The
-  # subnet is now read directly, so they compare against the real thing instead - which means they
-  # must be preconditions: a variable validation runs before any data source is read.
+  # A variable validation runs before any data source is read, so a check that compares against
+  # the real subnet has to be a precondition.
   lifecycle {
     precondition {
       condition = (
@@ -318,21 +317,36 @@ resource "aws_network_interface" "us_east_1" {
         )
       ])
       error_message = format(
-        "An additional_private_ips entry on %s (%v) falls outside subnet %s (%s) or lands on one of the five addresses AWS reserves in it.",
+        "These additional_private_ips entries on %s (%v) fall outside subnet %s (%s) or land on one of the five addresses AWS reserves in it.",
         each.value.hostname,
-        each.value.additional_private_ips,
+        [
+          for address in each.value.additional_private_ips : address
+          if !(
+            cidrhost(
+              "${address}/${split("/", data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block)[1]}",
+              0
+            ) == cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, 0) &&
+            !contains(
+              [
+                for reserved in [0, 1, 2, 3, -1] :
+                cidrhost(data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block, reserved)
+              ],
+              address,
+            )
+          )
+        ],
         each.value.subnet_id,
         data.aws_subnet.us_east_1[each.value.subnet_id].cidr_block,
       )
     }
 
-    # The ordered form's whole contract is that element 0 is the address AWS marks primary, but the
-    # provider fills private_ip_list straight from the order AWS happened to return and never reads
-    # the per-address primary flag. private_ip comes from the API's own scalar primary field, so
-    # comparing the two checks the contract against an independent source. The address set is
-    # compared as well, because the provider discards an element it cannot expand rather than
-    # refusing it, which would otherwise leave the interface carrying fewer addresses than authored
-    # with no diagnostic anywhere. Order among the secondaries is AWS's to choose.
+    # The ordered form's whole contract is that element 0 is the address AWS marks primary, but
+    # the provider fills private_ip_list straight from the order AWS happened to return and never
+    # reads the per-address primary flag. private_ip comes from the API's own scalar primary
+    # field, so comparing the two checks the contract against an independent source. The address
+    # set is compared as well, because the provider discards an element it cannot expand rather
+    # than refusing it, which would otherwise leave the interface carrying fewer addresses than
+    # authored with no diagnostic anywhere. Order among the secondaries is AWS's to choose.
     postcondition {
       condition = (
         each.value.private_ip_list == null ||
@@ -772,23 +786,24 @@ resource "aws_instance" "us_east_1" {
   for_each = local.elastic_compute_cloud_stable.us_east_1
 
   # Define the Elastic Compute Cloud Instance Properties
-  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  ami                         = local.amazon_machine_images.us_east_1[each.value.ami].id
   availability_zone           = each.value.availability_zone
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
-  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
-  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  # Fixed true per ADR repo/0001. A volume created by ebs_block_device with
+  # delete_on_termination = false is not reattached when the instance is replaced: the old volume
+  # is abandoned and a new one is created, so allowing false would strand a disk on every refresh.
   dynamic "ebs_block_device" {
     for_each = each.value.ami_block_device_overrides
 
     content {
-      delete_on_termination = ebs_block_device.value.delete_on_termination
+      delete_on_termination = true
       device_name           = ebs_block_device.value.device_name
       encrypted             = true
       iops                  = ebs_block_device.value.iops
@@ -822,8 +837,10 @@ resource "aws_instance" "us_east_1" {
     network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
   }
 
+  # Fixed true per ADR repo/0001. Instance replacement is the OS-upgrade path, and retaining the
+  # old root volume would strand an obsolete OS disk that the replacement instance cannot reuse.
   root_block_device {
-    delete_on_termination = each.value.root_block_device.delete_on_termination
+    delete_on_termination = true
     encrypted             = true
     iops                  = each.value.root_block_device.iops
     kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
@@ -889,23 +906,24 @@ resource "aws_instance" "us_east_1_refresh" {
   for_each = local.elastic_compute_cloud_refresh.us_east_1
 
   # Define the Elastic Compute Cloud Instance Properties
-  ami                         = local.amazon_machine_images[each.value.ami]["us_east_1"].id
+  ami                         = local.amazon_machine_images.us_east_1[each.value.ami].id
   availability_zone           = each.value.availability_zone
   get_password_data           = each.value.get_password_data
   iam_instance_profile        = data.aws_iam_instance_profile.us_east_1[each.value.iam_instance_profile].name
   instance_type               = each.value.instance_type
-  key_name                    = local.key_pair_names.us_east_1[each.value.key_name]
+  key_name                    = data.aws_key_pair.us_east_1[each.value.key_name].key_name
   tags                        = each.value.tags
   user_data                   = each.value.user_data
   user_data_replace_on_change = true
 
-  # A volume created by ebs_block_device with delete_on_termination = false is not reattached
-  # when the instance is replaced: the old volume is abandoned and a new one is created.
+  # Fixed true per ADR repo/0001. A volume created by ebs_block_device with
+  # delete_on_termination = false is not reattached when the instance is replaced: the old volume
+  # is abandoned and a new one is created, so allowing false would strand a disk on every refresh.
   dynamic "ebs_block_device" {
     for_each = each.value.ami_block_device_overrides
 
     content {
-      delete_on_termination = ebs_block_device.value.delete_on_termination
+      delete_on_termination = true
       device_name           = ebs_block_device.value.device_name
       encrypted             = true
       iops                  = ebs_block_device.value.iops
@@ -939,8 +957,10 @@ resource "aws_instance" "us_east_1_refresh" {
     network_interface_id = aws_network_interface.us_east_1["${each.key}-eni-0"].id
   }
 
+  # Fixed true per ADR repo/0001. Instance replacement is the OS-upgrade path, and retaining the
+  # old root volume would strand an obsolete OS disk that the replacement instance cannot reuse.
   root_block_device {
-    delete_on_termination = each.value.root_block_device.delete_on_termination
+    delete_on_termination = true
     encrypted             = true
     iops                  = each.value.root_block_device.iops
     kms_key_id            = data.aws_kms_alias.us_east_1[each.value.root_block_device.kms_key_id].target_key_arn
@@ -1049,18 +1069,19 @@ resource "aws_network_interface_attachment" "us_east_1_refresh" {
 
 #region ------ [ terraform_data.readiness_gate - us-east-1 ] ----------------------------------- #
 
-# Block `apply` until each instance finishes provisioning and is reachable over SSH — the single
-# readiness transport for every platform (WinRM is decommissioned). The connection retry
-# (10-minute timeout) waits for sshd; the OS-native inline command then waits for the launch agent
-# to finish (cloud-init on Linux, EC2Launch v2 on Windows) and fails the apply on a non-zero exit.
-# Both platforms authenticate with the launch key pair (path supplied by
+# Block `apply` until each instance finishes provisioning and is reachable over the transport its
+# connection_type selects: SSH on either platform, or WinRM on a Windows system that asks for it.
+# The connection retry (10-minute timeout) waits for the listener; the OS-native inline command
+# then waits for the launch agent to finish (cloud-init on Linux, EC2Launch v2 on Windows) and
+# fails the apply on a non-zero exit. SSH authenticates with the launch key pair (path supplied by
 # each system's readiness_private_key_path; the Windows bootstrap installs the launch public key
-# for Administrator). No `host_key` is pinned: the instance host key is generated at first boot
-# and is not retrievable through the provider, so the gate trusts the first host answering at the
-# private IP. Public-key auth means the launch key cannot be captured, and the channel carries
-# only the launch-agent wait command. Systems with readiness_gate = false are absent from
-# readiness_targets and create no gate at all. On a SEPARATE terraform_data so a gate failure
-# taints only this resource, never the EC2 instance.
+# for Administrator), so the key cannot be captured; WinRM authenticates as Administrator with the
+# launch password, decrypted in flight with that same key. No `host_key` is pinned: the instance
+# host key is generated at first boot and is not retrievable through the provider, so the gate
+# trusts the first host answering at the private IP, and the channel carries only the launch-agent
+# wait command. Systems with readiness_gate = false are absent from readiness_targets and create
+# no gate at all. On a SEPARATE terraform_data so a gate failure taints only this resource, never
+# the EC2 instance.
 resource "terraform_data" "readiness_gate" {
 
   # Iterate through all Readiness Gates in the US-East-1 region.
@@ -1072,8 +1093,9 @@ resource "terraform_data" "readiness_gate" {
   }
 
   lifecycle {
-    # The WinRM/Windows rule lives on the instance, not here: a system reached over SSM has no
-    # readiness gate, so a copy of it on this resource would not cover "winrm-ssm".
+    # local.readiness_targets depends on this: it hands WinRM a null password rather than calling
+    # file() on a path that is not there, so that this precondition is the thing a consumer hears
+    # from. Removing it turns that null into a silent authentication failure.
     precondition {
       condition     = each.value.private_key_path == null || fileexists(each.value.private_key_path)
       error_message = "readiness_private_key_path for host ${each.key} points at ${coalesce(each.value.private_key_path, "null")}, which does not exist on the machine running Terraform; fix the path or set it null, otherwise the readiness gate only fails after its ten-minute timeout."
@@ -1118,12 +1140,17 @@ resource "aws_volume_attachment" "us_east_1" {
   provider = aws.us_east_1
   for_each = local.ebs_volume_attachments.us_east_1
 
-  # Define the Elastic Block Store Volume Attachment Properties
-  # Stopping the instance before detaching prevents VolumeInUse wedges and force-detach
-  # filesystem corruption on a mounted volume.
+  # Define the Elastic Block Store Volume Attachment Properties. skip_destroy is fixed false per
+  # ADR repo/0001: true makes destroy a no-op and leaves the attachment in AWS after Terraform drops
+  # it from state. It also prevents a refresh replacement from detaching the volume from the old
+  # instance before reattaching it to the new one.
+  #
+  # Consumer data volumes are unaffected by refresh: aws_ebs_volume uses the stable
+  # <hostname>-ebs-<resource_key> key with no refresh dimension. Only this attachment is replaced,
+  # and stopping the instance before detaching prevents VolumeInUse wedges and filesystem damage.
   device_name                    = each.value.device_name
   instance_id                    = local.all_ec2_instances[each.value.hostname].id
-  skip_destroy                   = each.value.skip_destroy
+  skip_destroy                   = false
   stop_instance_before_detaching = true
   volume_id                      = aws_ebs_volume.us_east_1[each.value.volume_key].id
 
@@ -1174,10 +1201,10 @@ resource "aws_db_instance" "us_east_1" {
   vpc_security_group_ids              = each.value.vpc_security_group_ids
 
   dynamic "blue_green_update" {
-    for_each = each.value.blue_green_update ? [each.value.blue_green_update] : []
+    for_each = each.value.blue_green_update ? [true] : []
 
     content {
-      enabled = blue_green_update.value
+      enabled = true
     }
   }
 

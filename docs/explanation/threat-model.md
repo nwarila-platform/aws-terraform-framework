@@ -28,6 +28,10 @@ What this module guarantees:
 - RDS master passwords are generated and managed by AWS. The module does not
   accept plaintext master passwords, and RDS encrypts its Secrets Manager secret
   with the consumer-selected KMS key.
+- EC2 root and inline AMI-override volumes delete with their instance.
+  Standalone and shared external EBS volumes can survive replacement of an
+  attached instance, but their attachments detach and their volumes delete when
+  the Terraform deployment is destroyed.
 - Local and CI validation run without live AWS credentials by using Terraform's
   mock-provider test support.
 
@@ -72,26 +76,35 @@ What this module guarantees:
   interface; unrestricted egress remains supported.
 - **Region mis-bucketing.** Mitigation: tests cover hyphenated and underscored
   region inputs, and locals normalize keys before building regional maps.
-- **Spoofed SSH readiness target.** Accepted posture: no `host_key` is pinned
-  because the instance host key is generated at first boot and is not retrievable
-  through the provider. The gate trusts the first host answering at the private
-  IP; public-key authentication prevents capture of the launch key, and the
-  channel carries only the launch-agent wait command.
+- **Spoofed direct-readiness target.** Accepted posture: SSH pins no `host_key`
+  because the instance host key is generated at first boot and is not
+  retrievable through the provider; WinRM accepts the instance-generated
+  self-signed TLS certificate. The gate trusts the first host answering at the
+  private IP. SSH uses public-key authentication, and WinRM uses NTLM over
+  HTTPS. The framework's default command waits for the launch agent; consumers
+  may replace it through `readiness_command`. SSM-tunnelled systems cannot run
+  this direct readiness gate.
 
 ## Out Of Scope
 
 What this module does **not** guarantee:
 
-- It does not create VPCs, subnets, shared or cross-system security groups, KMS
-  aliases, key pairs, IAM roles, OIDC trust policies, or backend buckets. The
-  only groups it creates are per-interface `<hostname>-eni-<index>-sg` groups.
-- It does not prove that a live AWS account has the referenced AMIs, KMS aliases,
-  key pairs, subnets, or security groups.
+- It does not create VPCs, subnets, general-purpose shared or cross-system
+  security groups, KMS aliases, key pairs, IAM roles, OIDC trust policies, or
+  backend buckets. It creates per-interface `<hostname>-eni-<index>-sg` groups
+  and may create one narrowly scoped run ingress group when a runner or debug
+  address and at least one directly reached system are present.
+- It does not prove that a live AWS account has usable referenced AMIs, EBS
+  snapshots, KMS aliases, key pairs, subnets, or security groups. The provider
+  and AWS validate those references during live operations.
 - It does not verify that a supplied `device_name` matches the AMI's spelling
   beyond exact string equality.
 - It does not harden operating systems, databases, application workloads, or
   network policy beyond the Terraform resources it declares.
 - It does not distribute database credentials to applications.
+- It provides no general retention, backup, restore, or disaster-recovery
+  guarantee. `Backup` tags can drive external automation while a resource
+  exists, but do not themselves retain anything.
 - It does not decide whether publishing environment-specific IaC is acceptable;
   that portfolio decision is tracked separately.
 

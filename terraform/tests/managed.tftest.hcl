@@ -19,9 +19,9 @@ mock_provider "aws" {
 }
 
 # secure-wazuh-shaped baseline: a plain Linux system that references only pre-existing
-# infrastructure, sets both interface rule collections to null, and sets none of the managed_*
-# variables. It is the mechanical guarantee that this explicit pre-created-group path creates no
-# additional resources and preserves existing resource keys.
+# infrastructure and sets both interface rule collections to null. It is the mechanical guarantee
+# that this explicit pre-created-group path creates no additional resources and preserves existing
+# resource keys.
 variables {
   repository    = "nwarila-platform/aws-terraform-framework"
   repository_id = "123456789"
@@ -57,12 +57,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ebs_block_devices = []
@@ -154,12 +153,11 @@ run "inline_sg_zero_inbound_with_ssm_egress" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []
@@ -252,12 +250,11 @@ run "literal_byo_subnet_plans_eip_and_association" {
         }
 
         root_block_device = {
-          delete_on_termination = true
-          iops                  = null
-          tags                  = {}
-          throughput            = null
-          volume_type           = "gp3"
-          volume_size           = "100"
+          iops        = null
+          tags        = {}
+          throughput  = null
+          volume_type = "gp3"
+          volume_size = "100"
         }
 
         ebs_block_devices = []

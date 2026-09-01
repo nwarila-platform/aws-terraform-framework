@@ -14,7 +14,7 @@ per
 ## How-to guides
 
 - [Develop this module](how-to/develop-this-module.md)
-- [Manage EC2 over SSH](how-to/manage-ec2-over-ssh.md)
+- [Manage EC2 readiness transports](how-to/manage-ec2-over-ssh.md)
 
 ## Explanation
 

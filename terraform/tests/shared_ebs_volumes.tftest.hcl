@@ -61,12 +61,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_size           = "100"
-        volume_type           = "gp3"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_size = "100"
+        volume_type = "gp3"
       }
 
       ebs_block_devices = [
@@ -74,7 +73,6 @@ variables {
           resource_key = "standalone"
           device_index = 0
           iops         = null
-          skip_destroy = false
           snapshot_id  = null
           tags         = {}
           throughput   = null
@@ -85,12 +83,11 @@ variables {
 
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "/dev/sdf"
-          iops                  = null
-          throughput            = null
-          volume_size           = "20"
-          volume_type           = "gp3"
+          device_name = "/dev/sdf"
+          iops        = null
+          throughput  = null
+          volume_size = "20"
+          volume_type = "gp3"
         }
       ]
 
@@ -135,12 +132,11 @@ variables {
       }
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_size           = "100"
-        volume_type           = "gp3"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_size = "100"
+        volume_type = "gp3"
       }
 
       ebs_block_devices = [
@@ -148,7 +144,6 @@ variables {
           resource_key = "standalone"
           device_index = 0
           iops         = null
-          skip_destroy = false
           snapshot_id  = null
           tags         = {}
           throughput   = null
@@ -159,12 +154,11 @@ variables {
 
       ami_block_device_overrides = [
         {
-          delete_on_termination = true
-          device_name           = "xvdg"
-          iops                  = null
-          throughput            = null
-          volume_size           = "20"
-          volume_type           = "gp3"
+          device_name = "xvdg"
+          iops        = null
+          throughput  = null
+          volume_size = "20"
+          volume_type = "gp3"
         }
       ]
 
@@ -311,8 +305,9 @@ run "shared_ebs_volume_spans_stable_and_refresh_hosts" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      "cluster-data" = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "cluster-data"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -336,7 +331,7 @@ run "shared_ebs_volume_spans_stable_and_refresh_hosts" {
           }
         ]
       }
-    }
+    ]
   }
 
   override_data {
@@ -462,8 +457,9 @@ run "shared_attachment_keys_encode_the_full_tuple" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      "a-b" = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "a-b"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -476,8 +472,9 @@ run "shared_attachment_keys_encode_the_full_tuple" {
             device_index = 1
           }
         ]
-      }
-      "a" = {
+      },
+      {
+        resource_key      = "a"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -491,7 +488,7 @@ run "shared_attachment_keys_encode_the_full_tuple" {
           }
         ]
       }
-    }
+    ]
   }
 
   assert {
@@ -515,31 +512,13 @@ run "shared_attachment_keys_encode_the_full_tuple" {
   }
 }
 
-run "standalone_ebs_volumes_reject_ambiguous_generated_keys" {
-  command = plan
-
-  variables {
-    all_systems = [
-      for index, system in var.all_systems : merge(system, {
-        hostname = index == 0 ? "a" : "a-ebs-b"
-        ebs_block_devices = [
-          merge(system.ebs_block_devices[0], {
-            resource_key = index == 0 ? "b-ebs-c" : "c"
-          })
-        ]
-      })
-    ]
-  }
-
-  expect_failures = [var.all_systems]
-}
-
 run "shared_ebs_volumes_reject_standalone_shared_device_claim_collision" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      collision = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "collision"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -551,7 +530,7 @@ run "shared_ebs_volumes_reject_standalone_shared_device_claim_collision" {
           device_index = 0
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -561,8 +540,22 @@ run "shared_ebs_volumes_reject_shared_shared_device_claim_collision" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      first = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "first"
+        region            = "us-east-1"
+        availability_zone = "us-east-1a"
+        aws_kms_alias     = "shared-only"
+        iops              = "3000"
+        volume_size       = "100"
+        tags              = {}
+        attachments = [{
+          hostname     = "c"
+          device_index = 1
+        }]
+      },
+      {
+        resource_key      = "second"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -574,19 +567,7 @@ run "shared_ebs_volumes_reject_shared_shared_device_claim_collision" {
           device_index = 1
         }]
       }
-      second = {
-        region            = "us-east-1"
-        availability_zone = "us-east-1a"
-        aws_kms_alias     = "shared-only"
-        iops              = "3000"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = "c"
-          device_index = 1
-        }]
-      }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -596,8 +577,9 @@ run "shared_ebs_volumes_reject_sd_ami_override_collision" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      collision = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "collision"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -609,7 +591,7 @@ run "shared_ebs_volumes_reject_sd_ami_override_collision" {
           device_index = 2
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -619,8 +601,9 @@ run "shared_ebs_volumes_reject_xvd_ami_override_collision" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      xvd-spelling = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "xvd-spelling"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -632,7 +615,7 @@ run "shared_ebs_volumes_reject_xvd_ami_override_collision" {
           device_index = 3
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -642,8 +625,9 @@ run "shared_ebs_volumes_reject_missing_host" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      missing = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "missing"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -655,7 +639,7 @@ run "shared_ebs_volumes_reject_missing_host" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -665,8 +649,9 @@ run "shared_ebs_volumes_reject_cross_zone_host" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      cross-zone = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "cross-zone"
         region            = "us-east-1"
         availability_zone = "us-east-1b"
         aws_kms_alias     = "shared-only"
@@ -678,7 +663,7 @@ run "shared_ebs_volumes_reject_cross_zone_host" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -688,8 +673,9 @@ run "shared_ebs_volumes_reject_duplicate_hostname" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      duplicate = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "duplicate"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -707,7 +693,7 @@ run "shared_ebs_volumes_reject_duplicate_hostname" {
           }
         ]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -731,8 +717,9 @@ run "shared_ebs_volumes_reject_more_than_16_attachments" {
       })
     ]
 
-    shared_ebs_volumes = {
-      too-many = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "too-many"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -746,7 +733,7 @@ run "shared_ebs_volumes_reject_more_than_16_attachments" {
           }
         ]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -756,8 +743,9 @@ run "shared_ebs_volumes_reject_kms_alias_prefix" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      malformed-kms = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "malformed-kms"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "alias/shared-only"
@@ -769,55 +757,7 @@ run "shared_ebs_volumes_reject_kms_alias_prefix" {
           device_index = 1
         }]
       }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_name_over_256_characters" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      (join("", [for index in range(257) : "a"])) = {
-        region            = "us-east-1"
-        availability_zone = "us-east-1a"
-        aws_kms_alias     = "shared-only"
-        iops              = "3000"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = "c"
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_rendered_tag_count_over_50" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      too-many-tags = {
-        region            = "us-east-1"
-        availability_zone = "us-east-1a"
-        aws_kms_alias     = "shared-only"
-        iops              = "3000"
-        volume_size       = "100"
-        tags = {
-          for index in range(44) : "Consumer${index}" => "value"
-        }
-        attachments = [{
-          hostname     = "c"
-          device_index = 1
-        }]
-      }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -827,8 +767,9 @@ run "shared_ebs_volumes_reject_reserved_name_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-name = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-name"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -842,7 +783,7 @@ run "shared_ebs_volumes_reject_reserved_name_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -852,8 +793,9 @@ run "shared_ebs_volumes_reject_reserved_commit_sha_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-commit-sha = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-commit-sha"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -867,7 +809,7 @@ run "shared_ebs_volumes_reject_reserved_commit_sha_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -877,8 +819,9 @@ run "shared_ebs_volumes_reject_reserved_environment_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-environment = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-environment"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -892,7 +835,7 @@ run "shared_ebs_volumes_reject_reserved_environment_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -902,8 +845,9 @@ run "shared_ebs_volumes_reject_reserved_managed_by_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-managed-by = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-managed-by"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -917,7 +861,7 @@ run "shared_ebs_volumes_reject_reserved_managed_by_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -927,8 +871,9 @@ run "shared_ebs_volumes_reject_reserved_repository_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-repository = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-repository"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -942,7 +887,7 @@ run "shared_ebs_volumes_reject_reserved_repository_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -952,8 +897,9 @@ run "shared_ebs_volumes_reject_reserved_repository_id_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-repository-id = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-repository-id"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -967,7 +913,7 @@ run "shared_ebs_volumes_reject_reserved_repository_id_tag" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -977,8 +923,9 @@ run "shared_ebs_volumes_reject_reserved_run_id_tag" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      reserved-run-id = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "reserved-run-id"
         region            = "us-east-1"
         availability_zone = "us-east-1a"
         aws_kms_alias     = "shared-only"
@@ -992,53 +939,7 @@ run "shared_ebs_volumes_reject_reserved_run_id_tag" {
           device_index = 1
         }]
       }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_non_numeric_iops" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      bad-iops = {
-        region            = "us-east-1"
-        availability_zone = "us-east-1a"
-        aws_kms_alias     = "shared-only"
-        iops              = "not-a-number"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = "c"
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_non_numeric_volume_size" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      bad-volume-size = {
-        region            = "us-east-1"
-        availability_zone = "us-east-1a"
-        aws_kms_alias     = "shared-only"
-        iops              = "3000"
-        volume_size       = "not-a-number"
-        tags              = {}
-        attachments = [{
-          hostname     = "c"
-          device_index = 1
-        }]
-      }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1048,8 +949,9 @@ run "shared_ebs_volumes_reject_null_iops" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-iops = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-iops"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1061,7 +963,7 @@ run "shared_ebs_volumes_reject_null_iops" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1071,8 +973,9 @@ run "shared_ebs_volumes_reject_null_region" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-region = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-region"
         region            = null
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1084,7 +987,7 @@ run "shared_ebs_volumes_reject_null_region" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1094,8 +997,9 @@ run "shared_ebs_volumes_reject_null_availability_zone" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-availability-zone = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-availability-zone"
         region            = var.all_systems[0].region
         availability_zone = null
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1107,7 +1011,7 @@ run "shared_ebs_volumes_reject_null_availability_zone" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1117,8 +1021,9 @@ run "shared_ebs_volumes_reject_null_aws_kms_alias" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-aws-kms-alias = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-aws-kms-alias"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = null
@@ -1130,7 +1035,7 @@ run "shared_ebs_volumes_reject_null_aws_kms_alias" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1140,8 +1045,9 @@ run "shared_ebs_volumes_reject_null_volume_size" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-volume-size = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-volume-size"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1153,7 +1059,7 @@ run "shared_ebs_volumes_reject_null_volume_size" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1163,9 +1069,9 @@ run "shared_ebs_volumes_reject_null_volume_object" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-volume = null
-    }
+    shared_ebs_volumes = [
+      null
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1175,8 +1081,9 @@ run "shared_ebs_volumes_reject_null_tags" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-tags = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-tags"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1188,7 +1095,7 @@ run "shared_ebs_volumes_reject_null_tags" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1198,8 +1105,9 @@ run "shared_ebs_volumes_reject_null_attachments" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-attachments = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-attachments"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1208,7 +1116,7 @@ run "shared_ebs_volumes_reject_null_attachments" {
         tags              = {}
         attachments       = null
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1218,8 +1126,9 @@ run "shared_ebs_volumes_reject_null_hostname" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-hostname = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-hostname"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1231,7 +1140,7 @@ run "shared_ebs_volumes_reject_null_hostname" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1241,8 +1150,9 @@ run "shared_ebs_volumes_reject_null_device_index" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      null-device-index = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "null-device-index"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1254,191 +1164,7 @@ run "shared_ebs_volumes_reject_null_device_index" {
           device_index = null
         }]
       }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_volume_key_collision" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      c-ebs-standalone = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "3000"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_iops_below_minimum" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      low-iops = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "99"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_iops_above_maximum" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      high-iops = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "256001"
-        volume_size       = "1000"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_size_below_minimum" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      low-size = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "100"
-        volume_size       = "3"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_size_above_maximum" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      high-size = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "100"
-        volume_size       = "65537"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_iops_to_size_ratio" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      bad-ratio = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "5000"
-        volume_size       = "4"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_fractional_iops" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      fractional-iops = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "3000.5"
-        volume_size       = "100"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
-  }
-
-  expect_failures = [var.shared_ebs_volumes]
-}
-
-run "shared_ebs_volumes_reject_fractional_size" {
-  command = plan
-
-  variables {
-    shared_ebs_volumes = {
-      fractional-size = {
-        region            = var.all_systems[0].region
-        availability_zone = var.all_systems[0].availability_zone
-        aws_kms_alias     = var.all_systems[0].aws_kms_alias
-        iops              = "3000"
-        volume_size       = "100.5"
-        tags              = {}
-        attachments = [{
-          hostname     = var.all_systems[0].hostname
-          device_index = 1
-        }]
-      }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1448,8 +1174,9 @@ run "shared_ebs_volumes_reject_empty_attachments" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      empty-attachments = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "empty-attachments"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1458,7 +1185,7 @@ run "shared_ebs_volumes_reject_empty_attachments" {
         tags              = {}
         attachments       = []
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1468,8 +1195,9 @@ run "shared_ebs_volumes_reject_unknown_region" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      unknown-region = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "unknown-region"
         region            = "us_west_2"
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1481,7 +1209,7 @@ run "shared_ebs_volumes_reject_unknown_region" {
           device_index = 1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1491,8 +1219,9 @@ run "shared_ebs_volumes_reject_fractional_device_index" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      fractional-device-index = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "fractional-device-index"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1504,7 +1233,7 @@ run "shared_ebs_volumes_reject_fractional_device_index" {
           device_index = 1.5
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1514,8 +1243,9 @@ run "shared_ebs_volumes_reject_device_index_above_range" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      high-device-index = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "high-device-index"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1527,7 +1257,7 @@ run "shared_ebs_volumes_reject_device_index_above_range" {
           device_index = 23
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]
@@ -1537,8 +1267,9 @@ run "shared_ebs_volumes_reject_negative_device_index" {
   command = plan
 
   variables {
-    shared_ebs_volumes = {
-      negative-device-index = {
+    shared_ebs_volumes = [
+      {
+        resource_key      = "negative-device-index"
         region            = var.all_systems[0].region
         availability_zone = var.all_systems[0].availability_zone
         aws_kms_alias     = var.all_systems[0].aws_kms_alias
@@ -1550,7 +1281,7 @@ run "shared_ebs_volumes_reject_negative_device_index" {
           device_index = -1
         }]
       }
-    }
+    ]
   }
 
   expect_failures = [var.shared_ebs_volumes]

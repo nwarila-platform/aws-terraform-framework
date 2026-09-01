@@ -69,7 +69,6 @@ variables {
           tags         = { Function = "wsusdb" }
           iops         = null
           snapshot_id  = null
-          skip_destroy = false
           throughput   = null
           volume_type  = "gp3"
         },
@@ -79,7 +78,6 @@ variables {
           volume_size  = "30"
           iops         = null
           snapshot_id  = null
-          skip_destroy = false
           tags         = {}
           throughput   = null
           volume_type  = "gp3"
@@ -87,12 +85,11 @@ variables {
       ]
 
       root_block_device = {
-        delete_on_termination = true
-        iops                  = null
-        tags                  = {}
-        throughput            = null
-        volume_type           = "gp3"
-        volume_size           = "100"
+        iops        = null
+        tags        = {}
+        throughput  = null
+        volume_type = "gp3"
+        volume_size = "100"
       }
 
       ami_block_device_overrides = []

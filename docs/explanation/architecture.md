@@ -37,6 +37,24 @@ That local-map layer is the module's contract boundary: resources should read
 from normalized locals rather than reimplementing input parsing in each
 resource block.
 
+Non-root EBS storage has inline and external resource paths.
+`ami_block_device_overrides` renders inline `aws_instance.ebs_block_device`
+blocks for inherited AMI mappings. Standalone `ebs_block_devices` and
+`shared_ebs_volumes` use the external `aws_ebs_volume` plus
+`aws_volume_attachment` graph and may be combined with each other. This tree
+does not validate the inline and external paths as mutually exclusive.
+
+A standalone volume may start empty or from a supplied snapshot ID. The
+authored value passes unchanged through the regional volume map to
+`aws_ebs_volume`; the provider and AWS own source validation. It does not change
+the volume or attachment identity, which remains derived from the host and
+authored `resource_key`.
+
+EC2 root and inline volumes delete with their instance. Standalone and shared
+EBS volumes can survive replacement of an attached instance but delete with the
+Terraform deployment. External attachments detach on destroy and ask Terraform
+to stop the instance first.
+
 ## Outputs
 
 Outputs expose `aws_instances`, the non-secret EC2 inventory that the configuration-management

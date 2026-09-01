@@ -11,12 +11,25 @@ locals {
   # segment pins one level further until an atomic build date freezes it exactly. The grammar is
   # enforced on var.all_systems, so everything below may assume a well-formed lowercase selector.
   #
-  # Deduplicated to the distinct selectors actually in play: twenty systems sharing one image cost
-  # one parameter read and one image lookup, not twenty of each.
-  ami_selectors = toset([for system in var.all_systems : system.ami])
+  # Deduplicated per region to the distinct selectors actually in play: twenty systems sharing one
+  # image in one region cost one parameter read and one image lookup, not twenty of each.
+  ami_selectors_by_region = {
+    for region in var.aws_config.regions : region => toset([
+      for system in local.systems_by_region[region] : system.ami
+    ])
+  }
 
   # A literal id bypasses the catalog; every other selector resolves through it.
-  catalog_selectors = toset([for ami in local.ami_selectors : ami if !startswith(ami, "ami-")])
+  catalog_selectors_by_region = {
+    for region in var.aws_config.regions : region => toset([
+      for ami in local.ami_selectors_by_region[region] : ami if !startswith(ami, "ami-")
+    ])
+  }
+
+  catalog_selectors = toset([
+    for system in var.all_systems : system.ami
+    if !startswith(system.ami, "ami-")
+  ])
 
   # Accounts a literal ami- id may belong to. "self" is the deploying account (793496711039),
   # which publishes the catalog; the other two are vendor accounts whose base images are pinned
@@ -40,16 +53,59 @@ locals {
     "/nwarila/ami/${strcontains(ami, "@") ? replace(ami, "@", "/") : "${ami}/latest"}"
   }
 
-  # One verified image object per selector, keyed the way the rest of the plan already keys
-  # images. Consumers read .id, .platform, .platform_details, .root_device_name and
-  # .block_device_mappings from here and never learn whether the id was pinned or resolved.
+  # One verified image object per selector in each region. Consumers read .id, .platform,
+  # .platform_details, .root_device_name and .block_device_mappings from here and never learn
+  # whether the id was pinned or resolved.
   amazon_machine_images = {
-    for ami in local.ami_selectors : ami => {
-      us_east_1 = try(data.aws_ami.us_east_1_verified[ami], null)
+    us_east_1 = {
+      for ami in local.ami_selectors_by_region.us_east_1 : ami =>
+      data.aws_ami.us_east_1_verified[ami]
     }
   }
 
   #endregion --- [ Amazon Machine Image Resolution ] ------------------------------------------- #
+
+
+  #region ------ [ Pre-Existing Infrastructure Selectors ] ------------------------------------- #
+
+  # What each pre-existing-infrastructure lookup in data.tf iterates. Every set is deduplicated,
+  # so systems sharing an alias, key pair, subnet or instance profile cost one read between them.
+  # A KMS alias reaches this framework three ways, and all three land in the same region's key.
+  kms_alias_selectors = {
+    for region in var.aws_config.regions : region => toset(concat(
+      [
+        for system in local.systems_by_region[region] : system.aws_kms_alias
+      ],
+      [
+        for database in local.databases_by_region[region] : database.aws_kms_alias
+      ],
+      [
+        for volume in local.shared_volumes_by_region[region] : volume.aws_kms_alias
+      ],
+    ))
+  }
+
+  key_pair_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in local.systems_by_region[region] : system.key_name
+    ])
+  }
+
+  subnet_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in local.systems_by_region[region] : system.subnet_id
+    ])
+  }
+
+  # An instance profile is a global IAM object, so this partition is the region of the systems
+  # that reference it rather than a property of the profile itself.
+  iam_instance_profile_selectors = {
+    for region in var.aws_config.regions : region => toset([
+      for system in local.systems_by_region[region] : system.iam_instance_profile
+    ])
+  }
+
+  #endregion --- [ Pre-Existing Infrastructure Selectors ] ------------------------------------- #
 
 
   #region ------ [ Deployment Identity Tags ] -------------------------------------------------- #
@@ -189,8 +245,9 @@ locals {
     $imdsBase       = "http://169.254.169.254/latest"
 
     try {
-      # 1. Install OpenSSH Server when the image ships without it. Each supported OS build names
-      #    its own FoD cab; the payload comes from the staged bucket and DISM stays off Windows Update.
+      # 1. Install OpenSSH Server when the image ships without it. Each supported OS build
+      #    names its own FoD cab; the payload comes from the staged bucket and DISM stays
+      #    off Windows Update.
       $state = (Get-WindowsCapability -Online -Name $capability).State
       if ($state -ne "Installed") {
         if (-not $fodBucket) { throw "OpenSSH.Server is absent and windows_fod_source is unset" }
@@ -284,9 +341,9 @@ locals {
 
   #region ------ [ Readiness Gate Wait Commands ] ---------------------------------------------- #
 
-  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate), both executed
-  # over SSH. Each blocks until the OS launch/provisioning agent reports completion after
-  # Terraform has first connected.
+  # Readiness-gate wait commands (selected per-OS in terraform_data.readiness_gate). Each blocks
+  # until the OS launch/provisioning agent reports completion after Terraform has first
+  # connected.
   windows_readiness_command = "\"C:\\Program Files\\Amazon\\EC2Launch\\EC2Launch.exe\" status -b"
   linux_readiness_command   = "cloud-init status --wait"
 
@@ -301,15 +358,38 @@ locals {
 # Dynamically Configured LOCALS
 locals {
 
-  #region ------ [ EC2 Key Pairs ] ------------------------------------------------------------- #
+  #region ------ [ Inputs Partitioned By Region ] ---------------------------------------------- #
 
-  # Every referenced key pair is pre-existing: this framework consumes key pairs, it never
-  # creates them, so the data lookup is the only source.
-  key_pair_names = {
-    us_east_1 = { for name, keypair in data.aws_key_pair.us_east_1 : name => keypair.key_name }
+  # Region normalization lives here so every downstream consumer shares one partition rule.
+  systems_by_region = {
+    for region in var.aws_config.regions : region => [
+      for system in var.all_systems : system
+      if replace(system.region, "-", "_") == region
+    ]
   }
 
-  #endregion --- [ EC2 Key Pairs ] ------------------------------------------------------------- #
+  load_balancers_by_region = {
+    for region in var.aws_config.regions : region => [
+      for load_balancer in var.all_load_balancers : load_balancer
+      if replace(load_balancer.region, "-", "_") == region
+    ]
+  }
+
+  databases_by_region = {
+    for region in var.aws_config.regions : region => [
+      for database in var.all_databases : database
+      if replace(database.region, "-", "_") == region
+    ]
+  }
+
+  shared_volumes_by_region = {
+    for region in var.aws_config.regions : region => [
+      for volume in var.shared_ebs_volumes : volume
+      if replace(volume.region, "-", "_") == region
+    ]
+  }
+
+  #endregion --- [ Inputs Partitioned By Region ] ---------------------------------------------- #
 
 
   #region ------ [ Interface-Owned Security Groups ] ------------------------------------------- #
@@ -319,7 +399,7 @@ locals {
   # and VPC come from the parent system because every interface already uses that system's subnet.
   # Description and tags come from the interface itself; a null description uses a stable
   # framework string.
-  network_interface_security_groups = merge(concat([{}], [
+  network_interface_security_groups = merge([
     for system in var.all_systems : {
       for interface_index, network_interface in system.network_interfaces :
       "${system.hostname}-eni-${interface_index}-sg" => {
@@ -340,7 +420,7 @@ locals {
       }
       if network_interface.ingress != null && network_interface.egress != null
     }
-  ])...)
+  ]...)
 
   # Interface-owned security groups partitioned per region (same normalization rule the systems
   # use).
@@ -540,18 +620,22 @@ locals {
   # SSM contributes no VPC and builds no group rather than an orphan attached to nothing.
   run_ingress_vpc_ids = {
     for region in var.aws_config.regions : region => distinct([
-      for system in var.all_systems :
+      for system in local.systems_by_region[region] :
       data.aws_subnet.us_east_1[system.subnet_id].vpc_id
-      if replace(system.region, "-", "_") == region &&
-      !local.connection_over_ssm[system.hostname]
+      if !local.connection_over_ssm[system.hostname]
     ])
   }
 
-  # Empty when nothing grants access, and also when a region declares no systems: with nothing
-  # to attach to there is no group to build, and indexing an empty VPC list would fail.
+  # True when nothing grants access, and when a region declares no systems: with nothing to
+  # attach to there is no group to build, and indexing an empty VPC list would fail.
+  run_ingress_disabled = {
+    for region in var.aws_config.regions : region =>
+    length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0
+  }
+
   run_ingress_security_groups = {
     for region in var.aws_config.regions : region => (
-      length(local.run_ingress_grants) == 0 || length(local.run_ingress_vpc_ids[region]) == 0 ? {} : {
+      local.run_ingress_disabled[region] ? {} : {
         (local.runner_ingress_name) = {
 
           # AWS Security Group Properties
@@ -607,14 +691,14 @@ locals {
   # primary ENI.
   eip_systems = {
     for region in var.aws_config.regions : region => {
-      for system in var.all_systems : system.hostname => {
+      for system in local.systems_by_region[region] : system.hostname => {
 
         # An Elastic IP declares no consumer tags, so this map is wholly framework-owned.
         tags = merge(local.identity_tags, {
           Name = system.hostname
         })
       }
-      if replace(system.region, "-", "_") == region && system.associate_public_ip
+      if system.associate_public_ip
     }
   }
 
@@ -625,7 +709,7 @@ locals {
 
   elastic_compute_cloud = {
     for region in var.aws_config.regions : region => {
-      for system in var.all_systems : system.hostname => {
+      for system in local.systems_by_region[region] : system.hostname => {
 
         ami                        = system.ami
         availability_zone          = system.availability_zone
@@ -633,7 +717,7 @@ locals {
         iam_instance_profile       = system.iam_instance_profile
         imds_hop_limit             = system.imds_hop_limit
         instance_type              = system.instance_type
-        is_windows                 = local.amazon_machine_images[system.ami][region].platform == "windows"
+        is_windows                 = local.amazon_machine_images[region][system.ami].platform == "windows"
         key_name                   = system.key_name
         readiness_command          = system.readiness_command
         readiness_gate             = system.readiness_gate
@@ -648,14 +732,13 @@ locals {
         # data-resolved and a variable validation cannot see it.
         connection_type     = coalesce(system.connection_type, "ssh")
         connection_protocol = local.connection_protocol[system.hostname]
-        connection_over_ssm = local.connection_over_ssm[system.hostname]
 
         # WinRM authenticates as Administrator with the launch password, so the encrypted blob has
         # to be fetched. Only for WinRM: it costs apply latency while the provider waits for the
         # password to become available, and the SSH path has no use for it. Tunnelling over SSM
         # does not change how the far end authenticates, so this keys off the protocol.
         get_password_data = (
-          local.amazon_machine_images[system.ami][region].platform == "windows" &&
+          local.amazon_machine_images[region][system.ami].platform == "windows" &&
           local.connection_protocol[system.hostname] == "winrm"
         )
 
@@ -668,7 +751,7 @@ locals {
         # through SSM by its configuration management is the normal case, so every Linux image
         # gets the agent.
         user_data = trimspace(
-          local.amazon_machine_images[system.ami][region].platform == "windows"
+          local.amazon_machine_images[region][system.ami].platform == "windows"
           ? (
             local.connection_protocol[system.hostname] == "winrm"
             ? local.windows_winrm_user_data
@@ -678,12 +761,11 @@ locals {
         )
 
         root_block_device = {
-          delete_on_termination = system.root_block_device.delete_on_termination
-          iops                  = system.root_block_device.iops
-          kms_key_id            = system.aws_kms_alias
-          throughput            = system.root_block_device.throughput
-          volume_size           = system.root_block_device.volume_size
-          volume_type           = system.root_block_device.volume_type
+          iops        = system.root_block_device.iops
+          kms_key_id  = system.aws_kms_alias
+          throughput  = system.root_block_device.throughput
+          volume_size = system.root_block_device.volume_size
+          volume_type = system.root_block_device.volume_type
 
           tags = merge(
             system.root_block_device.tags,
@@ -698,10 +780,9 @@ locals {
 
         ami_block_device_overrides = [
           for override in system.ami_block_device_overrides : {
-            delete_on_termination = override.delete_on_termination
-            device_name           = override.device_name
-            iops                  = override.iops
-            kms_key_id            = system.aws_kms_alias
+            device_name = override.device_name
+            iops        = override.iops
+            kms_key_id  = system.aws_kms_alias
             # Identity on the volume itself. default_tags puts it in the launch request, but only
             # a tag on the resource survives into state where an ec2:ResourceTag-scoped grant for
             # DeleteVolume, DetachVolume or ModifyVolume can be written against it - and where a
@@ -725,12 +806,12 @@ locals {
         # Skipped: instance-store mappings (virtual_name, no EBS volume to encrypt) and
         # suppression entries (no_device, which removes the mapping instead of creating it).
         uncovered_ami_block_devices = sort([
-          for mapping in try(local.amazon_machine_images[system.ami][region].block_device_mappings, []) :
+          for mapping in try(local.amazon_machine_images[region][system.ami].block_device_mappings, []) :
           mapping.device_name
           if length(try(mapping.ebs, {})) > 0 &&
           try(mapping.no_device, "") == "" &&
           try(mapping.virtual_name, "") == "" &&
-          mapping.device_name != try(local.amazon_machine_images[system.ami][region].root_device_name, "") &&
+          mapping.device_name != try(local.amazon_machine_images[region][system.ami].root_device_name, "") &&
           !contains([for override in system.ami_block_device_overrides : override.device_name], mapping.device_name)
         ])
 
@@ -745,12 +826,10 @@ locals {
           {
             Connection = local.connection_tag[system.hostname]
             Name       = system.hostname
-            OS         = local.amazon_machine_images[system.ami][region].platform_details
+            OS         = local.amazon_machine_images[region][system.ami].platform_details
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(system.region, "-", "_") == region
     }
   }
 
@@ -766,57 +845,55 @@ locals {
   # Config entries keyed by hostname across all regions (disjoint union; see above).
   systems_by_hostname = merge(values(local.elastic_compute_cloud)...)
 
-  # Combine each instance's runtime facts (id, private IP, key pair name) with its OS so the
-  # readiness gate can pick the right login user and wait command per instance. Both platforms
-  # authenticate over SSH with the launch key pair (the Windows bootstrap installs the launch
-  # public key for Administrator); WinRM is decommissioned. Systems that set
-  # readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded entirely.
+  # Combine each instance's runtime facts (id, private IP) with its system's OS and transport, so
+  # the readiness gate can pick the right login user, wait command and connection per instance.
+  # Systems that set readiness_gate = false (for example zero-inbound SSM-only boxes) are excluded
+  # entirely.
   readiness_targets = {
     for region in var.aws_config.regions : region => {
-      for hostname, instance in local.all_ec2_instances : hostname => {
-        id         = instance.id
-        private_ip = instance.private_ip
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => {
+        id         = local.all_ec2_instances[hostname].id
+        private_ip = local.all_ec2_instances[hostname].private_ip
         # Everything the gate needs is decided here: the connection mechanics and both
         # OS-specific fallbacks, so the resource reads fields and makes no choices.
         readiness_user = coalesce(
-          local.systems_by_hostname[hostname].readiness_user,
-          local.systems_by_hostname[hostname].is_windows ? "Administrator" : "ec2-user",
+          system.readiness_user,
+          system.is_windows ? "Administrator" : "ec2-user",
         )
         readiness_command = coalesce(
-          local.systems_by_hostname[hostname].readiness_command,
-          local.systems_by_hostname[hostname].is_windows
-          ? local.windows_readiness_command
-          : local.linux_readiness_command,
+          system.readiness_command,
+          system.is_windows ? local.windows_readiness_command : local.linux_readiness_command,
         )
-        target_platform = local.systems_by_hostname[hostname].is_windows ? "windows" : "unix"
+        target_platform = system.is_windows ? "windows" : "unix"
         script_path = (
-          local.systems_by_hostname[hostname].is_windows
+          system.is_windows
           ? null
-          : format("%s/terraform_%%RAND%%.sh", coalesce(
-            local.systems_by_hostname[hostname].readiness_script_dir,
-            local.linux_readiness_script_dir,
-          ))
+          : "${coalesce(system.readiness_script_dir, local.linux_readiness_script_dir)}/terraform_%RAND%.sh"
         )
-        private_key_path = local.systems_by_hostname[hostname].readiness_private_key_path
+        private_key_path = system.readiness_private_key_path
 
         # WinRM reaches 5986 over TLS with a certificate the instance generated for itself, so the
         # client cannot verify it and insecure has to be true. NTLM carries the authentication.
-        connection_type     = local.systems_by_hostname[hostname].connection_type
-        connection_protocol = local.systems_by_hostname[hostname].connection_protocol
-        use_winrm           = local.systems_by_hostname[hostname].connection_protocol == "winrm"
-        winrm_port          = 5986
+        use_winrm  = system.connection_protocol == "winrm"
+        winrm_port = 5986
 
         # Decrypted in flight from the encrypted blob AWS returns, with the launch private key the
         # gate already requires. Only the ciphertext ever reaches state.
+        # For WinRM, fileexists adds a null password only for a non-null missing path.
+        # terraform_data.readiness_gate's file-existence precondition rejects that exact case, so
+        # this local depends on the precondition remaining in place.
         password = (
-          local.systems_by_hostname[hostname].connection_protocol == "winrm" &&
-          local.systems_by_hostname[hostname].readiness_private_key_path != null
-          ? rsadecrypt(instance.password_data, file(local.systems_by_hostname[hostname].readiness_private_key_path))
+          system.connection_protocol == "winrm" &&
+          system.readiness_private_key_path != null &&
+          fileexists(system.readiness_private_key_path)
+          ? rsadecrypt(
+            local.all_ec2_instances[hostname].password_data,
+            file(system.readiness_private_key_path),
+          )
           : null
         )
       }
-      if local.systems_by_hostname[hostname].readiness_gate &&
-      local.systems_by_hostname[hostname].region == region
+      if system.readiness_gate
     }
   }
 
@@ -860,11 +937,11 @@ locals {
   # Only systems that explicitly asked for a power state get an aws_ec2_instance_state.
   ec2_instance_states = {
     for region in var.aws_config.regions : region => {
-      for hostname, instance in local.all_ec2_instances : hostname => {
-        instance_id = instance.id
-        state       = local.elastic_compute_cloud[region][hostname].set_state
+      for hostname, system in local.elastic_compute_cloud[region] : hostname => {
+        instance_id = local.all_ec2_instances[hostname].id
+        state       = system.set_state
       }
-      if local.elastic_compute_cloud[region][hostname].set_state != null
+      if system.set_state != null
     }
   }
 
@@ -873,9 +950,10 @@ locals {
 
   #region ------ [ Elastic Network Interfaces (ENIs) ] ----------------------------------------- #
 
-  # Each interface's authored private IPv4 addresses, normalized. additional_private_ips has two off
-  # spellings - the attribute's own null and an empty list - and both have to mean "this interface is
-  # unchanged", so they collapse to one empty list here instead of at each place that reads them.
+  # Each interface's authored private IPv4 addresses, normalized. additional_private_ips has
+  # two off spellings - the attribute's own null and an empty list - and both have to mean
+  # "this interface is unchanged", so they collapse to one empty list here instead of at each
+  # place that reads them.
   interface_authored_addresses = merge([
     for system in var.all_systems : {
       for index in range(length(system.network_interfaces)) :
@@ -892,8 +970,9 @@ locals {
 
   # What the provider is actually handed for each interface's private IPv4 addressing.
   #
-  # An interface carrying at most one authored address keeps the unordered `private_ips` set this
-  # framework has always written, so an interface that asks for no further address plans no change.
+  # An interface carrying at most one authored address keeps the unordered `private_ips` set
+  # this framework has always written, so an interface that asks for no further address plans
+  # no change.
   #
   # Further addresses move the interface to `private_ip_list`, which reaches AWS in authored order
   # and whose first element AWS marks primary. The set cannot carry them, for two reasons. Its
@@ -904,9 +983,9 @@ locals {
   # needs the opposite of both: the node's own address primary, and every cluster address a
   # secondary the operating system never configures.
   #
-  # The provider declares the two mutually exclusive, so exactly one of them is ever non-null. An
-  # explicit null does not count as a configured value for that exclusivity, which is what lets both
-  # attributes stay listed on the resource.
+  # The provider declares the two mutually exclusive, so exactly one of them is ever non-null.
+  # An explicit null does not count as a configured value for that exclusivity, which is what
+  # lets both attributes stay listed on the resource.
   interface_private_addressing = {
     for key, addresses in local.interface_authored_addresses :
     key => {
@@ -928,7 +1007,7 @@ locals {
 
   elastic_network_interfaces = {
     for region in var.aws_config.regions : region => merge([
-      for system in var.all_systems : {
+      for system in local.systems_by_region[region] : {
         for index in range(length(system.network_interfaces)) :
         "${system.hostname}-eni-${index}" => {
 
@@ -979,8 +1058,6 @@ locals {
           )
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(system.region, "-", "_") == region
     ]...)
   }
 
@@ -989,23 +1066,24 @@ locals {
 
   #region ------ [ Elastic Block Store (EBS) ] ------------------------------------------------- #
 
-  ebs_block_devices = {
-    for region in var.aws_config.regions : region => merge(
-      merge([
-        for system in var.all_systems : {
-          for volume in system.ebs_block_devices :
-          "${system.hostname}-ebs-${volume.resource_key}" => {
-
-            # AWS Elastic Block Store Properties
+  # Standalone and shared entries deliberately share one list. The map comprehension below
+  # renders their resource keys together, so duplicate standalone keys, duplicate shared
+  # resource_keys, and collisions between the two kinds all fail as duplicate object keys. That
+  # failure is a locals diagnostic, which terraform test cannot target with expect_failures, so
+  # it is proven by constructing a collision and watching the plan fail, not by a committed run.
+  ebs_block_device_entries = {
+    for region in var.aws_config.regions : region => concat(
+      flatten([
+        for system in local.systems_by_region[region] : [
+          for volume in system.ebs_block_devices : {
+            kind                 = "standalone"
+            resource_key         = volume.resource_key
             availability_zone    = system.availability_zone
             hostname             = system.hostname
             index                = volume.device_index
             iops                 = volume.iops
             kms_key_id           = system.aws_kms_alias
             multi_attach_enabled = null
-            refresh              = system.refresh
-            resource_key         = volume.resource_key
-            skip_destroy         = volume.skip_destroy
             snapshot_id          = volume.snapshot_id
             throughput           = volume.throughput
             volume_size          = volume.volume_size
@@ -1013,8 +1091,8 @@ locals {
 
             device_name = (
               local.elastic_compute_cloud[region][system.hostname].is_windows
-              ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-              : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+              ? "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
+              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
             )
 
             tags = merge(
@@ -1028,21 +1106,22 @@ locals {
                 # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
                 DeviceName = (
                   local.elastic_compute_cloud[region][system.hostname].is_windows
-                  ? "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
-                  : "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                  ? "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
+                  : "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
                 )
-
               }
             )
           }
-        }
-        # Normalize 'region' variable input to align with Terraform best practices.
-        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
-      ]...),
-      {
-        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
-        volume_key => {
+        ]
+        if system.ebs_block_devices != null
+      ]),
+      [
+        for volume in local.shared_volumes_by_region[region] : {
+          kind                 = "shared"
+          resource_key         = volume.resource_key
           availability_zone    = volume.availability_zone
+          hostname             = null
+          index                = null
           iops                 = volume.iops
           kms_key_id           = volume.aws_kms_alias
           multi_attach_enabled = true
@@ -1050,61 +1129,95 @@ locals {
           throughput           = null
           volume_size          = volume.volume_size
           volume_type          = "io2"
+          device_name          = null
 
           tags = merge(volume.tags, local.identity_tags, {
-            Name = volume_key
+            Name = volume.resource_key
           })
         }
-        if try(replace(volume.region, "-", "_") == region, false)
-      },
+      ],
     )
   }
 
-  # The one attachment map spans stable, refresh, standalone, and shared lifecycles. Standalone
-  # keys stay unchanged; JSON tuple keys keep shared volume/host identities unambiguous.
-  ebs_volume_attachments = {
-    for region in var.aws_config.regions : region => merge(
-      merge([
-        for system in var.all_systems : {
-          for volume in system.ebs_block_devices :
-          "${system.hostname}-ebs-${volume.resource_key}" => {
+  ebs_block_devices = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.ebs_block_device_entries[region] :
+      (entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : entry.resource_key) => {
+        availability_zone    = entry.availability_zone
+        hostname             = entry.hostname
+        index                = entry.index
+        iops                 = entry.iops
+        kms_key_id           = entry.kms_key_id
+        multi_attach_enabled = entry.multi_attach_enabled
+        snapshot_id          = entry.snapshot_id
+        throughput           = entry.throughput
+        volume_size          = entry.volume_size
+        volume_type          = entry.volume_type
+        device_name          = entry.device_name
+        tags                 = entry.tags
+      }
+    }
+  }
+
+  # Each shared volume's device index, keyed by the host it is attached to. Attachment hostnames
+  # are validated unique within a volume, so this map is total and the attachments list is
+  # searched here once instead of at every place a device name is spelled.
+  shared_volume_device_indexes = {
+    for volume in var.shared_ebs_volumes : volume.resource_key => {
+      for attachment in volume.attachments : attachment.hostname => attachment.device_index
+    }
+  }
+
+  # Stable and refresh lifecycles converge before attachment identities are rendered. As with the
+  # volumes above, standalone and shared entries are composed by one comprehension. Standalone
+  # keys stay byte-identical to their volume keys; JSON tuple keys keep shared volume/host
+  # identities unambiguous.
+  ebs_volume_attachment_entries = {
+    for region in var.aws_config.regions : region => concat(
+      flatten([
+        for system in local.systems_by_region[region] : [
+          for volume in system.ebs_block_devices : {
+            kind         = "standalone"
+            resource_key = volume.resource_key
+            hostname     = system.hostname
             device_name = local.ebs_block_devices[region][
               "${system.hostname}-ebs-${volume.resource_key}"
             ].device_name
-            hostname     = system.hostname
-            skip_destroy = volume.skip_destroy
-            volume_key   = "${system.hostname}-ebs-${volume.resource_key}"
           }
-        }
-        if replace(system.region, "-", "_") == region && system.ebs_block_devices != null
-      ]...),
-      merge([
-        for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : {
+        ]
+        if system.ebs_block_devices != null
+      ]),
+      flatten([
+        for volume in local.shared_volumes_by_region[region] : [
           for hostname in distinct([
-            for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
-            try(attachment.hostname, null)
-            ]) : jsonencode([volume_key, hostname]) => {
+            for attachment in volume.attachments : attachment.hostname
+            ]) : {
+            kind         = "shared"
+            resource_key = volume.resource_key
             hostname     = hostname
-            skip_destroy = false
-            volume_key   = volume_key
 
-            device_name = try(local.elastic_compute_cloud[region][hostname].is_windows, false) ? (
-              "xvd${jsondecode(format("\"\\u%04x\"", 100 + [
-                for attachment in volume.attachments : attachment.device_index
-                if attachment.hostname == hostname
-              ][0]))}"
-              ) : (
-              "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + [
-                for attachment in volume.attachments : attachment.device_index
-                if attachment.hostname == hostname
-              ][0]))}"
+            # Device letters come from device_index: 0 is sdd/xvdd, through 22 for sdz/xvdz.
+            device_name = (
+              local.elastic_compute_cloud[region][hostname].is_windows
+              ? "xvd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume.resource_key][hostname], 1)}"
+              : "/dev/sd${substr("defghijklmnopqrstuvwxyz", local.shared_volume_device_indexes[volume.resource_key][hostname], 1)}"
             )
           }
-          if try(hostname != null && contains(keys(local.elastic_compute_cloud[region]), hostname), false)
-        }
-        if try(replace(volume.region, "-", "_") == region, false)
-      ]...),
+          if contains(keys(local.elastic_compute_cloud[region]), hostname)
+        ]
+      ]),
     )
+  }
+
+  ebs_volume_attachments = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.ebs_volume_attachment_entries[region] :
+      (entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : jsonencode([entry.resource_key, entry.hostname])) => {
+        device_name = entry.device_name
+        hostname    = entry.hostname
+        volume_key  = entry.kind == "standalone" ? "${entry.hostname}-ebs-${entry.resource_key}" : entry.resource_key
+      }
+    }
   }
 
   #endregion --- [ Elastic Block Store (EBS) ] ------------------------------------------------- #
@@ -1114,7 +1227,7 @@ locals {
 
   elastic_load_balancers = {
     for region in var.aws_config.regions : region => {
-      for load_balancer in var.all_load_balancers : load_balancer.resource_key => {
+      for load_balancer in local.load_balancers_by_region[region] : load_balancer.resource_key => {
 
         access_logs                                                  = load_balancer.access_logs
         client_keep_alive                                            = load_balancer.client_keep_alive
@@ -1157,14 +1270,12 @@ locals {
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     }
   }
 
   lb_target_groups = {
     for region in var.aws_config.regions : region => merge([
-      for load_balancer in var.all_load_balancers : {
+      for load_balancer in local.load_balancers_by_region[region] : {
         for target_group in load_balancer.target_groups :
         "${load_balancer.resource_key}/${target_group.resource_key}" => {
 
@@ -1195,16 +1306,14 @@ locals {
           )
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ]...)
   }
 
   lb_target_group_attachments = {
     for region in var.aws_config.regions : region => merge(flatten([
-      for load_balancer in var.all_load_balancers : [
+      for load_balancer in local.load_balancers_by_region[region] : [
         for target_group in load_balancer.target_groups : {
-          for system in var.all_systems :
+          for system in local.systems_by_region[region] :
           "${load_balancer.resource_key}/${target_group.resource_key}/${system.hostname}" => {
 
             hostname = system.hostname
@@ -1213,20 +1322,17 @@ locals {
 
           }
           if(
-            replace(system.region, "-", "_") == region &&
             system.tags.Function == target_group.function &&
             data.aws_subnet.us_east_1[system.subnet_id].vpc_id == target_group.vpc_id
           )
         }
       ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ])...)
   }
 
   lb_listeners = {
     for region in var.aws_config.regions : region => merge([
-      for load_balancer in var.all_load_balancers : {
+      for load_balancer in local.load_balancers_by_region[region] : {
         for listener in load_balancer.listeners :
         "${load_balancer.resource_key}/${listener.resource_key}" => {
 
@@ -1246,52 +1352,70 @@ locals {
           }
         }
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
     ]...)
   }
 
-  lb_listener_rules = {
-    for region in var.aws_config.regions : region => merge(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : {
-          for rule in listener.rules :
-          "${load_balancer.resource_key}/${listener.resource_key}/${rule.resource_key}" => {
-
-            conditions   = rule.conditions
-            listener_key = "${load_balancer.resource_key}/${listener.resource_key}"
-            priority     = rule.priority
-
-            action = {
-              type             = rule.action.type
-              target_group_key = rule.action.target_group_key == null ? null : "${load_balancer.resource_key}/${rule.action.target_group_key}"
-              redirect         = rule.action.redirect
-              fixed_response   = rule.action.fixed_response
-            }
-
+  # A rendered key that collides fails the plan here instead of silently losing a resource:
+  # merge() keeps the last value for a duplicate key, a single for expression refuses it. The
+  # entries carry identity components; the map below renders the key, as the security-group rule
+  # pair above does.
+  lb_listener_rule_entries = {
+    for region in var.aws_config.regions : region => flatten([
+      for load_balancer in local.load_balancers_by_region[region] : [
+        for listener in load_balancer.listeners : [
+          for rule in listener.rules : {
+            load_balancer_key = load_balancer.resource_key
+            listener_key      = listener.resource_key
+            rule              = rule
           }
-        }
+        ]
       ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
-    ])...)
+    ])
+  }
+
+  lb_listener_rules = {
+    for region in var.aws_config.regions : region => {
+      for entry in local.lb_listener_rule_entries[region] :
+      "${entry.load_balancer_key}/${entry.listener_key}/${entry.rule.resource_key}" => {
+
+        conditions   = entry.rule.conditions
+        listener_key = "${entry.load_balancer_key}/${entry.listener_key}"
+        priority     = entry.rule.priority
+
+        action = {
+          type             = entry.rule.action.type
+          target_group_key = entry.rule.action.target_group_key == null ? null : "${entry.load_balancer_key}/${entry.rule.action.target_group_key}"
+          redirect         = entry.rule.action.redirect
+          fixed_response   = entry.rule.action.fixed_response
+        }
+
+      }
+    }
+  }
+
+  lb_listener_certificate_entries = {
+    for region in var.aws_config.regions : region => flatten([
+      for load_balancer in local.load_balancers_by_region[region] : [
+        for listener in load_balancer.listeners : [
+          for certificate_arn in listener.additional_certificate_arns : {
+            load_balancer_key = load_balancer.resource_key
+            listener_key      = listener.resource_key
+            certificate_arn   = certificate_arn
+          }
+        ]
+      ]
+    ])
   }
 
   lb_listener_certificates = {
-    for region in var.aws_config.regions : region => merge(flatten([
-      for load_balancer in var.all_load_balancers : [
-        for listener in load_balancer.listeners : {
-          for certificate_arn in listener.additional_certificate_arns :
-          "${load_balancer.resource_key}/${listener.resource_key}/${certificate_arn}" => {
+    for region in var.aws_config.regions : region => {
+      for entry in local.lb_listener_certificate_entries[region] :
+      "${entry.load_balancer_key}/${entry.listener_key}/${entry.certificate_arn}" => {
 
-            listener_key    = "${load_balancer.resource_key}/${listener.resource_key}"
-            certificate_arn = certificate_arn
-          }
-        }
-      ]
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(load_balancer.region, "-", "_") == region
-    ])...)
+        listener_key    = "${entry.load_balancer_key}/${entry.listener_key}"
+        certificate_arn = entry.certificate_arn
+      }
+    }
   }
 
   #endregion --- [ Elastic Load Balancers (ELBs) ] --------------------------------------------- #
@@ -1306,7 +1430,7 @@ locals {
   # local destroys must pass a different run_id.
   relational_database_service = {
     for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+      for database in local.databases_by_region[region] : database.db_name => {
 
         allocated_storage                   = database.allocated_storage
         availability_zone                   = database.availability_zone
@@ -1345,18 +1469,14 @@ locals {
           }
         )
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
     }
   }
 
   relational_database_service_credentials = {
     for region in var.aws_config.regions : region => {
-      for database in var.all_databases : database.db_name => {
+      for database in local.databases_by_region[region] : database.db_name => {
         username = sensitive(database.username)
       }
-      # Normalize 'region' variable input to align with Terraform best practices.
-      if replace(database.region, "-", "_") == region
     }
   }
 

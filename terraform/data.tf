@@ -1,5 +1,4 @@
-# Pre-existing infrastructure lookups. Managed-capability names are excluded from these
-# lookups so a managed reference is never resolved as pre-existing.
+# Pre-existing infrastructure lookups.
 
 #region ------ [ aws_ssm_parameter (image catalog) ] ------------------------------------------- #
 
@@ -7,14 +6,8 @@
 
 data "aws_ssm_parameter" "us_east_1_ami" {
 
-  # Resolve every distinct catalog selector used by a US-East-1 system. Keyed by selector rather
-  # than by system, so systems sharing an image share one read.
   provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.ami
-    if !startswith(system.ami, "ami-") &&
-    replace(system.region, "-", "_") == "us_east_1"
-  ])
+  for_each = local.catalog_selectors_by_region.us_east_1
 
   # The key is computed from the selector, never searched for. A misspelled family or a version
   # that was never published fails the plan here with ParameterNotFound - which is the point:
@@ -38,10 +31,7 @@ data "aws_ami" "us_east_1_verified" {
   # id was pinned in tfvars or resolved from the catalog above. This is also the lookup the rest
   # of the plan reads image attributes from, so verification cannot be bypassed by accident.
   provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.ami
-    if replace(system.region, "-", "_") == "us_east_1"
-  ])
+  for_each = local.ami_selectors_by_region.us_east_1
 
   # Module-owned (ADR repo/0001). An id says nothing about who produced it, so pinning the owner
   # is what stops a look-alike in an unrelated account being launched on a matching id alone.
@@ -116,20 +106,7 @@ data "aws_kms_alias" "us_east_1" {
 
   # Iterate through all KMS Aliases in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = toset(distinct(concat(
-    [
-      for system in var.all_systems : system.aws_kms_alias
-      if replace(system.region, "-", "_") == "us_east_1"
-    ],
-    [
-      for database in var.all_databases : database.aws_kms_alias
-      if replace(database.region, "-", "_") == "us_east_1"
-    ],
-    [
-      for volume in values(var.shared_ebs_volumes) : volume.aws_kms_alias
-      if replace(volume.region, "-", "_") == "us_east_1"
-    ],
-  )))
+  for_each = local.kms_alias_selectors.us_east_1
 
   # Define the KMS Alias Properties
   name = "alias/${each.value}"
@@ -149,10 +126,7 @@ data "aws_key_pair" "us_east_1" {
 
   # Iterate through all EC2 Key Pairs in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.key_name
-    if replace(system.region, "-", "_") == "us_east_1"
-  ])
+  for_each = local.key_pair_selectors.us_east_1
 
   # Define the EC2 Key Pair Properties
   key_name = each.value
@@ -170,16 +144,13 @@ data "aws_key_pair" "us_east_1" {
 
 data "aws_subnet" "us_east_1" {
 
-  # Iterate through all Subnets in the US-East-1 region. Needs ec2:DescribeSubnets, already
-  # covered by the read-only statement in the consumer deploy policies.
+  # Needs ec2:DescribeSubnets, already covered by the read-only statement in the consumer deploy
+  # policies.
   #
   # VPC, CIDR block, and availability zone come from here: this framework consumes pre-created
   # subnets and the consumer no longer restates any of that metadata alongside the id.
   provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.subnet_id
-    if replace(system.region, "-", "_") == "us_east_1"
-  ])
+  for_each = local.subnet_selectors.us_east_1
 
   # Define the Subnet Properties
   id = each.value
@@ -199,10 +170,7 @@ data "aws_iam_instance_profile" "us_east_1" {
 
   # Iterate through all IAM Instance Profiles in the US-East-1 region.
   provider = aws.us_east_1
-  for_each = toset([
-    for system in var.all_systems : system.iam_instance_profile
-    if replace(system.region, "-", "_") == "us_east_1"
-  ])
+  for_each = local.iam_instance_profile_selectors.us_east_1
 
   # Define the IAM Instance Profile Properties
   name = each.value

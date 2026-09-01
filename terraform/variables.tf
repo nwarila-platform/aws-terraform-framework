@@ -1,5 +1,8 @@
-# Variable declarations. Provider-neutral system/database identity first, then the
-# AWS-specific configuration and managed-capability maps.
+# Input variable declarations - the framework's entire consumer contract. Shaping belongs to
+# locals.tf; nothing here reads a data source, which is why a check that needs the real
+# subnet or the resolved image is a precondition in resources.tf rather than a validation.
+
+#region ------ [ Framework Controls ] ---------------------------------------------------------- #
 
 variable "environment" {
   description = <<-EOT
@@ -42,6 +45,11 @@ variable "refresh_serial" {
     ])
   }
 }
+
+#endregion --- [ Framework Controls ] ---------------------------------------------------------- #
+
+
+#region ------ [ Managed AWS Capabilities ] ---------------------------------------------------- #
 
 variable "all_systems" {
   description = <<-EOT
@@ -120,7 +128,7 @@ variable "all_systems" {
     imds_hop_limit = number
 
     root_block_device = object({
-      delete_on_termination = bool
+      #delete_on_termination = # Statically set to 'true'
       #encrypted            = # Statically set to 'true'
       iops = string
       #kms_key_id           = # Calculated automatically from system.aws_kms_alias
@@ -139,12 +147,12 @@ variable "all_systems" {
         #encrypted            = # Statically set to 'true'
         iops = string
         #kms_key_id           = # Calculated automatically from system.aws_kms_alias
-        skip_destroy = bool
-        snapshot_id  = string
-        tags         = map(string)
-        throughput   = string
-        volume_size  = string
-        volume_type  = string
+        #skip_destroy         = # Statically set to 'false'
+        snapshot_id = string
+        tags        = map(string)
+        throughput  = string
+        volume_size = string
+        volume_type = string
       })
     )
 
@@ -153,8 +161,8 @@ variable "all_systems" {
     # the AMI ships unencrypted. Use [] when the AMI defines nothing beyond its root device.
     ami_block_device_overrides = list(
       object({
-        delete_on_termination = bool
-        device_name           = string
+        #delete_on_termination = # Statically set to 'true'
+        device_name = string
         #encrypted            = # Statically set to 'true'
         iops = string
         #kms_key_id           = # Calculated automatically from system.aws_kms_alias
@@ -174,15 +182,16 @@ variable "all_systems" {
         # Omit (null) to let AWS pick a free address from the subnet CIDR. A pinned address is
         # checked against the real subnet at plan time by a network-interface precondition.
         private_ip = string
-        # Further private IPv4 addresses this interface carries alongside private_ip, for software
-        # that must own an address the operating system itself never configures - a Windows failover
-        # cluster brings its client access point online on one of these, and AWS requires such an
-        # address to already exist on the owning interface. Null and [] are both the off switch and
-        # leave the interface exactly as it was before this attribute existed. A non-empty list
-        # requires a non-null private_ip, because the framework then hands AWS an ordered list whose
-        # first element becomes the interface's primary address; that primary has to be the one the
-        # consumer authored, not one AWS picked. Values pass through unchanged, must be distinct
-        # across every address in the subnet, and the provider and AWS validate their spelling.
+        # Further private IPv4 addresses this interface carries alongside private_ip, for
+        # software that must own an address the operating system itself never configures - a
+        # Windows failover cluster brings its client access point online on one of these, and
+        # AWS requires such an address to already exist on the owning interface. Null and []
+        # are both the off switch and leave the interface exactly as it was before this
+        # attribute existed. A non-empty list requires a non-null private_ip, because the
+        # framework then hands AWS an ordered list whose first element becomes the interface's
+        # primary address; that primary has to be the one the consumer authored, not one AWS
+        # picked. Values pass through unchanged, must be distinct across every address in the
+        # subnet, and the provider and AWS validate their spelling.
         additional_private_ips = optional(list(string))
         security_groups        = list(string)
         # Non-null ingress and egress declare this interface's own group, named
@@ -227,6 +236,8 @@ variable "all_systems" {
   default  = []
   nullable = false
 
+  #region ------ [ all_systems - Image Selection ] --------------------------------------------- #
+
   # Image selector grammar. Either the literal-id escape hatch, or a catalog address: a lowercase
   # family, optionally suffixed with "@" and up to three dot-separated numeric segments. Leading
   # segments are 1-4 digit vendor version components; a build date is atomic YYYYMMDD and may
@@ -241,18 +252,7 @@ variable "all_systems" {
     condition = alltrue([
       for system in var.all_systems : (
         can(regex("^ami-[0-9a-f]{8,17}$", system.ami)) ||
-        (
-          can(regex("^[a-z][a-z0-9-]+(@[0-9][0-9.]*)?$", system.ami)) &&
-          length(try(split(".", split("@", system.ami)[1]), [])) <= 3 &&
-          alltrue([
-            for index, segment in try(split(".", split("@", system.ami)[1]), []) :
-            can(regex("^[0-9]{1,4}$", segment)) ||
-            (
-              can(regex("^[0-9]{8}$", segment)) &&
-              index == length(try(split(".", split("@", system.ami)[1]), [])) - 1
-            )
-          ])
-        )
+        can(regex("^[a-z][a-z0-9-]+(@([0-9]{1,4}[.]){0,2}([0-9]{1,4}|[0-9]{8}))?$", system.ami))
       )
     ])
     error_message = join(" ", [
@@ -264,9 +264,11 @@ variable "all_systems" {
     ])
   }
 
-  # An omitted attribute is already rejected by the type checker, so this only fires on an
-  # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
-  # null there silently produces zero volumes instead of failing.
+  #endregion --- [ all_systems - Image Selection ] --------------------------------------------- #
+
+
+  #region ------ [ all_systems - Connection and Readiness ] ------------------------------------ #
+
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -301,6 +303,30 @@ variable "all_systems" {
     ])
   }
 
+  # A relative path silently uploads somewhere unexpected and a trailing slash produces a
+  # doubled separator; both surface only as a readiness-gate timeout minutes into an apply.
+  validation {
+    condition = alltrue([
+      for system in var.all_systems :
+      system.readiness_script_dir == null || (
+        startswith(system.readiness_script_dir, "/") &&
+        !endswith(system.readiness_script_dir, "/")
+      )
+    ])
+    error_message = join(" ", [
+      "Each all_systems readiness_script_dir must be null, which selects /home/ec2-user, or an",
+      "absolute path with no trailing slash.",
+    ])
+  }
+
+  #endregion --- [ all_systems - Connection and Readiness ] ------------------------------------ #
+
+
+  #region ------ [ all_systems - System Contract and Lifecycle ] ------------------------------- #
+
+  # An omitted attribute is already rejected by the type checker, so this only fires on an
+  # explicit null. That matters most for ebs_block_devices: locals filters on non-null, so a
+  # null there silently produces zero volumes instead of failing.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -309,25 +335,34 @@ variable "all_systems" {
       system.root_block_device != null &&
       system.ebs_block_devices != null &&
       system.ami_block_device_overrides != null &&
-      system.network_interfaces != null &&
-      alltrue(flatten([
+      system.network_interfaces != null
+    ])
+    error_message = join(" ", [
+      "tags.Backup, readiness_gate, root_block_device, ebs_block_devices,",
+      "ami_block_device_overrides, and network_interfaces carry no defaults and must not be",
+      "null. Give each a real value; use [] for an empty list rather than null.",
+    ])
+  }
+
+  # An omitted ip_protocol is already rejected by the type checker; this catches an explicit null
+  # without blaming an unrelated scalar on the same system.
+  validation {
+    condition = alltrue(flatten([
+      for system in var.all_systems : [
         for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
           for rule in concat(
             nic.ingress == null ? [] : nic.ingress,
             nic.egress == null ? [] : nic.egress,
           ) : rule.ip_protocol != null
         ]
-      ]))
-    ])
+      ]
+    ]))
     error_message = join(" ", [
-      "tags.Backup, readiness_gate, root_block_device, ebs_block_devices,",
-      "ami_block_device_overrides, and network_interfaces carry no defaults and must not be",
-      "null. Give each a real value; use [] for an empty list rather than null.",
-      "Network-interface ingress and egress rule ip_protocol values must not be null.",
+      "Each all_systems network-interface ingress and egress rule ip_protocol must not be null.",
     ])
   }
 
-  # As above: the type checker catches omission, this catches an explicit null.
+  # The type checker catches omission; this catches an explicit null.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -339,7 +374,7 @@ variable "all_systems" {
     ])
   }
 
-  # As above: the type checker catches omission, this catches an explicit null.
+  # The type checker catches omission; this catches an explicit null.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -373,8 +408,10 @@ variable "all_systems" {
 
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      contains(var.aws_config.regions, replace(system.region, "-", "_"))
+      for system in var.all_systems : try(
+        contains(var.aws_config.regions, replace(system.region, "-", "_")),
+        false,
+      )
     ])
     error_message = "Each all_systems entry region must normalize to one of aws_config.regions."
   }
@@ -386,6 +423,11 @@ variable "all_systems" {
     ])
     error_message = "all_systems set_state, when set, must be exactly \"running\" or \"stopped\"."
   }
+
+  #endregion --- [ all_systems - System Contract and Lifecycle ] ------------------------------- #
+
+
+  #region ------ [ all_systems - Block Devices ] ----------------------------------------------- #
 
   validation {
     condition = alltrue([
@@ -432,32 +474,6 @@ variable "all_systems" {
     ])
   }
 
-  # The standalone maps use "<hostname>-ebs-<resource_key>" as their resource address. Because
-  # either component may itself contain "-ebs-", uniqueness of the components does not imply
-  # uniqueness of the generated key. Match the locals' normalized, per-region partition so an
-  # identical key in two different regions remains valid.
-  validation {
-    condition = alltrue([
-      for region in var.aws_config.regions :
-      length(distinct(compact(flatten([
-        for system in var.all_systems : [
-          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-          try("${system.hostname}-ebs-${volume.resource_key}", null)
-        ] if try(replace(system.region, "-", "_") == region, false)
-        ])))) == length(compact(flatten([
-        for system in var.all_systems : [
-          for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-          try("${system.hostname}-ebs-${volume.resource_key}", null)
-        ] if try(replace(system.region, "-", "_") == region, false)
-      ])))
-    ])
-    error_message = join(" ", [
-      "Every generated all_systems EBS volume key must be unique within its normalized region;",
-      "choose hostname and resource_key combinations whose <hostname>-ebs-<resource_key> values",
-      "differ.",
-    ])
-  }
-
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : system.ebs_block_devices == null ? [] : [
@@ -490,11 +506,11 @@ variable "all_systems" {
             concat(
               [
                 for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-                "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
               ],
               [
                 for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-                "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
               ],
             ),
             override.device_name,
@@ -524,11 +540,11 @@ variable "all_systems" {
             concat(
               [
                 for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-                "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                "/dev/sd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
               ],
               [
                 for volume in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-                "xvd${jsondecode(format("\"\\u%04x\"", 100 + volume.device_index))}"
+                "xvd${substr("defghijklmnopqrstuvwxyz", volume.device_index, 1)}"
               ],
             ),
             override.device_name,
@@ -540,14 +556,21 @@ variable "all_systems" {
 
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      !startswith(system.aws_kms_alias, "alias/")
+      for system in var.all_systems : try(
+        !startswith(system.aws_kms_alias, "alias/"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "all_systems aws_kms_alias must NOT include the 'alias/' prefix (it is added",
       "automatically).",
     ])
   }
+
+  #endregion --- [ all_systems - Block Devices ] ----------------------------------------------- #
+
+
+  #region ------ [ all_systems - Network Interfaces ] ------------------------------------------ #
 
   validation {
     condition = alltrue([
@@ -667,7 +690,9 @@ variable "all_systems" {
           system.network_interfaces == null ? [] : system.network_interfaces
         ) :
         jsonencode([
-          replace(system.region, "-", "_"),
+          # A null region is reported by the region rule above; substituting keeps this count
+          # from failing with a function error before that message is ever produced.
+          system.region == null ? "" : replace(system.region, "-", "_"),
           lower("${system.hostname}-eni-${interface_index}-sg"),
         ])
         if nic.ingress != null && nic.egress != null
@@ -827,11 +852,12 @@ variable "all_systems" {
     ])
   }
 
-  # The first element of the ordered list the provider receives is the address AWS marks primary, so
-  # an interface asking for further addresses has to name that primary itself. With private_ip null
-  # there is nothing to put first, and one of the additional addresses would be promoted - the exact
-  # opposite of what a cluster address is for, since the operating system configures the primary and
-  # a cluster address has to stay unconfigured for the cluster to bring it online.
+  # The first element of the ordered list the provider receives is the address AWS marks
+  # primary, so an interface asking for further addresses has to name that primary itself. With
+  # private_ip null there is nothing to put first, and one of the additional addresses would be
+  # promoted - the exact opposite of what a cluster address is for, since the operating system
+  # configures the primary and a cluster address has to stay unconfigured for the cluster to
+  # bring it online.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
@@ -846,32 +872,36 @@ variable "all_systems" {
     ])
   }
 
-  # A written additional address is a value, not an omission. The attribute's own null and an empty
-  # list are the off switch; once a list has entries, a null or blank one is silently discarded by
-  # the provider's expander and the interface is created carrying fewer addresses than authored.
+  # The provider discards an element it cannot expand instead of refusing it, so a malformed entry
+  # creates the interface carrying fewer addresses than authored and reports nothing.
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
         for nic in(system.network_interfaces == null ? [] : system.network_interfaces) : [
           for address in(nic.additional_private_ips == null ? [] : nic.additional_private_ips) :
-          try(address != "" && trimspace(address) == address, false)
+          can(cidrhost("${address}/32", 0))
         ]
       ]
     ]))
     error_message = join(" ", [
-      "Each all_systems network_interfaces additional_private_ips entry must be a non-null,",
-      "non-empty address with no surrounding whitespace; use null or [] to request no further",
-      "addresses.",
+      "Each all_systems network_interfaces additional_private_ips entry must be a valid IP address;",
+      "use null or [] to request no further addresses.",
     ])
   }
 
+  #endregion --- [ all_systems - Network Interfaces ] ------------------------------------------ #
+
+
+  #region ------ [ all_systems - Tags ] -------------------------------------------------------- #
 
   # The object type used to guarantee these two were present. A map does not, so say it here
   # rather than discover it when a tag map renders without them.
   validation {
     condition = alltrue([
-      for system in var.all_systems :
-      contains(keys(system.tags), "Backup") && contains(keys(system.tags), "Function")
+      for system in var.all_systems : try(
+        contains(keys(system.tags), "Backup") && contains(keys(system.tags), "Function"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_systems tags map must set Backup and Function. Every other key in the map is the",
@@ -880,8 +910,7 @@ variable "all_systems" {
   }
 
   # Backup selects a normalized True/False tag, so it has to read as a boolean rather than as
-  # whatever string happens to be written. The object type enforced this by being typed bool;
-  # a map of strings cannot, so the check moves here.
+  # whatever string happens to be written.
   validation {
     condition = alltrue([
       for system in var.all_systems :
@@ -896,7 +925,9 @@ variable "all_systems" {
   validation {
     condition = alltrue([
       for system in var.all_systems : alltrue([
-        for key in keys(system.tags) : !contains(
+        # A null map is the required-tags rule's to report; substituting keeps this rule
+        # from claiming a forbidden key that was never written.
+        for key in keys(system.tags == null ? {} : system.tags) : !contains(
           [
             "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
             "runid", "os", "index", "devicename", "connection",
@@ -951,21 +982,7 @@ variable "all_systems" {
     ])
   }
 
-  # A relative path silently uploads somewhere unexpected and a trailing slash produces a
-  # doubled separator; both surface only as a readiness-gate timeout minutes into an apply.
-  validation {
-    condition = alltrue([
-      for system in var.all_systems :
-      system.readiness_script_dir == null || (
-        startswith(system.readiness_script_dir, "/") &&
-        !endswith(system.readiness_script_dir, "/")
-      )
-    ])
-    error_message = join(" ", [
-      "Each all_systems readiness_script_dir must be null, which selects /home/ec2-user, or an",
-      "absolute path with no trailing slash.",
-    ])
-  }
+  #endregion --- [ all_systems - Tags ] -------------------------------------------------------- #
 }
 
 variable "shared_ebs_volumes" {
@@ -974,11 +991,12 @@ variable "shared_ebs_volumes" {
     Zone. AWS additionally requires Nitro instances and a multi-writer-safe clustered storage
     design; ordinary filesystems are not safe for concurrent writers. Each volume supports at most
     16 attachments. These are new resources: do not move an existing standalone volume into this
-    map, because the pinned provider treats enabling Multi-Attach as a replacement operation. An
-    empty map creates no shared volumes or attachments.
+    list, because the pinned provider treats enabling Multi-Attach as a replacement operation. An
+    empty list creates no shared volumes or attachments.
   EOT
 
-  type = map(object({
+  type = list(object({
+    resource_key      = string
     region            = string
     availability_zone = string
     aws_kms_alias     = string
@@ -991,26 +1009,14 @@ variable "shared_ebs_volumes" {
     }))
   }))
 
-  default  = {}
+  default  = []
   nullable = false
 
-  # The map key is rendered verbatim as the EC2 Name tag value. EC2 tag values are limited to
-  # 256 Unicode characters, so reject an otherwise-valid resource key before CreateVolume.
   validation {
     condition = alltrue([
-      for volume_key in keys(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) :
-      length(volume_key) <= 256
-    ])
-    error_message = join(" ", [
-      "Each shared_ebs_volumes map key must be at most 256 characters because it is rendered",
-      "verbatim as the EC2 Name tag value.",
-    ])
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume != null &&
+        volume.resource_key != null &&
         volume.region != null &&
         volume.availability_zone != null &&
         volume.aws_kms_alias != null &&
@@ -1020,14 +1026,14 @@ variable "shared_ebs_volumes" {
       )
     ])
     error_message = join(" ", [
-      "Each shared_ebs_volumes volume scalar must be non-null: region, availability_zone,",
-      "aws_kms_alias, iops, and volume_size all require real values.",
+      "Each shared_ebs_volumes volume scalar must be non-null: resource_key, region,",
+      "availability_zone, aws_kms_alias, iops, and volume_size all require real values.",
     ])
   }
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true : volume.tags != null,
         false,
       )
@@ -1035,35 +1041,9 @@ variable "shared_ebs_volumes" {
     error_message = "Each shared_ebs_volumes tags map must be non-null; use {} for no tags."
   }
 
-  # Validate the map EC2 actually receives. merge() replaces exact duplicate keys, and the six
-  # identity tags plus Name are written after the consumer map. EC2 permits at most 50 tags on a
-  # resource; AWS-generated aws:* tags are not represented here and do not count toward the limit.
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.tags == null ? true :
-        length(merge(volume.tags, {
-          CommitSha    = ""
-          Environment  = ""
-          ManagedBy    = ""
-          Name         = ""
-          Repository   = ""
-          RepositoryId = ""
-          RunId        = ""
-        })) <= 50,
-        false,
-      )
-    ])
-    error_message = join(" ", [
-      "Each shared_ebs_volumes rendered tag map must contain at most 50 tags after the six",
-      "framework identity tags and Name are merged.",
-    ])
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true : volume.attachments != null,
         false,
       )
@@ -1076,7 +1056,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment != null && attachment.hostname != null,
           false,
@@ -1088,7 +1068,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment != null && attachment.device_index != null,
           false,
@@ -1098,139 +1078,9 @@ variable "shared_ebs_volumes" {
     error_message = "Each shared_ebs_volumes attachment device_index must be non-null."
   }
 
-  # merge() keeps the later value for a duplicate key. Reject a shared key that would otherwise
-  # replace an existing standalone volume at the same resource address.
-  validation {
-    condition = alltrue([
-      for volume_key, volume in(var.shared_ebs_volumes == null ? {} : var.shared_ebs_volumes) : try(
-        volume == null ? true :
-        volume.region == null ? true :
-        !contains(flatten([
-          for system in var.all_systems : [
-            for standalone in(system.ebs_block_devices == null ? [] : system.ebs_block_devices) :
-            "${system.hostname}-ebs-${standalone.resource_key}"
-          ] if replace(system.region, "-", "_") == replace(volume.region, "-", "_")
-        ]), volume_key),
-        false,
-      )
-    ])
-    error_message = join(" ", [
-      "Each shared_ebs_volumes map key must be distinct from every generated standalone EBS",
-      "volume key in the same region.",
-    ])
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true : (
-          (volume.iops == null ? true : can(tonumber(volume.iops))) &&
-          (volume.volume_size == null ? true : can(tonumber(volume.volume_size)))
-        ),
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes iops and volume_size value must be numeric."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.iops == null ? true :
-        !can(tonumber(volume.iops)) ? true :
-        tonumber(volume.iops) == floor(tonumber(volume.iops)),
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes iops value must be an integer."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.volume_size == null ? true :
-        !can(tonumber(volume.volume_size)) ? true :
-        tonumber(volume.volume_size) == floor(tonumber(volume.volume_size)),
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes volume_size value must be an integer."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.iops == null ? true :
-        !can(tonumber(volume.iops)) ? true :
-        tonumber(volume.iops) >= 100,
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes iops value must be at least 100."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.iops == null ? true :
-        !can(tonumber(volume.iops)) ? true :
-        tonumber(volume.iops) <= 256000,
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes iops value must be at most 256000."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.volume_size == null ? true :
-        !can(tonumber(volume.volume_size)) ? true :
-        tonumber(volume.volume_size) >= 4,
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes volume_size value must be at least 4 GiB."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.volume_size == null ? true :
-        !can(tonumber(volume.volume_size)) ? true :
-        tonumber(volume.volume_size) <= 65536,
-        false,
-      )
-    ])
-    error_message = "Each shared_ebs_volumes volume_size value must be at most 65536 GiB."
-  }
-
-  validation {
-    condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
-        volume == null ? true :
-        volume.iops == null ? true :
-        volume.volume_size == null ? true :
-        !can(tonumber(volume.iops)) ? true :
-        !can(tonumber(volume.volume_size)) ? true :
-        tonumber(volume.iops) <= 1000 * tonumber(volume.volume_size),
-        false,
-      )
-    ])
-    error_message = join(" ", [
-      "Each shared_ebs_volumes iops value must be at most 1000 times its volume_size in GiB.",
-    ])
-  }
-
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.device_index == null ? true :
@@ -1244,7 +1094,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.device_index == null ? true :
@@ -1260,7 +1110,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         length(volume.attachments) >= 1,
@@ -1272,7 +1122,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         length(volume.attachments) <= 16,
@@ -1284,7 +1134,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.attachments == null ? true :
         alltrue([
@@ -1305,7 +1155,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           attachment == null ? true :
           attachment.hostname == null ? true :
@@ -1319,17 +1169,16 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue(flatten([
-      for volume in try(values(var.shared_ebs_volumes), []) : [
+      for volume in var.shared_ebs_volumes : [
         for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
           volume == null ? true :
           volume.availability_zone == null ? true :
           attachment == null ? true :
           attachment.hostname == null ? true :
-          !contains([for system in var.all_systems : system.hostname], attachment.hostname) ? true :
-          [
-            for system in var.all_systems : system.availability_zone
+          alltrue([
+            for system in var.all_systems : system.availability_zone == volume.availability_zone
             if system.hostname == attachment.hostname
-          ][0] == volume.availability_zone,
+          ]),
           false,
         )
       ]
@@ -1339,9 +1188,11 @@ variable "shared_ebs_volumes" {
     ])
   }
 
+  # A null volume or a null region is diagnosed by the scalar-non-null rule above, which names the
+  # offending attribute. Passing them through keeps this rule's message true to what it checks.
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.region == null ? true :
         contains(var.aws_config.regions, replace(volume.region, "-", "_")),
@@ -1353,7 +1204,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.aws_kms_alias == null ? true :
         !startswith(volume.aws_kms_alias, "alias/"),
@@ -1368,7 +1219,7 @@ variable "shared_ebs_volumes" {
 
   validation {
     condition = alltrue([
-      for volume in try(values(var.shared_ebs_volumes), []) : try(
+      for volume in var.shared_ebs_volumes : try(
         volume == null ? true :
         volume.tags == null ? true :
         alltrue([
@@ -1399,7 +1250,7 @@ variable "shared_ebs_volumes" {
           volume.device_index
         ],
         flatten([
-          for volume in try(values(var.shared_ebs_volumes), []) : [
+          for volume in var.shared_ebs_volumes : [
             for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
             attachment.device_index if try(
               attachment != null &&
@@ -1416,7 +1267,7 @@ variable "shared_ebs_volumes" {
           volume.device_index
         ],
         flatten([
-          for volume in try(values(var.shared_ebs_volumes), []) : [
+          for volume in var.shared_ebs_volumes : [
             for attachment in try(volume.attachments == null ? [] : volume.attachments, []) :
             attachment.device_index if try(
               attachment != null &&
@@ -1440,7 +1291,7 @@ variable "shared_ebs_volumes" {
   validation {
     condition = alltrue(flatten([
       for system in var.all_systems : [
-        for volume in try(values(var.shared_ebs_volumes), []) : [
+        for volume in var.shared_ebs_volumes : [
           for attachment in try(volume.attachments == null ? [] : volume.attachments, []) : try(
             attachment == null ? true :
             attachment.device_index == null ? true :
@@ -1452,7 +1303,7 @@ variable "shared_ebs_volumes" {
                   system.ami_block_device_overrides == null ? [] : system.ami_block_device_overrides
                 ) : override.device_name
               ],
-              "/dev/sd${jsondecode(format("\"\\u%04x\"", 100 + attachment.device_index))}",
+              "/dev/sd${substr("defghijklmnopqrstuvwxyz", attachment.device_index, 1)}",
             ) &&
             !contains(
               [
@@ -1460,7 +1311,7 @@ variable "shared_ebs_volumes" {
                   system.ami_block_device_overrides == null ? [] : system.ami_block_device_overrides
                 ) : override.device_name
               ],
-              "xvd${jsondecode(format("\"\\u%04x\"", 100 + attachment.device_index))}",
+              "xvd${substr("defghijklmnopqrstuvwxyz", attachment.device_index, 1)}",
             ),
             false,
             ) if try(
@@ -1534,7 +1385,7 @@ variable "all_databases" {
   default  = []
   nullable = false
 
-  # As above: the type checker catches omission, this catches an explicit null.
+  # The type checker catches omission; this catches an explicit null.
   validation {
     condition = alltrue([
       for database in var.all_databases :
@@ -1547,8 +1398,10 @@ variable "all_databases" {
   # A map of strings cannot, so both checks move here.
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      contains(keys(database.tags), "Backup") && contains(keys(database.tags), "Function")
+      for database in var.all_databases : try(
+        contains(keys(database.tags), "Backup") && contains(keys(database.tags), "Function"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_databases tags map must set Backup and Function. Every other key in the map is",
@@ -1569,7 +1422,9 @@ variable "all_databases" {
   validation {
     condition = alltrue([
       for database in var.all_databases : alltrue([
-        for key in keys(database.tags) : !contains(
+        # A null map is the required-tags rule's to report; substituting keeps this rule
+        # from claiming a forbidden key that was never written.
+        for key in keys(database.tags == null ? {} : database.tags) : !contains(
           [
             "name", "environment", "managedby", "repository", "repositoryid", "commitsha",
             "runid",
@@ -1585,7 +1440,7 @@ variable "all_databases" {
     ])
   }
 
-  # As above: the type checker catches omission, this catches an explicit null.
+  # The type checker catches omission; this catches an explicit null.
   validation {
     condition = alltrue([
       for database in var.all_databases :
@@ -1605,9 +1460,12 @@ variable "all_databases" {
   }
 
   validation {
-    condition = length(distinct([
-      for database in var.all_databases : lower(database.db_name)
-    ])) == length(var.all_databases)
+    condition = try(
+      length(distinct([
+        for database in var.all_databases : lower(database.db_name)
+      ])) == length(var.all_databases),
+      false,
+    )
     error_message = join(" ", [
       "Each all_databases entry must have a case-insensitively unique db_name because the RDS",
       "identifier is lowercased.",
@@ -1616,16 +1474,20 @@ variable "all_databases" {
 
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      contains(var.aws_config.regions, replace(database.region, "-", "_"))
+      for database in var.all_databases : try(
+        contains(var.aws_config.regions, replace(database.region, "-", "_")),
+        false,
+      )
     ])
     error_message = "Each all_databases entry region must normalize to one of aws_config.regions."
   }
 
   validation {
     condition = alltrue([
-      for database in var.all_databases :
-      !startswith(database.aws_kms_alias, "alias/")
+      for database in var.all_databases : try(
+        !startswith(database.aws_kms_alias, "alias/"),
+        false,
+      )
     ])
     error_message = join(" ", [
       "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added",
@@ -1662,221 +1524,6 @@ variable "all_databases" {
 # single object: a command-line -var outranks every tfvars source, so a runner cannot quietly
 # restate any of these in a value file. Every field is required and non-nullable — there is no
 # "unattributed" deployment, so no coherence rule is needed to hold the set together.
-
-variable "repository" {
-  description = "GitHub owner/name slug of the deploying repository, stamped as the Repository tag."
-  type        = string
-  nullable    = false
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.repository))
-    error_message = "repository must be an owner/name slug (e.g. nwarila-platform/aws-terraform-framework)."
-  }
-
-  validation {
-    condition     = length(var.repository) <= 256
-    error_message = "repository must be at most 256 characters so its tag value fits the EC2 tag-value limit."
-  }
-}
-
-variable "repository_id" {
-  description = "Numeric, rename-stable GitHub repository id — the anchor of the deployment identity, stamped as the RepositoryId tag."
-  type        = string
-  nullable    = false
-
-  validation {
-    condition     = can(regex("^[0-9]+$", var.repository_id))
-    error_message = "repository_id must be the numeric, rename-stable GitHub repository id."
-  }
-
-  validation {
-    condition     = length(var.repository_id) <= 256
-    error_message = "repository_id must be at most 256 characters so its tag value fits the EC2 tag-value limit."
-  }
-}
-
-variable "commit_sha" {
-  description = "Checked-out commit (git rev-parse HEAD after checkout, not github.sha), stamped as the CommitSha tag."
-  type        = string
-  nullable    = false
-
-  validation {
-    condition     = can(regex("^[0-9a-f]{40}$", var.commit_sha))
-    error_message = "commit_sha must be the lowercase 40-character checked-out commit SHA (git rev-parse HEAD after checkout, not github.sha)."
-  }
-}
-
-variable "run_id" {
-  description = "Numeric GitHub Actions run id, stamped as the RunId tag. The run record holds actors, timestamps, and approvals; those stay in deployment evidence rather than in tags."
-  type        = string
-  nullable    = false
-
-  validation {
-    condition     = can(regex("^[0-9]+$", var.run_id))
-    error_message = "run_id must be the numeric GitHub Actions run id."
-  }
-}
-
-# Define Provider Configuration Options.
-variable "runner_ip" {
-  description = <<-EOT
-    Public IPv4 address of the CI runner that must reach every instance for the life of one run.
-    Non-null contributes tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all sourced from
-    "<runner_ip>/32", to the one run-scoped group this framework attaches to every network
-    interface it creates. Null, the default, contributes nothing: the posture for local operator
-    runs and for on-prem targets.
-
-    These are the transports a RUN drives; a human sitting on the host is debug_ip's business
-    and carries its own set, so widening one never widens the other. Both sets are module-owned
-    literals rather than consumer inputs, so no deployment can widen either beyond the
-    transports it exists to serve.
-
-    A bare address, never a CIDR. Accepting a prefix would make a range representable at all;
-    requiring a single host makes one structurally impossible, which is a stronger guarantee
-    than the world-open ingress ban because the input type enforces it rather than a validation
-    rule someone could later relax.
-
-    Pass it at apply time (-var "runner_ip=..."), not from a value file: the address belongs to
-    a single run, not to a deployment's committed configuration.
-  EOT
-  type        = string
-  default     = null
-
-  validation {
-    condition = var.runner_ip == null || can(regex(
-      "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
-      var.runner_ip
-    ))
-    error_message = join(" ", [
-      "runner_ip must be a single bare IPv4 address such as 203.0.113.7, carrying no prefix",
-      "length. A CIDR is rejected so that a range cannot be expressed at all.",
-    ])
-  }
-
-  validation {
-    condition = var.runner_ip != "0.0.0.0"
-    error_message = join(" ", [
-      "runner_ip must not be 0.0.0.0. It is the unspecified address, never a reachable runner,",
-      "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
-    ])
-  }
-}
-
-variable "debug_ip" {
-  description = <<-EOT
-    Public IPv4 address a HUMAN works from while the host stands. Non-null contributes tcp/22
-    (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP, all sourced from "<debug_ip>/32", to the
-    same run-scoped group runner_ip feeds, under that variable's rules and for its reasons: null
-    by default and granting nobody anything, a bare address rather than a CIDR, and passed at
-    apply time rather than committed.
-
-    RDP is why this is a second input and not a second address on the first. CI has no use for a
-    desktop; a person debugging a Windows host cannot work without one. Kept apart, an operator's
-    access is granted and withdrawn without ever touching what the automation may reach.
-
-    A committed operator address would also publish where that person sits, which is why a caller
-    that cannot know the address up front resolves it in the pipeline and passes the result --
-    naming the operator nowhere this configuration records.
-  EOT
-  type        = string
-  default     = null
-
-  validation {
-    condition = var.debug_ip == null || can(regex(
-      "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
-      var.debug_ip
-    ))
-    error_message = join(" ", [
-      "debug_ip must be a single bare IPv4 address such as 198.51.100.20, carrying no prefix",
-      "length. A CIDR is rejected so that a range cannot be expressed at all.",
-    ])
-  }
-
-  validation {
-    condition = var.debug_ip != "0.0.0.0"
-    error_message = join(" ", [
-      "debug_ip must not be 0.0.0.0. It is the unspecified address, never a reachable operator,",
-      "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
-    ])
-  }
-}
-
-variable "aws_config" {
-  description = <<-EOT
-    Define all of the required environmental variables specific to the AWS provider.
-  EOT
-  type = object({
-    regions = list(string)
-  })
-
-  default = {
-    regions = ["us_east_1"]
-  }
-  nullable = false
-
-  validation {
-    condition = var.aws_config.regions == tolist(["us_east_1"])
-    error_message = join(" ", [
-      "aws_config.regions must be exactly [\"us_east_1\"]. Supporting additional regions",
-      "requires new provider aliases and per-region resource blocks (a code change), not just a",
-      "variable",
-      "edit.",
-    ])
-  }
-}
-
-variable "windows_fod_source" {
-  description = <<-EOT
-    Where the Windows SSH bootstrap fetches Feature-on-Demand payloads to install OpenSSH.Server on
-    images that ship without it (Server 2022), since an isolated instance cannot reach Windows
-    Update. One account-wide bucket, rendered into user_data at plan time - nothing is looked up
-    on the instance. bucket is its name; region is the region it lives in, which S3 requests are
-    signed for (the instance needs a route to S3 there: a gateway endpoint when it is the
-    instance's own region, otherwise an internet or NAT route); key_prefix is the folder under
-    which cabs sit as <key_prefix>/<OS build>/<package>.cab (e.g.
-    fod/20348/OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab), no leading or trailing slash.
-    Instance roles need s3:GetObject on <key_prefix>/* in this bucket. Null disables the step; a
-    Windows image lacking OpenSSH then fails loudly at boot instead of stranding an unreachable
-    instance.
-  EOT
-  type = object({
-    bucket     = string
-    region     = string
-    key_prefix = string
-  })
-
-  default = null
-
-  validation {
-    condition = var.windows_fod_source == null || can(
-      regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.windows_fod_source.bucket)
-    )
-    error_message = join(" ", [
-      "windows_fod_source.bucket must be a valid S3 bucket name: lowercase letters, digits, dots",
-      "and hyphens, 3-63 characters, starting and ending alphanumeric.",
-    ])
-  }
-
-  validation {
-    condition = var.windows_fod_source == null || can(
-      regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]$", var.windows_fod_source.region)
-    )
-    error_message = join(" ", [
-      "windows_fod_source.region must be the AWS region the bucket lives in, written like",
-      "us-east-1 or us-gov-west-1.",
-    ])
-  }
-
-  validation {
-    condition = var.windows_fod_source == null || can(
-      regex("^[^/](.*[^/])?$", var.windows_fod_source.key_prefix)
-    )
-    error_message = join(" ", [
-      "windows_fod_source.key_prefix must be a non-empty key prefix with no leading or trailing",
-      "slash, such as fod or windows/fod; the bootstrap appends /<OS build>/<package>.cab.",
-    ])
-  }
-}
 
 variable "all_load_balancers" {
   description = <<-EOT
@@ -2049,7 +1696,9 @@ variable "all_load_balancers" {
   default  = []
   nullable = false
 
-  # As above: the type checker catches omission, this catches an explicit null.
+  #region ------ [ all_load_balancers - Load Balancers ] --------------------------------------- #
+
+  # The type checker catches omission; this catches an explicit null.
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers : try(
@@ -2121,8 +1770,10 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue([
-      for load_balancer in var.all_load_balancers :
-      contains(var.aws_config.regions, replace(load_balancer.region, "-", "_"))
+      for load_balancer in var.all_load_balancers : try(
+        contains(var.aws_config.regions, replace(load_balancer.region, "-", "_")),
+        false,
+      )
     ])
     error_message = join(" ", [
       "Each all_load_balancers entry region must normalize to one of",
@@ -2165,6 +1816,11 @@ variable "all_load_balancers" {
     ])
   }
 
+  #endregion --- [ all_load_balancers - Load Balancers ] --------------------------------------- #
+
+
+  #region ------ [ all_load_balancers - Target Groups ] ---------------------------------------- #
+
   validation {
     condition = alltrue([
       for load_balancer in var.all_load_balancers :
@@ -2190,6 +1846,31 @@ variable "all_load_balancers" {
       "contain only letters, numbers, underscores, or hyphens.",
     ])
   }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
+        for target_group in load_balancer.target_groups :
+        target_group.function != null && trimspace(target_group.function) != ""
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups entry must set a non-empty function."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
+        for target_group in load_balancer.target_groups :
+        target_group.target_type == null || target_group.target_type == "instance"
+      ]
+    ]))
+    error_message = "Each all_load_balancers target_groups target_type must be instance."
+  }
+
+  #endregion --- [ all_load_balancers - Target Groups ] ---------------------------------------- #
+
+
+  #region ------ [ all_load_balancers - Listeners and Rules ] ---------------------------------- #
 
   validation {
     condition = alltrue([
@@ -2327,26 +2008,6 @@ variable "all_load_balancers" {
 
   validation {
     condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
-        for target_group in load_balancer.target_groups :
-        target_group.function != null && trimspace(target_group.function) != ""
-      ]
-    ]))
-    error_message = "Each all_load_balancers target_groups entry must set a non-empty function."
-  }
-
-  validation {
-    condition = alltrue(flatten([
-      for load_balancer in var.all_load_balancers : load_balancer.target_groups == null ? [] : [
-        for target_group in load_balancer.target_groups :
-        target_group.target_type == null || target_group.target_type == "instance"
-      ]
-    ]))
-    error_message = "Each all_load_balancers target_groups target_type must be instance."
-  }
-
-  validation {
-    condition = alltrue(flatten([
       for load_balancer in var.all_load_balancers : load_balancer.listeners == null ? [] : [
         for listener in load_balancer.listeners : listener.rules == null ? [] : [
           for rule in listener.rules :
@@ -2421,6 +2082,11 @@ variable "all_load_balancers" {
     ])
   }
 
+  #endregion --- [ all_load_balancers - Listeners and Rules ] ---------------------------------- #
+
+
+  #region ------ [ all_load_balancers - Tags ] ------------------------------------------------- #
+
   # Same reserved keys, bound to the load-balancer tag maps.
   validation {
     condition = alltrue([
@@ -2452,4 +2118,227 @@ variable "all_load_balancers" {
       "consumer-supplied tag maps must not set them, in any letter case.",
     ])
   }
+
+  #endregion --- [ all_load_balancers - Tags ] ------------------------------------------------- #
 }
+
+#endregion --- [ Managed AWS Capabilities ] ---------------------------------------------------- #
+
+
+#region ------ [ Deployment Identity ] --------------------------------------------------------- #
+
+variable "repository" {
+  description = "GitHub owner/name slug of the deploying repository, stamped as the Repository tag."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.repository))
+    error_message = "repository must be an owner/name slug (e.g. nwarila-platform/aws-terraform-framework)."
+  }
+}
+
+variable "repository_id" {
+  description = "Numeric, rename-stable GitHub repository id — the anchor of the deployment identity, stamped as the RepositoryId tag."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.repository_id))
+    error_message = "repository_id must be the numeric, rename-stable GitHub repository id."
+  }
+}
+
+variable "commit_sha" {
+  description = "Checked-out commit (git rev-parse HEAD after checkout, not github.sha), stamped as the CommitSha tag."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.commit_sha))
+    error_message = "commit_sha must be the lowercase 40-character checked-out commit SHA (git rev-parse HEAD after checkout, not github.sha)."
+  }
+}
+
+variable "run_id" {
+  description = "Numeric GitHub Actions run id, stamped as the RunId tag. The run record holds actors, timestamps, and approvals; those stay in deployment evidence rather than in tags."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.run_id))
+    error_message = "run_id must be the numeric GitHub Actions run id."
+  }
+}
+
+#endregion --- [ Deployment Identity ] --------------------------------------------------------- #
+
+
+#region ------ [ Run-Scoped Ingress ] ---------------------------------------------------------- #
+
+variable "runner_ip" {
+  description = <<-EOT
+    Public IPv4 address of the CI runner that must reach every instance for the life of one run.
+    Non-null contributes tcp/22 (SSH), tcp/5986 (WinRM) and ICMP, all sourced from
+    "<runner_ip>/32", to the one run-scoped group this framework attaches to every network
+    interface it creates. Null, the default, contributes nothing: the posture for local operator
+    runs and for on-prem targets.
+
+    These are the transports a RUN drives; a human sitting on the host is debug_ip's business
+    and carries its own set, so widening one never widens the other. Both sets are module-owned
+    literals rather than consumer inputs, so no deployment can widen either beyond the
+    transports it exists to serve.
+
+    A bare address, never a CIDR. Accepting a prefix would make a range representable at all;
+    requiring a single host makes one structurally impossible, which is a stronger guarantee
+    than the world-open ingress ban because the input type enforces it rather than a validation
+    rule someone could later relax.
+
+    Pass it at apply time (-var "runner_ip=..."), not from a value file: the address belongs to
+    a single run, not to a deployment's committed configuration.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition = var.runner_ip == null || can(regex(
+      "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
+      var.runner_ip
+    ))
+    error_message = join(" ", [
+      "runner_ip must be a single bare IPv4 address such as 203.0.113.7, carrying no prefix",
+      "length. A CIDR is rejected so that a range cannot be expressed at all.",
+    ])
+  }
+
+  validation {
+    condition = var.runner_ip != "0.0.0.0"
+    error_message = join(" ", [
+      "runner_ip must not be 0.0.0.0. It is the unspecified address, never a reachable runner,",
+      "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
+    ])
+  }
+}
+
+variable "debug_ip" {
+  description = <<-EOT
+    Public IPv4 address a HUMAN works from while the host stands. Non-null contributes tcp/22
+    (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP, all sourced from "<debug_ip>/32", to the
+    same run-scoped group runner_ip feeds, under that variable's rules and for its reasons: null
+    by default and granting nobody anything, a bare address rather than a CIDR, and passed at
+    apply time rather than committed.
+
+    RDP is why this is a second input and not a second address on the first. CI has no use for a
+    desktop; a person debugging a Windows host cannot work without one. Kept apart, an operator's
+    access is granted and withdrawn without ever touching what the automation may reach.
+
+    A committed operator address would also publish where that person sits, which is why a caller
+    that cannot know the address up front resolves it in the pipeline and passes the result --
+    naming the operator nowhere this configuration records.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition = var.debug_ip == null || can(regex(
+      "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$",
+      var.debug_ip
+    ))
+    error_message = join(" ", [
+      "debug_ip must be a single bare IPv4 address such as 198.51.100.20, carrying no prefix",
+      "length. A CIDR is rejected so that a range cannot be expressed at all.",
+    ])
+  }
+
+  validation {
+    condition = var.debug_ip != "0.0.0.0"
+    error_message = join(" ", [
+      "debug_ip must not be 0.0.0.0. It is the unspecified address, never a reachable operator,",
+      "and 0.0.0.0/32 would slip past the world-open ingress ban because it is a host route.",
+    ])
+  }
+}
+
+#endregion --- [ Run-Scoped Ingress ] ---------------------------------------------------------- #
+
+
+#region ------ [ AWS Configuration and Bootstrap ] --------------------------------------------- #
+
+variable "aws_config" {
+  description = <<-EOT
+    Define all of the required environmental variables specific to the AWS provider.
+  EOT
+  type = object({
+    regions = list(string)
+  })
+
+  default = {
+    regions = ["us_east_1"]
+  }
+  nullable = false
+
+  validation {
+    condition = var.aws_config.regions == tolist(["us_east_1"])
+    error_message = join(" ", [
+      "aws_config.regions must be exactly [\"us_east_1\"]. Supporting additional regions",
+      "requires new provider aliases and per-region resource blocks (a code change), not just a",
+      "variable",
+      "edit.",
+    ])
+  }
+}
+
+variable "windows_fod_source" {
+  description = <<-EOT
+    Where the Windows SSH bootstrap fetches Feature-on-Demand payloads to install OpenSSH.Server on
+    images that ship without it (Server 2022), since an isolated instance cannot reach Windows
+    Update. One account-wide bucket, rendered into user_data at plan time - nothing is looked up
+    on the instance. bucket is its name; region is the region it lives in, which S3 requests are
+    signed for (the instance needs a route to S3 there: a gateway endpoint when it is the
+    instance's own region, otherwise an internet or NAT route); key_prefix is the folder under
+    which cabs sit as <key_prefix>/<OS build>/<package>.cab (e.g.
+    fod/20348/OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab), no leading or trailing slash.
+    Instance roles need s3:GetObject on <key_prefix>/* in this bucket. Null disables the step; a
+    Windows image lacking OpenSSH then fails loudly at boot instead of stranding an unreachable
+    instance.
+  EOT
+  type = object({
+    bucket     = string
+    region     = string
+    key_prefix = string
+  })
+
+  default = null
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.windows_fod_source.bucket)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.bucket must be a valid S3 bucket name: lowercase letters, digits, dots",
+      "and hyphens, 3-63 characters, starting and ending alphanumeric.",
+    ])
+  }
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]$", var.windows_fod_source.region)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.region must be the AWS region the bucket lives in, written like",
+      "us-east-1 or us-gov-west-1.",
+    ])
+  }
+
+  validation {
+    condition = var.windows_fod_source == null || can(
+      regex("^[^/](.*[^/])?$", var.windows_fod_source.key_prefix)
+    )
+    error_message = join(" ", [
+      "windows_fod_source.key_prefix must be a non-empty key prefix with no leading or trailing",
+      "slash, such as fod or windows/fod; the bootstrap appends /<OS build>/<package>.cab.",
+    ])
+  }
+}
+
+#endregion --- [ AWS Configuration and Bootstrap ] --------------------------------------------- #
