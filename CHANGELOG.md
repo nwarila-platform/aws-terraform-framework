@@ -1,5 +1,34 @@
 # Changelog
 
+## [4.0.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.2...v4.0.0) (2026-09-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ebs:** shared_ebs_volumes is a list(object) carrying resource_key instead of a map keyed by it; rewrite each map entry as a list element with resource_key set to its former key.
+* root_block_device.delete_on_termination, ami_block_device_overrides[*].delete_on_termination and ebs_block_devices[*].skip_destroy leave the consumer surface; the module fixes them true/true/false. Remove them from tfvars. A consumer already writing those values sees no plan diff. One holding skip_destroy = true in state must apply this alone before any destroy or refresh_serial bump.
+* **ebs:** attachments on systems with refresh enabled move resource address, because the refresh-specific attachment resource no longer exists. For each affected state, move every such attachment before applying:
+
+### Features
+
+* **ebs:** let one volume serve the several instances that share it ([5841f50](https://github.com/nwarila-platform/aws-terraform-framework/commit/5841f507eb41bdb9451a4d01057c423033342868))
+* **ec2:** install OpenSSH on Windows 2022 from a staged Feature-on-Demand cab ([#127](https://github.com/nwarila-platform/aws-terraform-framework/issues/127)) ([51d7c0e](https://github.com/nwarila-platform/aws-terraform-framework/commit/51d7c0e8e302db0ff45381309856f4a8cb98c8b2))
+* **ec2:** let one interface carry the several addresses a cluster needs ([#126](https://github.com/nwarila-platform/aws-terraform-framework/issues/126)) ([36710d6](https://github.com/nwarila-platform/aws-terraform-framework/commit/36710d6a15eaa50a0ef70f886c0875fb930bf14a))
+* **ingress:** grant a human their own way in ([#122](https://github.com/nwarila-platform/aws-terraform-framework/issues/122)) ([987839e](https://github.com/nwarila-platform/aws-terraform-framework/commit/987839e46739f38b4e33fa15db9a2304db6fd6db))
+* **ingress:** open WinRM over HTTP for the operator address ([#131](https://github.com/nwarila-platform/aws-terraform-framework/issues/131)) ([1abf5ae](https://github.com/nwarila-platform/aws-terraform-framework/commit/1abf5aee0b988f52c3472196a05d4e3793476eee))
+* make every pattern uniform and every silent failure loud ([#129](https://github.com/nwarila-platform/aws-terraform-framework/issues/129)) ([330c95c](https://github.com/nwarila-platform/aws-terraform-framework/commit/330c95c5b722d24e91254578a64cff16af72082c))
+* **tags:** publish the transport as a Connection tag ([#128](https://github.com/nwarila-platform/aws-terraform-framework/issues/128)) ([c301813](https://github.com/nwarila-platform/aws-terraform-framework/commit/c3018131c3a3abf2bd66d48ad9e15a77e010e13d))
+
+
+### Bug Fixes
+
+* **ingress:** attach the group an operator was promised, and say who each rule is for ([#124](https://github.com/nwarila-platform/aws-terraform-framework/issues/124)) ([546d80b](https://github.com/nwarila-platform/aws-terraform-framework/commit/546d80b1ea75d4a98870bbbb137e5ca329b33697))
+
+
+### Code Refactoring
+
+* **ebs:** record the shared_ebs_volumes shape change in the changelog ([#130](https://github.com/nwarila-platform/aws-terraform-framework/issues/130)) ([e05cbcf](https://github.com/nwarila-platform/aws-terraform-framework/commit/e05cbcf5e01fbae1bbddf6e66e5d2e247b8d4830))
+
 ## [3.1.2](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.1...v3.1.2) (2026-08-09)
 
 
