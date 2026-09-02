@@ -581,12 +581,27 @@ locals {
   # desktop is the one thing CI never wants and a person debugging one cannot do without. Also
   # module-owned literals, for the same reason -- an operator input here would be a port list,
   # and a port list invites 0-65535.
+  #
+  # tcp/5985 is the operator's too, and deliberately NOT the runner's. The HTTP listener is what
+  # a domain delivers by Group Policy ("Allow remote server management through WinRM"), so a
+  # person driving Ansible against a domain-joined guest arrives on 5985 -- and their client
+  # seals the traffic itself: pywinrm's NTLM and Kerberos message encryption is what the service's
+  # AllowUnencrypted=false accepts. The runner keeps 5986 only because the one WinRM client a run
+  # drives is Terraform's readiness gate, which cannot seal and is refused on 5985 anyway. Nothing
+  # here opens 5985 on the GUEST: that firewall rule is the domain's to deliver and the
+  # consumer's to prove.
   debug_ingress_rules = merge(local.runner_ingress_rules, {
     rdp = {
       description = "Run-scoped RDP ingress."
       ip_protocol = "tcp"
       from_port   = 3389
       to_port     = 3389
+    }
+    winrm_http = {
+      description = "Run-scoped WinRM-over-HTTP ingress for a message-sealing client."
+      ip_protocol = "tcp"
+      from_port   = 5985
+      to_port     = 5985
     }
   })
 

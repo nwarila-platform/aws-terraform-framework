@@ -2223,14 +2223,21 @@ variable "runner_ip" {
 variable "debug_ip" {
   description = <<-EOT
     Public IPv4 address a HUMAN works from while the host stands. Non-null contributes tcp/22
-    (SSH), tcp/3389 (RDP), tcp/5986 (WinRM) and ICMP, all sourced from "<debug_ip>/32", to the
-    same run-scoped group runner_ip feeds, under that variable's rules and for its reasons: null
-    by default and granting nobody anything, a bare address rather than a CIDR, and passed at
-    apply time rather than committed.
+    (SSH), tcp/3389 (RDP), tcp/5985 (WinRM over HTTP), tcp/5986 (WinRM) and ICMP, all sourced
+    from "<debug_ip>/32", to the same run-scoped group runner_ip feeds, under that variable's
+    rules and for its reasons: null by default and granting nobody anything, a bare address
+    rather than a CIDR, and passed at apply time rather than committed.
 
     RDP is why this is a second input and not a second address on the first. CI has no use for a
     desktop; a person debugging a Windows host cannot work without one. Kept apart, an operator's
     access is granted and withdrawn without ever touching what the automation may reach.
+
+    tcp/5985 is the operator's for a related reason: the HTTP listener is the one a domain
+    delivers by Group Policy, and a person driving Ansible against a domain-joined guest arrives
+    on it with a client that seals its own messages. The runner never gets it, because the one
+    WinRM client a run drives -- the Terraform readiness gate -- cannot seal, and only ever
+    speaks HTTPS/5986. The security group is the whole grant; the guest's own firewall rule for
+    5985 is the domain's to deliver, never this module's to open.
 
     A committed operator address would also publish where that person sits, which is why a caller
     that cannot know the address up front resolves it in the pipeline and passes the result --
