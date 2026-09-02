@@ -522,9 +522,11 @@ run "runner_ip_across_two_vpcs_fails_the_precondition" {
 }
 
 
-# The operator half. debug_ip carries the runner's three transports PLUS RDP, because a person
-# on a Windows host needs a desktop and CI never does -- so granting an operator access must not
-# be expressible as widening what the automation may reach.
+# The operator half. debug_ip carries the runner's three transports PLUS RDP and WinRM over
+# HTTP, because a person on a Windows host needs a desktop and CI never does, and a person
+# driving Ansible against a domain-joined guest arrives on the policy-delivered HTTP listener
+# with a client that seals its own messages -- so granting an operator access must not be
+# expressible as widening what the automation may reach.
 run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
   command = plan
 
@@ -554,8 +556,9 @@ run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
       "runner-ingress-123456789-test-winrm-198.51.100.20",
       "runner-ingress-123456789-test-icmp-198.51.100.20",
       "runner-ingress-123456789-test-rdp-198.51.100.20",
+      "runner-ingress-123456789-test-winrm_http-198.51.100.20",
     ])
-    error_message = "A debug address must carry ssh, winrm, icmp and rdp, and nothing else."
+    error_message = "A debug address must carry ssh, winrm, winrm_http, icmp and rdp, and nothing else."
   }
 
   assert {
@@ -565,6 +568,15 @@ run "debug_ip_carries_rdp_as_well_as_the_runner_transports" {
       aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-rdp-198.51.100.20"].ip_protocol == "tcp"
     )
     error_message = "The RDP rule must be tcp/3389 exactly."
+  }
+
+  assert {
+    condition = (
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm_http-198.51.100.20"].from_port == 5985 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm_http-198.51.100.20"].to_port == 5985 &&
+      aws_vpc_security_group_ingress_rule.runner_ingress_us_east_1["runner-ingress-123456789-test-winrm_http-198.51.100.20"].ip_protocol == "tcp"
+    )
+    error_message = "The WinRM-over-HTTP rule must be tcp/5985 exactly."
   }
 
   assert {
@@ -602,8 +614,9 @@ run "runner_and_debug_addresses_keep_their_own_transports" {
       "runner-ingress-123456789-test-winrm-198.51.100.20",
       "runner-ingress-123456789-test-icmp-198.51.100.20",
       "runner-ingress-123456789-test-rdp-198.51.100.20",
+      "runner-ingress-123456789-test-winrm_http-198.51.100.20",
     ])
-    error_message = "The runner address must carry no RDP rule while the debug address does."
+    error_message = "The runner address must carry no RDP or WinRM-over-HTTP rule while the debug address does."
   }
 }
 
@@ -625,6 +638,7 @@ run "an_address_that_is_both_runner_and_operator_collapses" {
       "runner-ingress-123456789-test-winrm-203.0.113.7",
       "runner-ingress-123456789-test-icmp-203.0.113.7",
       "runner-ingress-123456789-test-rdp-203.0.113.7",
+      "runner-ingress-123456789-test-winrm_http-203.0.113.7",
     ])
     error_message = "One address named twice must yield one rule per transport, not two."
   }

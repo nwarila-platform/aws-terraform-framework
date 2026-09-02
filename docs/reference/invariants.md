@@ -82,8 +82,12 @@ change at minimum.
 - A run-scoped ingress rule's identity MUST include both its transport and its
   source address, so an identical runner and operator grant collapses to one AWS
   rule while distinct transports or addresses stay distinct. The operator grant
-  keeps the wider transport set, which is what adds tcp/3389 when `debug_ip` is
-  set.
+  keeps the wider transport set, which is what adds tcp/3389 and tcp/5985 when
+  `debug_ip` is set. tcp/5985 MUST stay out of the runner set: the one WinRM
+  client a run drives is the Terraform readiness gate, which does not seal
+  messages and speaks HTTPS/5986 only. The grant is the security group alone;
+  the framework MUST NOT open 5985 in the guest firewall, which is the domain's
+  policy to deliver.
 
 - An interface-owned security group MUST attach only to its declaring interface.
   Its consumer tags MUST be the interface's `tags`. At creation, its description

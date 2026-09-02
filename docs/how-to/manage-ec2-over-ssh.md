@@ -331,6 +331,14 @@ Use this network posture:
   side - the framework never enables the Windows RDP service or its host
   firewall. WinRM is configured only when the system selects a WinRM connection
   type.
+- WinRM over HTTP on 5985 is opened the same way, for the same address and
+  nobody else. A domain-joined guest gets its HTTP listener and firewall rule
+  from Group Policy, and an operator driving Ansible against it arrives on that
+  listener with a client that seals its own messages (pywinrm's NTLM or Kerberos
+  message encryption satisfies `AllowUnencrypted = false`). The runner's set
+  never includes 5985: the only WinRM client a run drives is the readiness gate
+  above, which does not seal. As with RDP, the security group is the whole of
+  the framework's part - it never opens 5985 in the guest firewall.
 - Systems with `readiness_gate = false` need no inbound access from the apply
   host for readiness. The `-ssm` forms require this posture.
 
