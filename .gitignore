@@ -28,6 +28,7 @@
 !/.github/workflows/release-please.yaml
 !/.github/workflows/security.yaml
 !/.github/workflows/template-sync.yaml
+!/.github/workflows/template-drift.yaml
 
 # Editor configuration
 !/.vscode/
