@@ -30,12 +30,13 @@
 !/.github/workflows/repo-hygiene.yaml
 !/.github/workflows/release-please.yaml
 !/.github/workflows/security.yaml
-!/.github/workflows/template-drift.yaml
+!/.github/workflows/workflow-containers.yaml
 
 # Editor configuration
 !/.vscode/
 !/.vscode/extensions.json
 !/.vscode/settings.json
+!/.vscode/tasks.json
 
 # Terraform module sources and tests
 !/terraform/

@@ -8,9 +8,8 @@ PRs to `main` must pass:
 - `Security` (the local `security.yaml` caller, which delegates to the
   namespace-local `nwarila-platform/.github` CodeQL, IaC/security, and
   Scorecard reusables per org ADR-0005)
-- `Template Drift` (`template-drift / template drift` for the org policy and
-  `framework-template-drift / template drift` for the pinned
-  `NWarila/terraform-framework-template` version-3 policy)
+- `Workflow containers` (`template-drift / run / check` for the pinned org and
+  `NWarila/terraform-framework-template` version-3 policies)
 - `Repo Hygiene` (`nwarila-platform/.github` repo-hygiene policy)
 
 Workflow and action references are 40-character SHA-pinned per the repo-hygiene
