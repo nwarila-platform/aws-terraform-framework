@@ -23,6 +23,8 @@
   "labels": ["dependencies"],
   "prConcurrentLimit": 5,
 
+  "ignorePaths": [".github/workflows/workflow-containers.yaml"],
+
   "enabledManagers": [
     "github-actions",
     "terraform",
@@ -46,7 +48,7 @@
         "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: packageName=(?<packageName>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?\\s+\\w+(?:_VERSION)?:\\s*\"(?<currentValue>[^\"]+)\"",
         "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: packageName=(?<packageName>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?\\s+\\w+_VERSION=\"(?<currentValue>[^\"]+)\"",
         "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: packageName=(?<packageName>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?\\s+pip install --no-cache-dir (?<depName2>[a-zA-Z0-9-._]+)==(?<currentValue>[^\\s]+)",
-        "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?) packageName=(?<packageName>[^\\s]+?) currentValue=(?<currentValue>[^\\s]+?)\\s+(?:source-ref:|template_ref:|uses:\\s*[^@\\s]+@)\\s*(?<currentDigest>[a-f0-9]{40})"
+        "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?) packageName=(?<packageName>[^\\s]+?) currentValue=(?<currentValue>[^\\s]+?)\\s+source-ref:\\s*(?<currentDigest>[a-f0-9]{40})"
       ]
     }
   ],
