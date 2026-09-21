@@ -3,10 +3,14 @@ on:
   pull_request:
   push:
     branches: [main]
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 jobs:
   template-drift:
-    # renovate: datasource=git-refs depName=nwarila-platform/workflow-template-drift packageName=https://github.com/nwarila-platform/workflow-template-drift.git currentValue=main
-    uses: nwarila-platform/workflow-template-drift/.github/workflows/check.yaml@d20e0fd946ed87001b582ac88d868a9b45cde839 # v2.1.0
+    permissions:
+      contents: read
+      security-events: write # Propagates A14: a nested reusable workflow cannot elevate its caller's token.
+    uses: nwarila-platform/workflow-template-drift/.github/workflows/check.yaml@141a77a03da55254c280c4c3a05717fd97ea2789 # acc W0
+    with:
+      # renovate: datasource=docker depName=ghcr.io/nwarila-platform/workflow-template-drift
+      version: 2.1.0
+      digest: sha256:92fa32bf5cd9ba48adf95bc984677964c21b254e514f45515ea7f13a145b208d
