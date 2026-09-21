@@ -13,4 +13,3 @@ jobs:
     with:
       # renovate: datasource=docker depName=ghcr.io/nwarila-platform/workflow-template-drift
       version: 2.1.0
-      digest: sha256:zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
