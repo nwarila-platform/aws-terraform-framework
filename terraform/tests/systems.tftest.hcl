@@ -4139,10 +4139,36 @@ run "systems_render_windows_fod_bucket_into_user_data" {
       can(regex("[$]fodBucket\\s+= \"123456789012-apprepo\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
       can(regex("[$]fodRegion\\s+= \"us-west-2\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
       can(regex("[$]fodKeyPrefix\\s+= \"windows/fod\"", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
-      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key \"$fodKeyPrefix/$build/$cab\" -File \"$stagingDir\\$cab\""),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key \"$fodKeyPrefix/$build/$cab\" -File (Join-Path $stagingDir $cab)"),
       !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "placement/region"),
     ])
     error_message = "windows_fod_source must render bucket, region and key_prefix into the Windows SSH user_data for Read-S3Object, with no instance-side region lookup."
+  }
+
+  # Staging lives under the system temp directory and is removed on EVERY path. Remove-Item as a
+  # trailing statement never ran on a throw, because $ErrorActionPreference is Stop, so a failed
+  # fetch or install left the cab on disk.
+  assert {
+    condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "$stagingDir = Join-Path $env:TEMP \"openssh-fod\""),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Remove-Item -Path $stagingDir -Recurse -Force -ErrorAction SilentlyContinue"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "C:\\Windows\\Temp\\fod"),
+    ])
+    error_message = "The FoD staging directory must be under the system temp directory and removed in a finally, not by a trailing Remove-Item that a throw skips."
+  }
+
+  # Server 2019 is build 17763 and its cab is named identically to 20348's -- the build directory
+  # in the key is what separates them. Its RTM sshd.exe cannot load against the serviced
+  # libcrypto.dll, so the payload's own copy is placed beside the binary. 20348 must NOT get that
+  # treatment: it works as shipped, and copying an older libcrypto over it would be a downgrade.
+  assert {
+    condition = alltrue([
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "17763   { \"OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab\" }"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 17763) {"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "System32\\OpenSSH\\libcrypto.dll"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 20348) {"),
+    ])
+    error_message = "Build 17763 must be a staged cab arm and the only build that gets the libcrypto placement."
   }
 }
 
