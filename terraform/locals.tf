@@ -254,15 +254,46 @@ locals {
 
         $build = [int](Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name CurrentBuild)
         $cab   = switch ($build) {
+          17763   { "OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab" }
           20348   { "OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab" }
           default { throw "no OpenSSH FoD is staged for Windows build $build" }
         }
 
-        $stagingDir = "C:\Windows\Temp\fod"
-        New-Item -Path $stagingDir -ItemType Directory -Force | Out-Null
-        Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key "$fodKeyPrefix/$build/$cab" -File "$stagingDir\$cab" | Out-Null
-        Add-WindowsCapability -Online -Name $capability -Source $stagingDir -LimitAccess | Out-Null
-        Remove-Item -Path $stagingDir -Recurse -Force
+        # try/finally because Remove-Item as the last statement never runs on a throw, and
+        # $ErrorActionPreference is Stop. SilentlyContinue on the cleanup is deliberate: an
+        # error raised inside finally would replace the fault being cleaned up after, and the
+        # log would report a failed delete instead of the S3 or DISM failure that killed boot.
+        $stagingDir = Join-Path $env:TEMP "openssh-fod"
+        try {
+          New-Item -Path $stagingDir -ItemType Directory -Force | Out-Null
+          Read-S3Object -BucketName $fodBucket -Region $fodRegion -Key "$fodKeyPrefix/$build/$cab" -File (Join-Path $stagingDir $cab) | Out-Null
+          Add-WindowsCapability -Online -Name $capability -Source $stagingDir -LimitAccess | Out-Null
+
+          # HOTFIX, Server 2019 only. REPLACE THIS; it is not a sanctioned fix.
+          # A FoD payload is always the RTM baseline. On a 2019 image patched to KB5050008
+          # (17763.6775) or later, Windows Update has already advanced OpenSSH Client and
+          # libcrypto.dll -- measured: client 9.5.5.2 against OpenSSL 3.8.2.0 -- but skipped the
+          # Server half because it was not installed. The cab then delivers sshd.exe 7.7.2.1,
+          # built against LibreSSL 2.6.5.1, which cannot resolve its imports in OpenSSL 3.x: it
+          # dies at image load with 0xC0000139 and the service times out as error 1053.
+          # Microsoft documents this case and names libcrypto.dll, and prescribes either
+          # reinstalling the latest cumulative update -- which this boot cannot afford -- or
+          # installing the Win32-OpenSSH client and server together. Until one is adopted, bind
+          # sshd to the crypto from its own payload. The real fix is adding the capability to a
+          # baked image BEFORE its final cumulative update, the order Microsoft prescribes;
+          # that image work deletes this block and the 17763 arm with it.
+          if ($build -eq 17763) {
+            $expandDir = Join-Path $stagingDir "expanded"
+            New-Item -Path $expandDir -ItemType Directory -Force | Out-Null
+            expand.exe (Join-Path $stagingDir $cab) -F:* $expandDir | Out-Null
+            $lib = Get-ChildItem -Path $expandDir -Recurse -Filter libcrypto.dll | Select-Object -First 1
+            if (-not $lib) { throw "no libcrypto.dll in $cab; 2019 sshd cannot be matched to the serviced client" }
+            Copy-Item -Path $lib.FullName -Destination (Join-Path $env:SystemRoot "System32\OpenSSH\libcrypto.dll") -Force
+          }
+        }
+        finally {
+          Remove-Item -Path $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
       }
 
       # 2. Enable the service and open the host firewall. Both are idempotent.
