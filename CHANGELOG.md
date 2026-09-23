@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.1.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v4.0.0...v4.1.0) (2026-09-23)
+
+
+### Features
+
+* **windows:** install the OpenSSH FoD on Server 2019, and clean up staging ([#143](https://github.com/nwarila-platform/aws-terraform-framework/issues/143)) ([195da95](https://github.com/nwarila-platform/aws-terraform-framework/commit/195da95047d8d207591eb98eac5b07873fb14d84))
+
+
+### Bug Fixes
+
+* **windows:** generate the 2019 host keys before the libcrypto placement ([#145](https://github.com/nwarila-platform/aws-terraform-framework/issues/145)) ([d49eb78](https://github.com/nwarila-platform/aws-terraform-framework/commit/d49eb78de449b6acce7411106b188492fa9fd840))
+
 ## [4.0.0](https://github.com/nwarila-platform/aws-terraform-framework/compare/v3.1.2...v4.0.0) (2026-09-17)
 
 
