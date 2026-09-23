@@ -288,6 +288,19 @@ locals {
             expand.exe (Join-Path $stagingDir $cab) -F:* $expandDir | Out-Null
             $lib = Get-ChildItem -Path $expandDir -Recurse -Filter libcrypto.dll | Select-Object -First 1
             if (-not $lib) { throw "no libcrypto.dll in $cab; 2019 sshd cannot be matched to the serviced client" }
+
+            # HOST KEYS FIRST, AND THE ORDER IS THE WHOLE POINT. The cab leaves this directory
+            # holding a MIXED set: sshd, sftp-server and ssh-shellhost at 7.7.2.1 from the
+            # payload, every other binary at the serviced 9.5.5.2. One libcrypto.dll cannot
+            # satisfy both. ssh-keygen is one of the 9.5.5.2 ones, so once the cab's LibreSSL
+            # 2.6.5.1 sits beside it the executable's own directory wins the DLL search and
+            # ssh-keygen dies with the same 0xC0000139 the placement exists to cure. sshd then
+            # exits "no hostkeys available" and nothing reaches the instance -- which is how
+            # this was found, on a real deploy. Generating the keys while System32's OpenSSL
+            # 3.x is still the only candidate costs one call and removes the trap.
+            & (Join-Path $env:SystemRoot "System32\OpenSSH\ssh-keygen.exe") -A | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "ssh-keygen -A failed with $LASTEXITCODE before the libcrypto placement" }
+
             Copy-Item -Path $lib.FullName -Destination (Join-Path $env:SystemRoot "System32\OpenSSH\libcrypto.dll") -Force
           }
         }

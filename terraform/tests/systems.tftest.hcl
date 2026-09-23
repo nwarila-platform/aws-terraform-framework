@@ -4166,6 +4166,9 @@ run "systems_render_windows_fod_bucket_into_user_data" {
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "17763   { \"OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab\" }"),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 17763) {"),
       strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "System32\\OpenSSH\\libcrypto.dll"),
+      # Host keys must be generated BEFORE the payload libcrypto lands: ssh-keygen is the
+      # serviced 9.5.5.2 binary and cannot load against the cab's LibreSSL.
+      can(regex("(?s)ssh-keygen\\.exe.{0,400}Copy-Item -Path [$]lib\\.FullName", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
       !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 20348) {"),
     ])
     error_message = "Build 17763 must be a staged cab arm and the only build that gets the libcrypto placement."
