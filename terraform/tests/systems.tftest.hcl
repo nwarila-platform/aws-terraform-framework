@@ -4036,7 +4036,7 @@ run "systems_render_readiness_user_data_per_os" {
       !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "WSMan"),
       !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "5986"),
     ])
-    error_message = "WinRM is decommissioned; Windows user_data must not configure WSMan/WinRM listeners."
+    error_message = "The SSH user_data must not configure WSMan/WinRM: the two transports are chosen per system and each gets its own user_data, so a listener appearing here would be one the operator did not ask for."
   }
 
   assert {
@@ -4157,21 +4157,19 @@ run "systems_render_windows_fod_bucket_into_user_data" {
     error_message = "The FoD staging directory must be under the system temp directory and removed in a finally, not by a trailing Remove-Item that a throw skips."
   }
 
-  # Server 2019 is build 17763 and its cab is named identically to 20348's -- the build directory
-  # in the key is what separates them. Its RTM sshd.exe cannot load against the serviced
-  # libcrypto.dll, so the payload's own copy is placed beside the binary. 20348 must NOT get that
-  # treatment: it works as shipped, and copying an older libcrypto over it would be a downgrade.
+  # ONE arm only. Server 2019's payload OpenSSH cannot run on a patched 17763 host -- its
+  # sshd is built against a LibreSSL that servicing has already replaced -- so 17763 must NOT
+  # be a staged build here and must fall through to the throw. It reaches the framework over
+  # WinRM instead.
   assert {
     condition = alltrue([
-      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "17763   { \"OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab\" }"),
-      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 17763) {"),
-      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "System32\\OpenSSH\\libcrypto.dll"),
-      # Host keys must be generated BEFORE the payload libcrypto lands: ssh-keygen is the
-      # serviced 9.5.5.2 binary and cannot load against the cab's LibreSSL.
-      can(regex("(?s)ssh-keygen\\.exe.{0,400}Copy-Item -Path [$]lib\\.FullName", local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data)),
-      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 20348) {"),
+      strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "20348   { \"OpenSSH-Server-Package~31bf3856ad364e35~amd64~~.cab\" }"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "17763   {"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "if ($build -eq 17763)"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "expand.exe"),
+      !strcontains(local.elastic_compute_cloud.us_east_1["win-ssh-01"].user_data, "Copy-Item -Path $lib.FullName"),
     ])
-    error_message = "Build 17763 must be a staged cab arm and the only build that gets the libcrypto placement."
+    error_message = "Only build 20348 may be a staged cab arm; the Server 2019 payload and its repairs must not be present."
   }
 }
 
