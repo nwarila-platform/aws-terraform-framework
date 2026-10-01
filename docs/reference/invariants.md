@@ -42,6 +42,11 @@ change at minimum.
 - An RDS `multi_az` of null MUST leave the provider argument unset, exactly as
   before the attribute existed. `multi_az = true` MUST be paired with a null
   `availability_zone`, and a pinned zone MUST fail at the variable boundary.
+- An RDS `parameter_group_name` of null MUST leave the provider argument unset,
+  exactly as before the attribute existed, so AWS attaches the engine family's
+  default group at create. On a live instance a later null keeps the attached
+  group, and a changed name's parameters wait for a reboot this framework does
+  not perform. The framework MUST NOT create or modify a parameter group.
 - Security invariants owned by this module MUST be hard-coded directly on
   resources wherever possible and covered by native Terraform test assertions.
 - Terraform variable validations MUST be reserved for valid-typeable consumer

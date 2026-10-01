@@ -147,6 +147,7 @@ output "aws_databases" {
       address                = database.address
       identifier             = database.identifier
       master_user_secret_arn = try(database.master_user_secret[0].secret_arn, null)
+      parameter_group_name   = database.parameter_group_name
       port                   = database.port
     }
   }

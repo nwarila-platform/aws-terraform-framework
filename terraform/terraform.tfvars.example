@@ -181,7 +181,8 @@ all_databases = [
     # Highly available with no monthly key charge. Storage uses the AWS managed aws/rds key
     # and the master secret uses aws/secretsmanager: an AWS managed key serves only its own
     # service, so the secret cannot share aws/rds. Multi-AZ needs a null availability_zone,
-    # because AWS places the primary and the standby itself.
+    # because AWS places the primary and the standby itself. The engine settings come from a
+    # parameter group created beforehand in the postgres16 family.
     availability_zone                   = null
     aws_kms_alias                       = "aws/rds"
     db_name                             = "appdb"
@@ -214,11 +215,13 @@ all_databases = [
 
     master_user_secret_kms_alias = "aws/secretsmanager"
     multi_az                     = true
+    parameter_group_name         = "appdb-postgres16"
   },
   {
-    # Null is the off switch for both attributes below: a single-AZ instance in the pinned zone,
-    # with the master secret on the storage key. That shared key must be customer managed, because
-    # Secrets Manager cannot encrypt with aws/rds.
+    # Null is the off switch for the three attributes below: a single-AZ instance in the pinned
+    # zone on the engine family's default parameter group, with the master secret on the storage
+    # key. That shared key must be customer managed, because Secrets Manager cannot encrypt with
+    # aws/rds.
     availability_zone                   = "us-east-1a"
     aws_kms_alias                       = "rds-REPLACE_ME"
     db_name                             = "reportdb"
@@ -251,6 +254,7 @@ all_databases = [
 
     master_user_secret_kms_alias = null
     multi_az                     = null
+    parameter_group_name         = null
   }
 ]
 
