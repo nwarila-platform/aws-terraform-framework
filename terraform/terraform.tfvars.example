@@ -176,9 +176,86 @@ shared_ebs_volumes = [
   }
 ]
 
-# See docs/reference/terraform.md for fully-specified database and load balancer
-# object schemas when these collections are populated.
-all_databases      = []
+all_databases = [
+  {
+    # Highly available with no monthly key charge. Storage uses the AWS managed aws/rds key
+    # and the master secret uses aws/secretsmanager: an AWS managed key serves only its own
+    # service, so the secret cannot share aws/rds. Multi-AZ needs a null availability_zone,
+    # because AWS places the primary and the standby itself.
+    availability_zone                   = null
+    aws_kms_alias                       = "aws/rds"
+    db_name                             = "appdb"
+    db_subnet_group_name                = "db-subnets-REPLACE_ME"
+    engine                              = "postgres"
+    engine_version                      = "16"
+    iam_database_authentication_enabled = true
+    instance_class                      = "db.t4g.micro"
+    manage_master_user_password         = true
+    region                              = "us_east_1"
+    username                            = "dbadmin"
+
+    tags = {
+      Function = "app database"
+      Backup   = true
+    }
+
+    allocated_storage        = "20"
+    backup_retention_period  = "7"
+    backup_window            = null
+    blue_green_update        = false
+    ca_cert_identifier       = null
+    dedicated_log_volume     = false
+    delete_automated_backups = true
+    deletion_protection      = true
+    max_allocated_storage    = "100"
+    skip_final_snapshot      = false
+    storage_type             = "gp3"
+    vpc_security_group_ids   = ["sg-REPLACE_ME"]
+
+    master_user_secret_kms_alias = "aws/secretsmanager"
+    multi_az                     = true
+  },
+  {
+    # Null is the off switch for both attributes below: a single-AZ instance in the pinned zone,
+    # with the master secret on the storage key. That shared key must be customer managed, because
+    # Secrets Manager cannot encrypt with aws/rds.
+    availability_zone                   = "us-east-1a"
+    aws_kms_alias                       = "rds-REPLACE_ME"
+    db_name                             = "reportdb"
+    db_subnet_group_name                = "db-subnets-REPLACE_ME"
+    engine                              = "postgres"
+    engine_version                      = "16"
+    iam_database_authentication_enabled = false
+    instance_class                      = "db.t4g.micro"
+    manage_master_user_password         = true
+    region                              = "us_east_1"
+    username                            = "dbadmin"
+
+    tags = {
+      Function = "report database"
+      Backup   = false
+    }
+
+    allocated_storage        = "20"
+    backup_retention_period  = null
+    backup_window            = null
+    blue_green_update        = false
+    ca_cert_identifier       = null
+    dedicated_log_volume     = false
+    delete_automated_backups = true
+    deletion_protection      = true
+    max_allocated_storage    = "100"
+    skip_final_snapshot      = false
+    storage_type             = "gp3"
+    vpc_security_group_ids   = ["sg-REPLACE_ME"]
+
+    master_user_secret_kms_alias = null
+    multi_az                     = null
+  }
+]
+
+# See docs/reference/terraform.md for the fully-specified load balancer object schema when this
+# collection is populated.
 all_load_balancers = []
 
 # Where the Windows SSH bootstrap fetches Feature-on-Demand cabs to install OpenSSH.Server on
