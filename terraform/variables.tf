@@ -1338,6 +1338,8 @@ variable "all_databases" {
   type = list(object({
     # Required: give each attribute below a real value.
     # manage_master_user_password must be true so AWS owns the master secret.
+    # availability_zone is the one exception: a Multi-AZ instance must leave it null, because
+    # AWS places the primary and the standby itself and rejects a pinned zone.
     availability_zone    = string
     aws_kms_alias        = string
     db_name              = string
@@ -1379,6 +1381,19 @@ variable "all_databases" {
     skip_final_snapshot      = bool
     storage_type             = string
     vpc_security_group_ids   = list(string)
+
+    # Additive (ADR repo/0002): bare optional() so value files written before these existed
+    # stay valid. Null is the off switch and reproduces the earlier plan exactly; new value
+    # files still write it explicitly.
+    #
+    # The KMS alias for the Secrets Manager secret RDS creates for the master password. Null
+    # encrypts it with aws_kms_alias, the storage key. An AWS managed key only works through
+    # its own service, so storage on aws/rds needs a different key here: aws/secretsmanager
+    # carries no monthly key charge, where a customer managed key shared by both does.
+    master_user_secret_kms_alias = optional(string)
+    # True runs a synchronous standby in a second zone, and requires a null availability_zone.
+    # Null leaves the argument unset, which AWS reads as a single-AZ instance.
+    multi_az = optional(bool)
 
   }))
 
@@ -1492,6 +1507,31 @@ variable "all_databases" {
     error_message = join(" ", [
       "all_databases aws_kms_alias must NOT include the 'alias/' prefix (it is added",
       "automatically).",
+    ])
+  }
+
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      database.master_user_secret_kms_alias == null ? true :
+      !startswith(database.master_user_secret_kms_alias, "alias/")
+    ])
+    error_message = join(" ", [
+      "all_databases master_user_secret_kms_alias must NOT include the 'alias/' prefix (it is",
+      "added automatically).",
+    ])
+  }
+
+  # CreateDBInstance refuses a pinned zone for a Multi-AZ instance, and the provider does not
+  # catch the pairing at plan time.
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      database.multi_az == true ? database.availability_zone == null : true
+    ])
+    error_message = join(" ", [
+      "An all_databases entry with multi_az = true must set availability_zone to null; AWS",
+      "chooses the primary and standby zones for a Multi-AZ instance.",
     ])
   }
 

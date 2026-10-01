@@ -10,9 +10,10 @@ change at minimum.
   a code change, not a consumer configuration change.
 - Region bucketing MUST continue to accept both hyphenated (`us-east-1`) and
   underscored (`us_east_1`) spellings for the supported commercial region.
-- Every EC2, shared-EBS, and RDS `aws_kms_alias` is authored as a suffix. The
-  framework MUST add the `alias/` prefix exactly once, so an authored prefix
-  MUST fail. AWS and the provider own the resulting alias grammar.
+- Every EC2, shared-EBS, and RDS `aws_kms_alias`, and every non-null RDS
+  `master_user_secret_kms_alias`, is authored as a suffix. The framework MUST
+  add the `alias/` prefix exactly once, so an authored prefix MUST fail. AWS and
+  the provider own the resulting alias grammar.
 - Resource keys used in outputs MUST remain stable across patch versions.
 - Tag-count quotas for EC2-family, shared-EBS, RDS, and ELBv2 resources MUST
   remain owned by the provider and AWS. The framework MUST pass rendered tag
@@ -34,6 +35,13 @@ change at minimum.
 - Every RDS `region` and `aws_kms_alias` MUST be non-null because they feed
   regional bucketing and the exact KMS alias lookup set. Explicit null MUST
   fail at the variable boundary.
+- An RDS `master_user_secret_kms_alias` of null MUST encrypt the master secret
+  with the storage `aws_kms_alias` key, exactly as before the attribute existed.
+  A non-null alias MUST join the same regional KMS alias lookup set, which reads
+  each distinct alias once.
+- An RDS `multi_az` of null MUST leave the provider argument unset, exactly as
+  before the attribute existed. `multi_az = true` MUST be paired with a null
+  `availability_zone`, and a pinned zone MUST fail at the variable boundary.
 - Security invariants owned by this module MUST be hard-coded directly on
   resources wherever possible and covered by native Terraform test assertions.
 - Terraform variable validations MUST be reserved for valid-typeable consumer

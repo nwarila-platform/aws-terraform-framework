@@ -138,7 +138,9 @@ output "aws_databases" {
     get_password_data = false on Windows instances, where the credential stays retrievable
     out-of-band instead of being copied into Terraform state. Read it with
     'aws secretsmanager get-secret-value --secret-id <arn>', which needs
-    secretsmanager:GetSecretValue plus kms:Decrypt on the database's KMS key.
+    secretsmanager:GetSecretValue, plus kms:Decrypt when the secret's key is customer managed.
+    That key is the database's master_user_secret_kms_alias when set, otherwise its
+    aws_kms_alias.
   EOT
   value = {
     for key, database in aws_db_instance.us_east_1 : key => {

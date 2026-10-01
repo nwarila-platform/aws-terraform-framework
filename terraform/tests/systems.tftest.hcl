@@ -4616,6 +4616,96 @@ run "databases_reject_kms_alias_prefix" {
   ]
 }
 
+run "databases_reject_master_user_secret_kms_alias_prefix" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "prefixed_secret_kms_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "aws/rds"
+        master_user_secret_kms_alias        = "alias/aws/secretsmanager"
+        multi_az                            = null
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Prefixed master secret KMS alias"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_multi_az_with_a_pinned_availability_zone" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "pinned_multi_az_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = true
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Multi-AZ database pinned to one zone"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
 run "databases_require_managed_master_user_password" {
   command = plan
 
@@ -4803,6 +4893,237 @@ run "databases_configure_managed_master_user_password_without_plaintext_input" {
   assert {
     condition     = issensitive(aws_db_instance.us_east_1["manageddb"].username)
     error_message = "Managed-password database username must stay sensitive on the planned RDS resource."
+  }
+}
+
+# The zero-diff proof for the additive database attributes. A database that never names them must
+# reach the resource exactly as it did before they existed: multi_az left unset, which AWS reads
+# as single-AZ, and the master secret on the storage key with no lookup of its own. An explicit
+# null has to land in the same place. The provider computes multi_az when the argument is unset,
+# so the planned attribute is unknown here and the proof reads the local the resource consumes.
+run "databases_omitting_multi_az_and_secret_alias_plan_unchanged" {
+  command = plan
+
+  variables {
+    # No systems, so every KMS alias lookup in the plan is one a database asked for.
+    all_systems = []
+
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "omitteddb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Pinned consumer that never mentions the new attributes"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      },
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "explicitnulldb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Consumer that writes both off switches explicitly"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
+    }
+  }
+
+  assert {
+    condition     = toset(keys(data.aws_kms_alias.us_east_1)) == toset(["west"])
+    error_message = "A database without a master secret alias must add no KMS alias lookup of its own."
+  }
+
+  assert {
+    condition = alltrue([
+      for db_name in ["omitteddb", "explicitnulldb"] :
+      local.relational_database_service.us_east_1[db_name].multi_az == null
+    ])
+    error_message = "Omitted and null multi_az must leave the argument unset, as it was before the attribute existed."
+  }
+
+  assert {
+    condition = alltrue([
+      for db_name in ["omitteddb", "explicitnulldb"] :
+      local.relational_database_service.us_east_1[db_name].master_user_secret_kms_key_id == "west" &&
+      aws_db_instance.us_east_1[db_name].master_user_secret_kms_key_id == aws_db_instance.us_east_1[db_name].kms_key_id &&
+      aws_db_instance.us_east_1[db_name].kms_key_id == data.aws_kms_alias.us_east_1["west"].target_key_arn
+    ])
+    error_message = "Omitted and null master_user_secret_kms_alias must keep the master secret on the storage key."
+  }
+}
+
+# Multi-AZ with no monthly key charge: storage on the AWS managed aws/rds key and the master
+# secret on aws/secretsmanager, because Secrets Manager cannot encrypt with a key another service
+# manages. Both databases name both aliases, so each alias must still be read exactly once.
+run "databases_carry_multi_az_and_a_separate_master_secret_key" {
+  command = plan
+
+  variables {
+    # No systems, so every KMS alias lookup in the plan is one a database asked for.
+    all_systems = []
+
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = null
+        db_name                             = "highlyavailabledb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "aws/rds"
+        master_user_secret_kms_alias        = "aws/secretsmanager"
+        multi_az                            = true
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Multi-AZ database"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      },
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "singlezonedb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "aws/rds"
+        master_user_secret_kms_alias        = "aws/secretsmanager"
+        multi_az                            = false
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Single-AZ database pinned to one zone"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["aws/rds"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/11111111-1111-1111-1111-${join("", ["111111", "111111"])}"
+    }
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["aws/secretsmanager"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/22222222-2222-2222-2222-${join("", ["222222", "222222"])}"
+    }
+  }
+
+  assert {
+    condition     = toset(keys(data.aws_kms_alias.us_east_1)) == toset(["aws/rds", "aws/secretsmanager"])
+    error_message = "Every referenced KMS alias, storage or master secret, must be looked up exactly once."
+  }
+
+  assert {
+    condition = (
+      local.relational_database_service.us_east_1["highlyavailabledb"].multi_az == true &&
+      local.relational_database_service.us_east_1["highlyavailabledb"].availability_zone == null &&
+      aws_db_instance.us_east_1["highlyavailabledb"].multi_az == true
+    )
+    error_message = "multi_az = true must reach the RDS resource with no pinned availability zone."
+  }
+
+  assert {
+    condition     = aws_db_instance.us_east_1["singlezonedb"].multi_az == false
+    error_message = "An explicit multi_az = false must reach the RDS resource unchanged."
+  }
+
+  assert {
+    condition = alltrue([
+      for db_name in ["highlyavailabledb", "singlezonedb"] :
+      aws_db_instance.us_east_1[db_name].kms_key_id == data.aws_kms_alias.us_east_1["aws/rds"].target_key_arn &&
+      aws_db_instance.us_east_1[db_name].master_user_secret_kms_key_id == data.aws_kms_alias.us_east_1["aws/secretsmanager"].target_key_arn &&
+      aws_db_instance.us_east_1[db_name].master_user_secret_kms_key_id != aws_db_instance.us_east_1[db_name].kms_key_id
+    ])
+    error_message = "A non-null master_user_secret_kms_alias must encrypt the master secret with its own key, leaving storage on aws_kms_alias."
   }
 }
 

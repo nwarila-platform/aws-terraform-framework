@@ -26,8 +26,9 @@ second argument. Terraform supplies a typed `null` when an existing value file
 omits it, so no consumer value-file change is required; new and updated examples
 still write the `null` off switch explicitly. The first use was
 `all_systems[*].managed_security_group`; that attribute has since been removed,
-and the repository's live use is now
-`all_systems[*].network_interfaces[*].additional_private_ips`.
+and the repository's live uses are now
+`all_systems[*].network_interfaces[*].additional_private_ips`,
+`all_databases[*].master_user_secret_kms_alias`, and `all_databases[*].multi_az`.
 
 ## Context and Problem Statement
 
@@ -207,7 +208,7 @@ claim that every map-to-inline migration replaces a group would be inaccurate.
 
 ## Confirmation
 
-1. The repository's live bounded use is
+1. One live bounded use is
    `all_systems[*].network_interfaces[*].additional_private_ips`. It MUST be
    declared as bare `optional(list(string))` with no second argument, and every
    companion validation MUST read an absent list as "feature not requested": it
@@ -218,7 +219,15 @@ claim that every map-to-inline migration replaces a group would be inaccurate.
 3. `terraform/tests/systems.tftest.hcl` MUST retain a run proving that a
    consumer which never names the attribute keeps the exact network-interface
    `for_each` keys and attribute values it had before the attribute existed.
-4. Any future `optional(` occurrence carrying a second argument is a style
+4. `all_databases[*].master_user_secret_kms_alias` and `all_databases[*].multi_az`
+   MUST be declared as bare `optional(string)` and `optional(bool)`, and their
+   companion rules, the alias-prefix rule and the Multi-AZ zone rule, MUST pass
+   a `null` value. `terraform/terraform.tfvars.example` MUST show both populated
+   on one database and written as `null` on another, and
+   `terraform/tests/systems.tftest.hcl` MUST retain a run proving that a
+   database which omits them or writes them as `null` leaves `multi_az` unset,
+   keeps its master secret on the storage key, and adds no KMS alias lookup.
+5. Any future `optional(` occurrence carrying a second argument is a style
    violation regardless of this ADR.
 
 ## Consequences
@@ -287,6 +296,7 @@ Implementation history is recorded in the changelog below.
 
 | Date       | Change                                                        | Reason                                                                              | Author/Role          | Body-diff? |
 | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 2026-10-01 | Recorded `all_databases[*].master_user_secret_kms_alias` and `all_databases[*].multi_az` as live bounded `optional()` uses. | A highly available database needed Multi-AZ and a master-secret key apart from an AWS managed storage key without forcing a migration on pinned consumers. | Portfolio maintainer | Yes        |
 | 2026-08-28 | Recorded `additional_private_ips` as the repository's live bounded `optional()` use. | An interface had to carry more than one private IPv4 address without forcing a migration on pinned consumers. | Portfolio maintainer | Yes        |
 | 2026-07-27 | Renamed interface-owned groups to `<hostname>-eni-<index>-sg`. | Pair every group visibly with the ENI it protects. | Portfolio maintainer | Yes        |
 | 2026-07-27 | Moved created security-group declaration to each network interface. | Model the AWS attachment boundary directly. | Portfolio maintainer | Yes        |

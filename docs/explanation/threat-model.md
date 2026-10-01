@@ -27,7 +27,8 @@ What this module guarantees:
   AMI declares that `ami_block_device_overrides` does not cover.
 - RDS master passwords are generated and managed by AWS. The module does not
   accept plaintext master passwords, and RDS encrypts its Secrets Manager secret
-  with the consumer-selected KMS key.
+  with a consumer-selected KMS key: `master_user_secret_kms_alias` when set,
+  otherwise the storage `aws_kms_alias`.
 - EC2 root and inline AMI-override volumes delete with their instance.
   Standalone and shared external EBS volumes can survive replacement of an
   attached instance, but their attachments detach and their volumes delete when
@@ -49,7 +50,10 @@ What this module guarantees:
   backend configuration, network IDs, key pairs, and KMS aliases. Those
   operational controls live outside this module.
 - **RDS to Secrets Manager.** When RDS manages the master password, AWS creates a
-  Secrets Manager secret encrypted with the consumer-selected KMS key.
+  Secrets Manager secret encrypted with the consumer-selected secret key, which
+  defaults to the database's storage key. An AWS managed key serves only its own
+  service, so a database stored under `aws/rds` names a separate secret key such
+  as `aws/secretsmanager`.
 - **Terraform to remote state.** The framework enables request-side S3 encryption and
   S3-native lockfiles. Consumers own the bucket identity, KMS and bucket encryption
   policies, access policy, versioning, and recovery controls.

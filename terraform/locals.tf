@@ -70,7 +70,8 @@ locals {
 
   # What each pre-existing-infrastructure lookup in data.tf iterates. Every set is deduplicated,
   # so systems sharing an alias, key pair, subnet or instance profile cost one read between them.
-  # A KMS alias reaches this framework three ways, and all three land in the same region's key.
+  # A KMS alias reaches this framework four ways, and all four land in the same region's key. A
+  # null database secret alias adds nothing: that secret reuses the storage alias already here.
   kms_alias_selectors = {
     for region in var.aws_config.regions : region => toset(concat(
       [
@@ -78,6 +79,10 @@ locals {
       ],
       [
         for database in local.databases_by_region[region] : database.aws_kms_alias
+      ],
+      [
+        for database in local.databases_by_region[region] : database.master_user_secret_kms_alias
+        if database.master_user_secret_kms_alias != null
       ],
       [
         for volume in local.shared_volumes_by_region[region] : volume.aws_kms_alias
@@ -1510,7 +1515,9 @@ locals {
         instance_class                      = database.instance_class
         kms_key_id                          = database.aws_kms_alias
         manage_master_user_password         = database.manage_master_user_password
+        master_user_secret_kms_key_id       = database.master_user_secret_kms_alias == null ? database.aws_kms_alias : database.master_user_secret_kms_alias
         max_allocated_storage               = database.max_allocated_storage
+        multi_az                            = database.multi_az
         skip_final_snapshot                 = database.skip_final_snapshot
         storage_type                        = database.storage_type
         vpc_security_group_ids              = database.vpc_security_group_ids

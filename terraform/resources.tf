@@ -1190,8 +1190,9 @@ resource "aws_db_instance" "us_east_1" {
   instance_class                      = each.value.instance_class
   kms_key_id                          = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
   manage_master_user_password         = true
-  master_user_secret_kms_key_id       = data.aws_kms_alias.us_east_1[each.value.kms_key_id].target_key_arn
+  master_user_secret_kms_key_id       = data.aws_kms_alias.us_east_1[each.value.master_user_secret_kms_key_id].target_key_arn
   max_allocated_storage               = each.value.max_allocated_storage
+  multi_az                            = each.value.multi_az
   publicly_accessible                 = false
   skip_final_snapshot                 = each.value.skip_final_snapshot
   storage_encrypted                   = true
