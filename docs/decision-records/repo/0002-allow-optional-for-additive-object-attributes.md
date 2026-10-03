@@ -28,7 +28,8 @@ still write the `null` off switch explicitly. The first use was
 `all_systems[*].managed_security_group`; that attribute has since been removed,
 and the repository's live uses are now
 `all_systems[*].network_interfaces[*].additional_private_ips`,
-`all_databases[*].master_user_secret_kms_alias`, and `all_databases[*].multi_az`.
+`all_databases[*].master_user_secret_kms_alias`, `all_databases[*].multi_az`, and
+`all_databases[*].parameter_group_name`.
 
 ## Context and Problem Statement
 
@@ -227,7 +228,13 @@ claim that every map-to-inline migration replaces a group would be inaccurate.
    `terraform/tests/systems.tftest.hcl` MUST retain a run proving that a
    database which omits them or writes them as `null` leaves `multi_az` unset,
    keeps its master secret on the storage key, and adds no KMS alias lookup.
-5. Any future `optional(` occurrence carrying a second argument is a style
+5. `all_databases[*].parameter_group_name` MUST be declared as bare
+   `optional(string)`, and its naming rule MUST pass a `null` value.
+   `terraform/terraform.tfvars.example` MUST show it populated on one database
+   and written as `null` on another, and `terraform/tests/systems.tftest.hcl`
+   MUST retain a run proving that a database which omits it or writes it as
+   `null` leaves the argument unset.
+6. Any future `optional(` occurrence carrying a second argument is a style
    violation regardless of this ADR.
 
 ## Consequences
@@ -296,6 +303,7 @@ Implementation history is recorded in the changelog below.
 
 | Date       | Change                                                        | Reason                                                                              | Author/Role          | Body-diff? |
 | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 2026-10-01 | Recorded `all_databases[*].parameter_group_name` as a live bounded `optional()` use. | A database needed engine settings from a parameter group created outside this framework without forcing a migration on pinned consumers. | Portfolio maintainer | Yes        |
 | 2026-10-01 | Recorded `all_databases[*].master_user_secret_kms_alias` and `all_databases[*].multi_az` as live bounded `optional()` uses. | A highly available database needed Multi-AZ and a master-secret key apart from an AWS managed storage key without forcing a migration on pinned consumers. | Portfolio maintainer | Yes        |
 | 2026-08-28 | Recorded `additional_private_ips` as the repository's live bounded `optional()` use. | An interface had to carry more than one private IPv4 address without forcing a migration on pinned consumers. | Portfolio maintainer | Yes        |
 | 2026-07-27 | Renamed interface-owned groups to `<hostname>-eni-<index>-sg`. | Pair every group visibly with the ENI it protects. | Portfolio maintainer | Yes        |

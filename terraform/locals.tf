@@ -1518,6 +1518,7 @@ locals {
         master_user_secret_kms_key_id       = database.master_user_secret_kms_alias == null ? database.aws_kms_alias : database.master_user_secret_kms_alias
         max_allocated_storage               = database.max_allocated_storage
         multi_az                            = database.multi_az
+        parameter_group_name                = database.parameter_group_name
         skip_final_snapshot                 = database.skip_final_snapshot
         storage_type                        = database.storage_type
         vpc_security_group_ids              = database.vpc_security_group_ids

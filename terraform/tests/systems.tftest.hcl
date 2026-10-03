@@ -4706,6 +4706,190 @@ run "databases_reject_multi_az_with_a_pinned_availability_zone" {
   ]
 }
 
+run "databases_reject_parameter_group_name_with_uppercase" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "uppercase_pg_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "Gitlab"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Mixed-case parameter group name"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_parameter_group_name_starting_with_a_digit" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "digit_first_pg_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "1gitlab"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Parameter group name starting with a digit"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_parameter_group_name_ending_in_a_hyphen" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "trailing_hyphen_pg_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "gitlab-"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Parameter group name ending in a hyphen"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
+run "databases_reject_parameter_group_name_with_consecutive_hyphens" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "double_hyphen_pg_db"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "git--lab"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Parameter group name with consecutive hyphens"
+          Backup   = true
+        }
+        allocated_storage           = "100"
+        backup_retention_period     = null
+        backup_window               = null
+        blue_green_update           = false
+        ca_cert_identifier          = null
+        dedicated_log_volume        = true
+        delete_automated_backups    = true
+        deletion_protection         = true
+        manage_master_user_password = true
+        max_allocated_storage       = "1000"
+        skip_final_snapshot         = false
+        storage_type                = "gp3"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.all_databases,
+  ]
+}
+
 run "databases_require_managed_master_user_password" {
   command = plan
 
@@ -5124,6 +5308,212 @@ run "databases_carry_multi_az_and_a_separate_master_secret_key" {
       aws_db_instance.us_east_1[db_name].master_user_secret_kms_key_id != aws_db_instance.us_east_1[db_name].kms_key_id
     ])
     error_message = "A non-null master_user_secret_kms_alias must encrypt the master secret with its own key, leaving storage on aws_kms_alias."
+  }
+}
+
+# The zero-diff proof for parameter_group_name. A database that never names it must leave the
+# argument unset, so AWS attaches the engine family's default group at create exactly as before
+# the attribute existed, and an explicit null has to land in the same place. The override stands
+# in for the value the provider computes when the argument is unset, so the sentinel reaches the
+# planned resource only where the configuration leaves the argument null.
+run "databases_omitting_parameter_group_name_plan_unchanged" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "omitteddb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Pinned consumer that never mentions the parameter group"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      },
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "explicitnulldb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = null
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Consumer that writes the parameter group off switch explicitly"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
+    }
+  }
+
+  override_resource {
+    target          = aws_db_instance.us_east_1
+    override_during = plan
+    values = {
+      parameter_group_name = "sentinel-provider-computed"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      for db_name in ["omitteddb", "explicitnulldb"] :
+      aws_db_instance.us_east_1[db_name].parameter_group_name == "sentinel-provider-computed"
+    ])
+    error_message = "Omitted and null parameter_group_name must leave the argument to the provider, as it was before the attribute existed."
+  }
+}
+
+# A named group reaches the instance ahead of the value the provider would compute, which the same
+# override stands in for. An AWS default group's name passes the naming rule, period included.
+run "databases_pass_a_parameter_group_name_through" {
+  command = plan
+
+  variables {
+    all_databases = [
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "tuneddb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "16.3"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "gitlab"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Database on a standing parameter group"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      },
+      {
+        region                              = "us-east-1"
+        availability_zone                   = "us-east-1a"
+        db_name                             = "familydefaultdb"
+        instance_class                      = "db.t3.micro"
+        db_subnet_group_name                = "db-subnets"
+        engine                              = "postgres"
+        engine_version                      = "17.5"
+        iam_database_authentication_enabled = false
+        username                            = "dbadmin"
+        manage_master_user_password         = true
+        aws_kms_alias                       = "west"
+        master_user_secret_kms_alias        = null
+        multi_az                            = null
+        parameter_group_name                = "default.postgres17"
+        vpc_security_group_ids              = ["sg-database"]
+
+        tags = {
+          Function = "Database naming its engine family's default group"
+          Backup   = true
+        }
+        allocated_storage        = "100"
+        backup_retention_period  = null
+        backup_window            = null
+        blue_green_update        = false
+        ca_cert_identifier       = null
+        dedicated_log_volume     = true
+        delete_automated_backups = true
+        deletion_protection      = true
+        max_allocated_storage    = "1000"
+        skip_final_snapshot      = false
+        storage_type             = "gp3"
+      }
+    ]
+  }
+
+  override_data {
+    target = data.aws_kms_alias.us_east_1["west"]
+    values = {
+      target_key_arn = "arn:aws:kms:us-east-1:${join("", ["123456", "789012"])}:key/00000000-0000-0000-0000-${join("", ["000000", "000000"])}"
+    }
+  }
+
+  override_resource {
+    target          = aws_db_instance.us_east_1
+    override_during = plan
+    values = {
+      parameter_group_name = "sentinel-provider-computed"
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      for db_name, group in { tuneddb = "gitlab", familydefaultdb = "default.postgres17" } :
+      local.relational_database_service.us_east_1[db_name].parameter_group_name == group &&
+      aws_db_instance.us_east_1[db_name].parameter_group_name == group
+    ])
+    error_message = "A named parameter_group_name must reach the RDS resource unchanged."
+  }
+
+  assert {
+    condition     = output.aws_databases["tuneddb"].parameter_group_name == "gitlab"
+    error_message = "aws_databases must report the parameter group the database runs on."
   }
 }
 

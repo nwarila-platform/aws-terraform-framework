@@ -1394,6 +1394,12 @@ variable "all_databases" {
     # True runs a synchronous standby in a second zone, and requires a null availability_zone.
     # Null leaves the argument unset, which AWS reads as a single-AZ instance.
     multi_az = optional(bool)
+    # The DB parameter group the instance boots with, by name. Null leaves the argument unset,
+    # so AWS attaches the engine family's default group at create, exactly as before. On a live
+    # instance a later null keeps the attached group, and a changed name's parameters wait for
+    # a reboot this framework does not perform. A name must already exist; this framework
+    # never creates a group.
+    parameter_group_name = optional(string)
 
   }))
 
@@ -1532,6 +1538,25 @@ variable "all_databases" {
     error_message = join(" ", [
       "An all_databases entry with multi_az = true must set availability_zone to null; AWS",
       "chooses the primary and standby zones for a Multi-AZ instance.",
+    ])
+  }
+
+  # The provider's parameter-group name grammar, which it never applies to this argument. Without
+  # it, a mixed-case name plans a change on every run, because RDS stores the name lowercased,
+  # and an empty string is silently dropped, attaching the family default.
+  validation {
+    condition = alltrue([
+      for database in var.all_databases :
+      database.parameter_group_name == null ? true : (
+        can(regex("^[a-z][a-z0-9.-]{0,254}$", database.parameter_group_name)) &&
+        !endswith(database.parameter_group_name, "-") &&
+        !strcontains(database.parameter_group_name, "--")
+      )
+    ])
+    error_message = join(" ", [
+      "all_databases parameter_group_name must be 1 to 255 lowercase letters, digits, periods",
+      "and hyphens, start with a letter, not end with a hyphen, and not contain two consecutive",
+      "hyphens.",
     ])
   }
 
